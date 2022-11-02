@@ -14,23 +14,26 @@ while(row=table.rows[r++]){
             if(c==2){//O nome do item
                 let text = cell.innerHTML;
                 
-                //console.log(`<button onclick="${copy2Clipboard(text)}">Copy text</button>`)
+                //console.log(`<button onclick="${copy2Clipboard(text)}">Copy text</button>`)//"' + copy2Clipboard(text) +'"//${copy2Clipboard(text)}
+
+                console.log(`oi = ${document.getElementById(nameWOSpaces(text))}`);
                     
-                cell.innerHTML = text + '<button onclick="' + copy2Clipboard() +'" style="background:#3630a3;color:white;border:0px;"><img src="https://cdn-icons-png.flaticon.com/512/4024/4024457.png" style="width:10%;"></button>';
+                cell.innerHTML = `<b id="${nameWOSpaces(text)}">` + text + "</b>" +`<button onclick="navigator.clipboard.writeText()" style="background:#3630a3;color:white;border:0px;"><img src="https://cdn-icons-png.flaticon.com/512/4024/4024457.png" style="width:5%;" /></button>`;
             }
         }
     }
 }
 
-function copy2Clipboard(){
-    //Pick the name of the item
+function copy2Clipboard(name){
+    console.log(name)
 
-
-    //Put the text to the clipboard
-    //navigator.clipboard.writeText(text);º
-
-    console.log("")
+    //Put in clipboard
+    navigator.clipboard.writeText(name);
     
     //return the name of the function to execute
-    return "copy2Clipboard()";
+    return `copy2Clipboard(${name})`;
+}
+
+function nameWOSpaces(itemName){
+    return itemName.replace(/\s/g, '');
 }
