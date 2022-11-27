@@ -1,3 +1,7 @@
-# scraptfC2CExtension
+# tf2TradingExtensions
 
-An extension for scrap.tf that copies the name of the item in scrap.tf to make it easier to search the items in another sites.
+This repo contains all extensions i use for trading items in multiple sites in tf2(Team Fortress 2)
+
+> <a href="./scrap.tf">Scrap.tf Extensions</a>
+> <a href="./backpack.tf">Backpack.tf Extensions</a>
+> <a href="./stn">stn Extensions</a>

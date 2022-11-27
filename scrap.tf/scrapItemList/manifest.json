@@ -1,9 +1,8 @@
 {
     "manifest_version": 3,
    
-    "name": "scraptf copy2clipboard extension",
+    "name": "scrap.tf items name list",
     "version": "0.1.0",
-    "icons": {"128": "icon.png" },
    
     "content_scripts": [{
       "js": ["content.js"],
