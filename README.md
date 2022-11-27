@@ -6,4 +6,4 @@ This repo contains all extensions i use for trading items in multiple sites in t
 
 > <a href="./backpack.tf">Backpack.tf Extensions</a><br />
 
-> <a href="./stn">stn Extensions</a>
+> <a href="./stntrading.eu">stntrading.eu Extensions</a>
