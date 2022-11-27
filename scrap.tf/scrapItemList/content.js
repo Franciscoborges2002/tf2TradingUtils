@@ -62,17 +62,218 @@ function getLinkSTN(itemName){
 
     let baseURL = 'https://stntrading.eu/item/tf2/';
 
+    //Change put the '
+    if(itemName.includes("Vintage Bills Hat")){
+        itemName = "Vintage Bill's Hat";
+    }
+
+    if(itemName.includes("Bills Hat")){
+        itemName = "Bill's Hat";
+    }
+
+    if(itemName.includes("Battin a Thousand")){
+        itemName = "Taunt: Battin' a Thousand";
+    }
+
+    if(itemName.includes("Flippin Awesome")){
+        itemName = "Taunt: Flippin' Awesome";
+    }
+
+    if(itemName.includes("The Shred Alert")){
+        itemName = "The Shred Alert";
+    }
+
+    if(itemName.includes("Soldiers Requiem")){
+        itemName = "Taunt: Soldier's Requiem";
+    }
+
+    if(itemName.includes("Zoomin Broom")){
+        itemName = "Taunt: Zoomin' Broom";
+    }
+
+    if(itemName.includes("Manns Mint")){
+        itemName = "A Mann's Mint";
+    }
+
+    if(itemName.includes("Noble Hatters Violet")){
+        itemName = "Noble Hatter's Violet";
+    }
+
+    if(itemName.includes("Operators Overalls")){
+        itemName = "Operator's Overalls";
+    }
+
+    if(itemName.includes("The Color of a Gentlemanns Business Pants")){
+        itemName = "The Color of a Gentlemann's Business Pants";
+    }
+
+    if(itemName.includes("Zepheniahs Greed")){
+        itemName = "Zepheniah's Greed";
+    }
+
+    if(itemName.includes("Strange Part: Kills While Ubercharged")){
+        itemName = "Strange Part: Kills While Übercharged";
+    }
+
+    if(itemName.includes("Strange Part: Medics Killed That Have Full")){
+        itemName = "Strange Part: Medics Killed That Have Full ÜberCharge";
+    }
+
+    if(itemName.includes("Maxs Severed Head")){
+        itemName = "Max's Severed Head";
+    }
+
+    if(itemName.includes("Towering Pillar Of Summer Shades")){//giving a another space at the end
+        itemName = "Towering Pillar Of Summer Shades";
+    }
+
+    if(itemName.includes("Mann Co. Directors Cut Reel")){
+        itemName = "Mann Co. Director's Cut Reel";
+    }
+
+    if(itemName.includes("Smissmas 2015 Festive Gift")){//giving a another space at the end
+        itemName = "Smissmas 2015 Festive Gift";
+    }
+
+    if(itemName.includes("Gentle Mannes Service Medal")){
+        itemName = "Gentle Manne's Service Medal";
+    }
+
+    if(itemName.includes("Scotsmanns Stagger")){
+        itemName = "Taunt: Scotsmann's Stagger";
+    }
+
+    if(itemName.includes("Surgeons Squeezebox")){
+        itemName = "Taunt: Surgeon's Squeezebox";
+    }
+
+    if(itemName.includes("Trackmans Touchdown")){
+        itemName = "Taunt: The Trackman's Touchdown";
+    }
+
+    if(itemName.includes("Runners Rhythm")){
+        itemName = "Taunt: Runner's Rhythm";
+    }
+
+    if(itemName.includes("Genuine Fan OWar")){
+        itemName = "Genuine Fan O'War";
+    }
+
+    if(itemName.includes("Vintage Fan OWar")){
+        itemName = "Vintage Fan O'War";
+    }
+
+    if(itemName.includes("Genuine Connivers Kunai")){
+        itemName = "Genuine Conniver's Kunai";
+    }
+
+    if(itemName.includes("Vintage Connivers Kunai")){
+        itemName = "Vintage Conniver's Kunai";
+    }
+
+    if(itemName.includes("Vintage Crusaders Crossbow")){
+        itemName = "Vintage Crusader's Crossbow";
+    }
+
+    if(itemName.includes("Vintage Warriors Spirit")){
+        itemName = "Vintage Warrior's Spirit";
+    }
+
+    if(itemName.includes("Vintage Fosters Facade")){
+        itemName = "Vintage Foster's Facade";
+    }
+
+    if(itemName.includes("Fosters Facade")){
+        itemName = "Foster's Facade";
+    }
+
+    if(itemName.includes("Vintage Stockbrokers Scarf")){
+        itemName = "Vintage Stockbroker's Scarf";
+    }
+
+    if(itemName.includes("Stockbrokers Scarf")){
+        itemName = "Stockbroker's Scarf";
+    }
+
+    if(itemName.includes("Vintage Scotsmans Skullcutter")){
+        itemName = "Vintage Scotsman's Skullcutter";
+    }
+
+    if(itemName.includes("Genuine Quackenbirdt")){
+        itemName = "Genuine Quäckenbirdt";
+    }
+
+    if(itemName.includes("The Quackenbirdt")){
+        itemName = "The Quäckenbirdt";
+    }
+
+    if(itemName.includes("Genuine Dashin Hashshashin")){
+        itemName = "Genuine Dashin' Hashshashin";
+    }
+
+    if(itemName.includes("Horseless Headless Horsemanns Headtaker")){
+        itemName = "Unusual Horseless Headless Horsemann's Headtaker";
+    }
+
+    if(itemName.includes("Taunt: Pooped Deck")){
+        itemName = "Taunt: The Pooped Deck";
+    }
+
+    if(itemName.includes("Taunt: Scorchers Solo")){
+        itemName = "Taunt: Scorcher's Solo";
+    }
+
+    if(itemName.includes("Taunt: Texas Truckin")){
+        itemName = "Taunt: Texas Truckin'";
+    }
+
+    if(itemName.includes("Taunt: Homerunners Hobby")){
+        itemName = "Taunt: The Homerunner's Hobby";
+    }
+
+    if(itemName.includes("Taunt: Profane Puppeteer")){
+        itemName = "Taunt: The Profane Puppeteer";
+    }
+
+    if(itemName.includes("Taunt: Drunken Sailor")){
+        itemName = "Taunt: The Drunken Sailor";
+    }
+
+    if(itemName.includes("Taunt: Doctors Defibrillators")){
+        itemName = "Taunt: Doctor's Defibrillators";
+    }
+
+    if(itemName.includes("Taunt: Drunk Manns Cannon")){
+        itemName = "Taunt: Drunk Mann's Cannon";
+    }
+
+    if(itemName.includes("Taunt: Texas Twirl Em")){
+        itemName = "Taunt: Texas Twirl 'Em";
+    }
+
+    //Taunt: Texas Twirl Em
+    //Remove the uneccessary things of the string
     if(itemName.includes("#")){
         itemName = itemName.substr(0, itemName.indexOf("#") - 1);
     }
 
+    if(itemName.includes("(Secondary)")){
+        itemName = itemName.substr(0, itemName.indexOf("(") - 1);
+    }
+
+    //%27
     let itemNameReplace2Dots = itemName.replace(/:/g, "%3A");
     let itemName2Link = itemNameReplace2Dots.replace(/ /g, "+");
-
-    if(itemName.includes("Key")){
+    itemName2Link = itemName2Link.replace(/'/g, "%27");
+    
+    if(itemName.includes("Key") || itemName.includes("Squad Surplus Voucher") || itemName.includes("Civilian Grade Stat Clock") || itemName.includes("Festivizer") || itemName.includes("Duck Journal")){
         url = baseURL + "Non-Craftable+" + itemName2Link;
     }else{
         url = baseURL + itemName2Link;
+    }
+
+    if(itemName.includes("Collectors")){
+        url= "https://stntrading.eu/";
     }
 
     
