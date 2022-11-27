@@ -58,13 +58,24 @@ function copy2Clipboard(itemName) {
 } */
 
 function getLinkSTN(itemName){
-    let baseURL = 'https://stntrading.eu/item/tf2/'
-    let itemNameRemove2Dots = itemName.replace(/:/g, "%3A")
-    let itemName2Link = itemNameRemove2Dots.replace(/ /g, "+")
+    var url = null;//initiate var to return
 
+    let baseURL = 'https://stntrading.eu/item/tf2/';
 
-    let url = baseURL + itemName2Link
+    if(itemName.includes("#")){
+        itemName = itemName.substr(0, itemName.indexOf("#") - 1);
+    }
 
+    let itemNameReplace2Dots = itemName.replace(/:/g, "%3A");
+    let itemName2Link = itemNameReplace2Dots.replace(/ /g, "+");
+
+    if(itemName.includes("Key")){
+        url = baseURL + "Non-Craftable+" + itemName2Link;
+    }else{
+        url = baseURL + itemName2Link;
+    }
+
+    
     return url;
 }
 
