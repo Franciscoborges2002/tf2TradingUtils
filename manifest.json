@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+
+  "name": "multi tool for tf2 trading websites",
+  "version": "0.1.0",
+
+  "content_scripts": [
+    {
+      "js": ["./scrap.tf/scrapItemList/content.js"],
+      "matches": ["https://scrap.tf/*"]
+    },
+    {
+      "js": ["./stntrading.eu/unusualBackpack/content.js"],
+      "permissions": ["scripting"],
+      "matches": ["https://stntrading.eu/item/tf2/Unusual*"]
+    },
+    {
+      "js": ["./backpack.tf/backpackTfContent.js"],
+      "matches": ["https://backpack.tf/stats/*"]
+    }
+  ]
+}

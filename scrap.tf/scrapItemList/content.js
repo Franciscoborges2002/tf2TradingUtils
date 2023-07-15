@@ -21,7 +21,7 @@ while(row=table.rows[r++]){
                 let text = cell.innerHTML;
                 items.push(cell.innerHTML);
                 itemName = cell.innerHTML;
-                cell.innerHTML=text + ' <br/> <a href="'  + getLinkBackpack() + '" target="_blank">BP</a> | <a href="' + getLinkSTN(text) +'" target="_blank">STN</a>';
+                cell.innerHTML=text + ' <br/> <a href="'  + getLinkBackpack(text) + '" target="_blank">BP</a> | <a href="' + getLinkSTN(text) +'" target="_blank">STN</a>';
                 //cell.innerHTML = `<ins><i><b onclick="copy2Clipboard('${text}')">` + text + "</b></i></ins>";
             }
 
@@ -272,7 +272,7 @@ function getLinkSTN(itemName){
         url = baseURL + itemName2Link;
     }
 
-    if(itemName.includes("Collectors")){
+    if(itemName.includes("Collectors")){//stntrading doesnt have collectors items
         url= "https://stntrading.eu/";
     }
 
@@ -288,8 +288,53 @@ function getLinkSTN(itemName){
     return baseUrl;
 } */
 
-function getLinkBackpack(itemName){}
+function getLinkBackpack(itemName){
+    var url = null;//initiate var to return
+
+    let baseURL = 'https://backpack.tf/stats/';
+    let restURL = null;
+
+    //if the name includes vintage
+    if(itemName.includes("Vintage")){
+        restURL = "Vintage";
+        itemName = itemName.replace("Vintage ", "");
+    }else if(itemName.includes("Genuine")){
+        restURL = "Genuine";
+        itemName = itemName.replace("Genuine ", "");
+    }else if(itemName.includes("Strange")){
+        restURL = "Strange";
+        itemName = itemName.replace("Strange ", "");
+    }else if(itemName.includes("Collectors")){
+        restURL = "Collector%27s";
+        itemName = itemName.replace("Collectors ", "");
+    }else{
+        restURL = "Unique";
+    }
+
+    if(itemName.includes("Taunt:")){
+        restURL = restURL + "/Taunt%3A";
+        itemName = itemName.replace("Taunt:", "");
+    }
+    //let itemName2Link = itemNameReplace2Dots.replace(/ /g, "+");
+    //put the name into the restURL
+    console.log("before " +restURL);
+    if(restURL.includes("/")){
+        restURL = restURL + itemName.replace(/ /g, "%20").replace(/!/g, "%21") + "/Tradable/Craftable"; //replaceEvery(itemName, " ", "%20");
+    }else{
+        restURL = restURL + '/' + itemName.replace("The ", "").replace(/ /g, "%20").replace(/!/g, "%21") + "/Tradable/Craftable"; //replaceEvery(itemName, " ", "%20");
+    }
+    console.log(restURL);
+    url = baseURL + restURL;
+
+    return url;
+}
 
 function nameWOSpaces(itemName){
     return itemName.replace(/\s/g, '');
+}
+
+function replaceEvery(string, changing, changeTo){
+    string = string.replace(changing, changeTo);
+    //string.inde
+    console.log(string);
 }
