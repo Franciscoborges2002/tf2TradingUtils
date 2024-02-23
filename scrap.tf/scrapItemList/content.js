@@ -1,7 +1,3 @@
-/* ICON:
-<a href="https://www.flaticon.com/free-icons/copy" title="copy icons">Copy icons created by apien - Flaticon</a>
-*/
-
 var table = document.getElementById('itembanking-list');
 
 var r = 0, c=0, itemName;
@@ -47,6 +43,9 @@ while(row=table.rows[r++]){
     }
 } 
 
+/**
+ * Experimental Function
+ */
 function copy2Clipboard(itemName) {
     navigator.clipboard.writeText(itemName);
 }
@@ -57,6 +56,9 @@ function copy2Clipboard(itemName) {
     navigator.clipboard.writeText("itemName");
 } */
 
+/**
+ * Function to generate the links to stntrading.eu
+ */
 function getLinkSTN(itemName){
     var url = null;//initiate var to return
 
@@ -280,14 +282,9 @@ function getLinkSTN(itemName){
     return url;
 }
 
-/* function getLinkBackpack(itemName){
-    let baseUrl = 'https://backpack.tf/stats/';
-
-    counter++;
-
-    return baseUrl;
-} */
-
+/**
+ * Function to generate the links to backpack.tf
+ */
 function getLinkBackpack(itemName){
     var url = null;//initiate var to return
 
@@ -327,14 +324,4 @@ function getLinkBackpack(itemName){
     url = baseURL + restURL;
 
     return url;
-}
-
-function nameWOSpaces(itemName){
-    return itemName.replace(/\s/g, '');
-}
-
-function replaceEvery(string, changing, changeTo){
-    string = string.replace(changing, changeTo);
-    //string.inde
-    console.log(string);
 }

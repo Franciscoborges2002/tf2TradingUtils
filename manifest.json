@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
 
-  "name": "multi tool for tf2 trading websites",
+  "name": "tf2TradingUtils",
   "version": "0.1.0",
 
   "content_scripts": [
     {
       "js": ["./scrap.tf/scrapItemList/content.js"],
-      "matches": ["https://scrap.tf/*"]
+      "matches": ["https://scrap.tf/items*"]
     },
     {
       "js": ["./stntrading.eu/unusualBackpack/content.js"],
@@ -15,7 +15,12 @@
       "matches": ["https://stntrading.eu/item/tf2/Unusual*"]
     },
     {
-      "js": ["./backpack.tf/backpackTfContent.js"],
+      "js": ["./stntrading.eu/copyClipboard/content.js"],
+      "matches": ["https://stntrading.eu/item*"]
+    },
+    {
+      "js": ["./backpack.tf/addKSButton/content.js"],
+      "permissions": ["activeTab"],
       "matches": ["https://backpack.tf/stats/*"]
     }
   ]

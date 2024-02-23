@@ -2,10 +2,6 @@
 
 //console.log(backpackUnusualIds)
 
-chrome.scripting.executeScript({
-    target
-})
-
 let buttonsPart = document.getElementsByClassName("justify-content-sm-start")[0];
 let nameItemPage = document.getElementsByClassName("card-title")[1];
 

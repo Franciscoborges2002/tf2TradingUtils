@@ -1,5 +1,6 @@
-# Scrap.tf Extensions
+# stnTrading.eu Extensions
 
 |Name| What it does| Link|
 |-|-|-|
-|unusualBackpack|Provides the link to backpack.tf in stn unusual|<a href="./unusualBackpack">Link</a>|<a href="./unusualBackpack/changeLog.md">Change log</a>|
+|unusualBackpack|Provides the link to backpack.tf in stn unusual|[link](./unusualBackpack) \| [changeLog](./unusualBackpack/changeLog.md)|
+|copyNameClipboard|Copy the name of the item to the clipboard|[link](./copyClipboard/) \| [changeLog](./copyClipboard//changeLog.md)|
