@@ -19,7 +19,7 @@
       "matches": ["https://stntrading.eu/item*"]
     },
     {
-      "js": ["./backpack.tf/addKSButton/content.js"],
+      "js": ["./backpack.tf/oldUI/addKSButton/content.js"],
       "permissions": ["activeTab"],
       "matches": ["https://backpack.tf/stats/*"]
     }

@@ -2,3 +2,4 @@
 
 Added the button
 Added the script to copy to the clipboard
+Added a filter to remove non wanted words
