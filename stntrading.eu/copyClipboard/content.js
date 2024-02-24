@@ -1,5 +1,5 @@
 /**
- * Function tto get the name, add a button and copy to the clipboard
+ * Function to get the name, add a button and copy to the clipboard
  *
  * @parameter url -> get the url of the current tab
  */
@@ -29,6 +29,13 @@ function copyNameClipboard() {
   placeAddButton.appendChild(button); //append the button to the page
 }
 
+/**
+ * Function to remove some unwanted words like "The" and "Non-craftable" to let use the string in all plataforms
+ *
+ * @parameter itemName -> item name to apply the filter
+ * 
+ * @remove itemName -> the item name without the words that are not important
+ */
 function removeNonImportantWords(itemName){
   if(itemName.startsWith("The")){//If the name starts with The
     itemName = itemName.replace(/The /g, "");//Remove the The
