@@ -22,6 +22,11 @@
       "js": ["./backpack.tf/oldUI/addKSButton/content.js"],
       "permissions": ["activeTab"],
       "matches": ["https://backpack.tf/stats/*"]
+    },
+    {
+      "js": ["./steamcommunity.com/steamLinks/content.js"],
+      "permissions": ["activeTab"],
+      "matches": ["https://steamcommunity.com/*"]
     }
   ]
 }

@@ -1,7 +1,5 @@
 /**
  * Function to get the name, add a button and copy to the clipboard
- *
- * @parameter url -> get the url of the current tab
  */
 function copyNameClipboard() {
   let placeAddButton = document.getElementsByClassName("card-body")[1]; //place for were i want to add the button in the actual page
@@ -20,8 +18,6 @@ function copyNameClipboard() {
   button.onclick = () => {
     let text2Clipboard = document.querySelector("h3").innerHTML;//Get the name of the item
     text2Clipboard = removeNonImportantWords(text2Clipboard);
-
-    console.log(text2Clipboard);
     
     navigator.clipboard.writeText(text2Clipboard);//copy the tag of the item to the clipboard
   };

@@ -8,8 +8,6 @@ let buttons = [
   { text: "Professional Killstreak", urlCompletitionClassifieds: "&killstreak_tier=3", urlCompletitionStats: "Professional%20Killstreak%20" },
 ];
 
-let nameURLparser = require("../../utils/nameURLparser");
-
 /**
  * Function to create 4 buttons to show the KS on a gun in a backpack.tf website
  *
