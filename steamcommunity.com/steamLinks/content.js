@@ -1,4 +1,23 @@
 function showUsefullLinks() {
+  let url = window.location.toString(); // Get the url of the page
+  if (
+    url.includes("friends") ||
+    url.includes("tradeoffers") ||
+    url.includes("tradehistory") ||
+    url.includes("games") ||
+    url.includes("groups") ||
+    url.includes("badges") ||
+    url.includes("inventory") ||
+    url.includes("screenshots") ||
+    url.includes("images")||
+    url.includes("videos")||
+    url.includes("myworkshopfiles")||// for workshop items, merchandasing, collections and guides
+    url.includes("home")||//Community part
+    url.includes("edit")//Edit part of the profile
+  ) {
+    return; //Dont execute the rest of the script
+  }
+
   let locationButtons = document.getElementsByClassName(
     "profile_header_actions"
   )[0]; //To use on own profile
@@ -17,7 +36,7 @@ function showUsefullLinks() {
     allText.search("personaname") - 3
   ); //substring from all the text gotten from the allText var
 
-  //Verify if has the drowpdown menu int he profile header actions
+  //Verify if has the drowpdown menu nt he profile header actions
   if (locationButtonsDrowdown !== null) {
     let linkBp = document.createElement("a"); // Create the link element for the backpack.tf
     let linkSpanBp = document.createElement("span"); // Create the span element for the backpack.tf

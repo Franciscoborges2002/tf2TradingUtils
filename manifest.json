@@ -6,7 +6,7 @@
 
   "content_scripts": [
     {
-      "js": ["./scrap.tf/scrapItemList/content.js"],
+      "js": ["./scrap.tf/scrapItemLinks/content.js"],
       "matches": ["https://scrap.tf/items*"]
     },
     {
@@ -26,7 +26,7 @@
     {
       "js": ["./steamcommunity.com/steamLinks/content.js"],
       "permissions": ["activeTab"],
-      "matches": ["https://steamcommunity.com/*"]
+      "matches": ["https://steamcommunity.com/profiles/*", "https://steamcommunity.com/id/*"]
     }
   ]
 }

@@ -4,4 +4,4 @@
 
 |Name| What it does| Link|Change log|
 |-|-|-|-|
-|scrapItemsList|Provides the items links to stn and bp.tf|<a href="./scrapItemsList">Link</a>|<a href="./scrapItemsList/changeLog.md">Change log</a>|
+|scrapItemLinks|Provides the items links to stn and bp.tf|<a href="./scrapItemLinks">Link</a>|<a href="./scrapItemLinks/changeLog.md">Change log</a>|
