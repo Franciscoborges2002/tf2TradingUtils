@@ -1,3 +1,7 @@
 # Version 1.0.0
 
-Added scrapItemList
+Added steamLinks
+
+# Version 1.0.1
+
+Added steamTradeHelper

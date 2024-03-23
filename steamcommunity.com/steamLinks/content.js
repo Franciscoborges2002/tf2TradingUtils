@@ -1,5 +1,6 @@
 function showUsefullLinks() {
   let url = window.location.toString(); // Get the url of the page
+
   if (
     url.includes("friends") ||
     url.includes("tradeoffers") ||
