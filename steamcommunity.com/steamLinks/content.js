@@ -1,3 +1,24 @@
+const linksInfo = [
+  {
+    label: "bp.tf",
+    href: (id) => `https://backpack.tf/profiles/${id}`,
+    classes: ["btn_profile_action", "btn_medium"],
+    dropdown_classes: ["popup_menu_item"],
+  },
+  {
+    label: "rep.tf",
+    href: (id) => `https://rep.tf/${id}`,
+    classes: ["btn_profile_action", "btn_medium"],
+    dropdown_classes: ["popup_menu_item"],
+  },
+  {
+    label: "posts.tf",
+    href: (id) => `https://posts.tf/users/${id}`,
+    classes: ["btn_profile_action", "btn_medium"],
+    dropdown_classes: ["popup_menu_item"],
+  },
+];
+
 function showUsefullLinks() {
   let url = window.location.toString(); // Get the url of the page
 
@@ -10,11 +31,11 @@ function showUsefullLinks() {
     url.includes("badges") ||
     url.includes("inventory") ||
     url.includes("screenshots") ||
-    url.includes("images")||
-    url.includes("videos")||
-    url.includes("myworkshopfiles")||// for workshop items, merchandasing, collections and guides
-    url.includes("home")||//Community part
-    url.includes("edit")//Edit part of the profile
+    url.includes("images") ||
+    url.includes("videos") ||
+    url.includes("myworkshopfiles") || // for workshop items, merchandasing, collections and guides
+    url.includes("home") || //Community part
+    url.includes("edit") //Edit part of the profile
   ) {
     return; //Dont execute the rest of the script
   }
@@ -39,54 +60,34 @@ function showUsefullLinks() {
 
   //Verify if has the drowpdown menu nt he profile header actions
   if (locationButtonsDrowdown !== null) {
-    let linkBp = document.createElement("a"); // Create the link element for the backpack.tf
-    let linkSpanBp = document.createElement("span"); // Create the span element for the backpack.tf
-    let linkRep = document.createElement("a"); // Create the link element for the rep.tf
-    let linkSpanRep = document.createElement("span"); // Create the span element for the rep.tf
+    linksInfo.forEach(({ label, href, dropdown_classes }) => {
+      const link = document.createElement("a");
+      link.href = href(steamid64);
+      link.target = "_blank";
+      link.rel = "noopener noreferrer"; // good practice
+      link.classList.add(...dropdown_classes);
 
-    linkBp.classList.add("popup_menu_item"); //Add the class of the menu item
-    linkRep.classList.add("popup_menu_item"); //Add the class of the menu item
+      const span = document.createElement("span");
+      span.textContent = label;
 
-    //get the steam id 64 of the user
-
-    //Add all the stuff for the new item in the drop down menu
-    linkBp.href = "https://backpack.tf/profiles/" + steamid64; //Add the link
-    linkBp.target = "_blank"; //To open in a new page
-    linkSpanBp.textContent = "  Backpack.tf"; //Add the text in the span
-    linkBp.appendChild(linkSpanBp); //Add the span to the
-
-    //Add all the stuff for the new item in the drop down menu
-    linkRep.href = "https://rep.tf/" + steamid64; //Add the link
-    linkRep.target = "_blank"; //To open in a new page
-    linkSpanRep.textContent = "Rep.tf"; //Add the text in the span
-    linkRep.appendChild(linkSpanRep); //Add the span to the
-
-    locationButtonsDrowdownList.appendChild(linkBp); //Add the backpack.tf link to the drop down list
-    locationButtonsDrowdownList.appendChild(linkRep); //Add the backpack.tf link to the drop down list
+      link.appendChild(span);
+      locationButtonsDrowdownList.appendChild(link);
+    });
   } else {
     //If doenst have the dropdown
-    let linkBp = document.createElement("a"); // Create the link element for the backpack.tf
-    let textBp = document.createElement("span"); // Create the text for backpack.tf
-    let linkRep = document.createElement("a"); // Create the link element for the rep.tf
-    let textRep = document.createElement("span"); // Create the text for rep.tf
+    linksInfo.forEach(({ label, href, classes }) => {
+      const link = document.createElement("a");
+      link.href = href(steamid64);
+      link.target = "_blank";
+      link.rel = "noopener noreferrer"; // safety for new tabs
+      link.classList.add(...classes);
 
-    linkBp.classList.add("btn_profile_action"); //Add the class
-    linkBp.classList.add("btn_medium"); //Add the class
-    linkRep.classList.add("btn_profile_action"); //Add the class
-    linkRep.classList.add("btn_medium"); //Add the class
+      const span = document.createElement("span");
+      span.textContent = label;
 
-    linkBp.href = "https://backpack.tf/profiles/" + steamid64; //Add the link
-    linkBp.target = "_blank"; //To open in a new page
-    textBp.textContent = "bp.tf";
-    linkBp.appendChild(textBp);
-
-    linkRep.href = "https://rep.tf/" + steamid64; //Add the link
-    linkRep.target = "_blank"; //To open in a new page
-    textRep.textContent = "rep.tf";
-    linkRep.appendChild(textRep);
-
-    locationButtons.appendChild(linkBp);
-    locationButtons.appendChild(linkRep);
+      link.appendChild(span);
+      locationButtons.appendChild(link);
+    });
   }
 }
 
