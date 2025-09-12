@@ -2,9 +2,9 @@
   "manifest_version": 3,
 
   "name": "tf2TradingUtils",
-  "version": "1.0.0",
+  "version": "1.0.1",
 
-  "description": "Some scripts for tf2 trading",
+  "description": "Some usefull scripts for tf2 trading",
   "author": "Francisco Borges",
 
   "content_scripts": [
@@ -21,8 +21,8 @@
       "matches": ["https://stntrading.eu/item*"]
     },
     {
-      "js": ["./backpack.tf/oldUI/addKSButton/content.js"],
-      "matches": ["https://backpack.tf/stats/*"]
+      "matches": ["https://*.backpack.tf/*"],
+      "js": ["backpack.tf/content.js"]
     },
     {
       "js": ["./steamcommunity.com/steamLinks/content.js"],
@@ -34,6 +34,17 @@
     {
       "js": ["./steamcommunity.com/steamTradeHelper/content.js"],
       "matches": ["https://steamcommunity.com/tradeoffer/new/*"]
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["backpack.tf/oldUI/**"],
+      "matches": ["https://*.backpack.tf/*"]
+    },
+    {
+      "resources": ["backpack.tf/newUI/**"],
+      "matches": ["https://*.backpack.tf/*"]
     }
   ],
   "icons": {
