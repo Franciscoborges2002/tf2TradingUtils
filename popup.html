@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <style>
+        body {
+            margin: 12px;
+            font: 13px/1.4 system-ui, Segoe UI, Roboto, Helvetica, Arial;
+            width: 280px;
+            background-color: #201C1A;
+            color: white;
+        }
+
+        div{
+            display: flex;
+            flex-direction: row;
+            gap: 12px;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 14px;
+            margin: 0 0 8px;
+        }
+
+        .muted {
+            color: #949494;
+        }
+
+        ul {
+            margin: 6px 0 0;
+            padding-left: 16px;
+        }
+
+        .badge {
+            display: inline-block;
+            margin: 8px 0 0;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #201C1A;
+            color: #fff;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <img src="./public/icons/png/icon_48.png" />
+        <h1>TF2TradingUtils</h1>
+    </div>
+    <div id="status" class="muted">Checking this tab…</div>
+    <div id="host" class="muted"></div>
+    <div id="active" class="badge" style="display:none;">Active</div>
+    <ul id="features"></ul>
+    <script src="popup.js"></script>
+</body>
+
+</html>

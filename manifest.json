@@ -7,18 +7,19 @@
   "description": "Some usefull scripts for tf2 trading",
   "author": "Francisco Borges",
 
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TF2TradingUtils"
+  },
+
   "content_scripts": [
     {
       "js": ["./scrap.tf/scrapItemLinks/content.js"],
       "matches": ["https://scrap.tf/items*"]
     },
     {
-      "js": ["./stntrading.eu/unusualBackpack/content.js"],
-      "matches": ["https://stntrading.eu/item/tf2/Unusual*"]
-    },
-    {
-      "js": ["./stntrading.eu/copyClipboard/content.js"],
-      "matches": ["https://stntrading.eu/item*"]
+      "js": ["stntrading.eu/content.js"],
+      "matches": ["https://stntrading.eu/*"]
     },
     {
       "matches": ["https://*.backpack.tf/*"],
@@ -32,19 +33,23 @@
       ]
     },
     {
-      "js": ["./steamcommunity.com/steamTradeHelper/content.js"],
-      "matches": ["https://steamcommunity.com/tradeoffer/new/*"]
+      "matches": ["https://steamcommunity.com/tradeoffer/new/*"],
+      "js": ["./steamcommunity.com/steamTradeHelper/content.js"]
     }
   ],
 
   "web_accessible_resources": [
     {
       "resources": ["backpack.tf/oldUI/**"],
-      "matches": ["https://*.backpack.tf/*"]
+      "matches": ["https://backpack.tf/*"]
     },
     {
       "resources": ["backpack.tf/newUI/**"],
-      "matches": ["https://*.backpack.tf/*"]
+      "matches": ["https://next.backpack.tf/*"]
+    },
+    {
+      "resources": ["stntrading.eu/**"],
+      "matches": ["https://stntrading.eu/*"]
     }
   ],
   "icons": {

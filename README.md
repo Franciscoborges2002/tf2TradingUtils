@@ -10,6 +10,7 @@ This repo contains little utils for the websites i use to make the trading easie
 
 - <a href="./steamcommunity.com">Steamcommunity.com Extensions</a>
 
-## Roadmap:
-- [x] Make some utils for each website.
-- [x] Add to chrome extension store
+## Roadmap V1.0.1:
+- [ ] STN links
+- [ ] steamTradeHelper
+- [x] Finish KSButtons oldUI backpack
