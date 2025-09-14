@@ -11,5 +11,5 @@ This repo contains little utils for the websites i use to make the trading easie
 - <a href="./steamcommunity.com">Steamcommunity.com Extensions</a>
 
 ## Roadmap:
-- [ ] Make some utils for each website.
-- [ ] Add to chrome extension store
+- [x] Make some utils for each website.
+- [x] Add to chrome extension store
