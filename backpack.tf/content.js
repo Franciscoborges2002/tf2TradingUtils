@@ -28,7 +28,7 @@ Utility funtions to load scripts
 */
 function loadAddKSButtons() {
   (async () => {
-    // Load your module dynamically
+    // Load module dynamically
     const { createKSButtons } = await import(
       chrome.runtime.getURL("backpack.tf/oldUI/addKSButtons/content.js")
     );
