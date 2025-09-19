@@ -10,7 +10,7 @@ export function copyNameClipboard() {
 
   //Add style with bootstrap classes
   button.classList.add("btn");
-  button.classList.add("btn-primary");
+  button.classList.add("btn-secondary");
 
   //Add a function for the click button
   button.onclick = () => {
@@ -43,6 +43,3 @@ function removeNonImportantWords(itemName) {
 
   return itemName;
 }
-
-// Calling the function
-copyNameClipboard();
