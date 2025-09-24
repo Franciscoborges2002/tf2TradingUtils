@@ -19,7 +19,7 @@ const linksInfo = [
   },
 ];
 
-function showUsefullLinks() {
+export function showUsefullLinks() {
   let url = window.location.toString(); // Get the url of the page
 
   if (
@@ -90,5 +90,3 @@ function showUsefullLinks() {
     });
   }
 }
-
-showUsefullLinks();

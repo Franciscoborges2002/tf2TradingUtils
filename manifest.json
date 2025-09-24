@@ -26,15 +26,15 @@
       "js": ["backpack.tf/content.js"]
     },
     {
-      "js": ["./steamcommunity.com/steamLinks/content.js"],
+      "js": ["./steamcommunity.com/content.js"],
       "matches": [
         "https://steamcommunity.com/profiles/*",
         "https://steamcommunity.com/id/*"
       ]
     },
     {
-      "matches": ["https://steamcommunity.com/tradeoffer/new/*"],
-      "js": ["./steamcommunity.com/steamTradeHelper/content.js"]
+      "matches": ["https://steamcommunity.com/tradeoffer/new/*", "https://steamcommunity.com/profiles/*"],
+      "js": ["./steamTradeHelper/content.js"]
     }
   ],
 
@@ -50,6 +50,10 @@
     {
       "resources": ["stntrading.eu/**"],
       "matches": ["https://stntrading.eu/*"]
+    },
+    {
+      "resources": ["steamcommunity.com/**", "steamTradeHelper/**"],
+      "matches": ["https://steamcommunity.com/*"]
     }
   ],
   "icons": {
