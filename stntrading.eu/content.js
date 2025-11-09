@@ -1,8 +1,13 @@
 /* 
-File for routing the scripts for backpack.tf based
+File for routing the scripts for stntrading.eu based
 on the hostname and pathaname the user is in
 */
-//import { createKSButtons } from "./oldUI/addKSButton/content.js";
+
+// Var to be able to present the scripts loaded in popup
+const EXT_SCRIPT_INFO = {
+  site: window.location.hostname,
+  scripts: [],
+};
 
 /**
 @description: Function to route the pathname to the scripts
@@ -18,8 +23,10 @@ function scriptRouter() {
   if (url.pathname.includes("item") && url.pathname.includes("tf2")) {
     /* start scripts for normal item page */
     loadLink2Backpack();
+    EXT_SCRIPT_INFO.scripts.push("Links to Bacpack.tf");
 
     loadCopyClipboard();
+    EXT_SCRIPT_INFO.scripts.push("Copy to clipboard");
   }
 
   /* Start all pages script */
@@ -52,3 +59,13 @@ function loadLink2Backpack() {
     link2Backpack();
   })();
 }
+
+/* 
+Listener to respond to the call of the popup, to now which scripts were loaded
+*/
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "GET_LOADED_SCRIPTS") {
+    sendResponse(EXT_SCRIPT_INFO);
+    return true;
+  }
+});
