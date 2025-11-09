@@ -1,4 +1,6 @@
-// your existing config (unchanged)
+/* 
+Possible websites to link to the trade partner
+*/
 const linksInfo = [
   {
     label: "bp.tf",
@@ -20,9 +22,9 @@ const linksInfo = [
   },
 ];
 
-// --- new code for the trade page ---
-
-// compute SteamID64 from accountid (data-miniprofile) safely with BigInt
+/* 
+Get the SteamID64 from accountid
+*/
 function getTradePartnerSteamID64() {
   const a = document.querySelector(
     ".trade_partner_header .trade_partner_headline a[data-miniprofile]"
@@ -37,38 +39,54 @@ function getTradePartnerSteamID64() {
   return (base + accountId).toString(); // steamid64 as string
 }
 
-function makeLinkEl({ label, href, classes }, steamid64) {
+/* 
+Function to create theh button swith links to refirect to the websites
+*/
+function makeButtonLinkEl({ label, href, classes }, steamid64) {
+  //create button and link
+  const button = document.createElement("button");
   const link = document.createElement("a");
+  //classes to button
+  button.classList.add("btn_grey_black");
+  button.classList.add("btn_medium");
+  //configure link
   link.href = href(steamid64);
   link.target = "_blank";
   link.rel = "noopener noreferrer";
-  // use your provided classes for styling
-  if (classes && classes.length) link.classList.add(...classes);
+  link.classList.add(...classes);
 
+  //create the text
   const span = document.createElement("span");
   span.textContent = label;
+  //append text and button
   link.appendChild(span);
+  button.appendChild(link)
 
-  return link;
+  return button;
 }
 
 /* 
 Function to pass to the script router
 */
 export function showPartnerLinks() {
-  const traderPartnerHeaderDiv = document.getElementsByClassName(
-    "trade_partner_header"
-  );
+  const traderPartnerHeaderDiv = document.querySelector('.trade_partner_header')
   if (!traderPartnerHeaderDiv) return;
+  //get steamid64
   const steamid64 = getTradePartnerSteamID64();
   if (!steamid64) return;
 
-  const frag = document.createDocumentFragment();
+  //create the div to append the buttons
+  const div = document.createElement("div");
+  div.classList.add("trade_partner_info_block") //add class
+  const title = document.createElement("h3")
+  title.textContent = "Partner Links"
+  div.appendChild(title)
+  //add the buttons
   linksInfo.forEach((info) => {
-    frag.appendChild(makeLinkEl(info, steamid64));
-    frag.appendChild(document.createTextNode(" "));
+    div.appendChild(makeButtonLinkEl(info, steamid64));
   });
 
-  const parent = clearDiv.parentNode;
-  if (parent) parent.insertBefore(frag, clearDiv);
+  //append the buttons to the page
+  if (parent) traderPartnerHeaderDiv.insertBefore(div, parent.lastElementChild);
+  return;
 }
