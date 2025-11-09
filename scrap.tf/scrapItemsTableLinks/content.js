@@ -3,8 +3,7 @@ var table = document.getElementById("itembanking-list"); //Get the table in the 
 /**
  * Main Function to put the links
  */
-function insertLinks() {
-  let  = 0;
+function scrapItemsTableLinks() {
   var iterateRow = 0, // Iterated row
     column= 0,// Iterated Column
     itemName;//To have the item name
@@ -319,4 +318,4 @@ function getLinkBackpack(itemName) {
   return url;
 }
 
-insertLinks(); //Call the main function
+scrapItemsTableLinks(); //Call the main function

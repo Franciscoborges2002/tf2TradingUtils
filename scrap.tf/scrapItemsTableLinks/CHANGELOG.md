@@ -1,3 +1,7 @@
+## Version 1.0.1
+
+Renamed from scrapItemsLinks to scrapItemsTableLinks
+
 ## Version 1.0.0
 
 Added stntrading.eu links
