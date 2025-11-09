@@ -1,5 +1,5 @@
 /* 
-File for routing the scripts for backpack.tf based
+File for routing the scripts for scrap.tf based
 on the hostname and pathaname the user is in
 */
 
@@ -16,14 +16,14 @@ function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
   /* If there is the next in hostname, redirect to newUI scripts */
-  if (url.hostname.includes("next")) {
-    /* start scripts for newUI */
-  } else {
-    /* start scripts for oldUI */
-    //createKSButtons(url);
-    loadAddKSButtons(url)
-    EXT_SCRIPT_INFO.scripts.push("Killstreak Buttons");
+
+  if (url.pathname.includes("items")) {
+    /* start scripts for normal item page */
+    loadScrapItemsTableLinks()
+    EXT_SCRIPT_INFO.scripts.push("Scrap Items Table List");
   }
+
+  /* Start all pages script */
 }
 
 //Start the script
@@ -32,14 +32,14 @@ scriptRouter();
 /* 
 Utility funtions to load scripts
 */
-function loadAddKSButtons(url) {
+function loadScrapItemsTableLinks() {
   (async () => {
     // Load module dynamically
-    const { createKSButtons } = await import(
-      chrome.runtime.getURL("backpack.tf/oldUI/addKSButtons/content.js")
+    const { scrapItemsTableLinks } = await import(
+      chrome.runtime.getURL("scrap.tf/scrapItemsTableLinks/content.js")
     );
 
-    createKSButtons(url);
+    scrapItemsTableLinks();
   })();
 }
 
