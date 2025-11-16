@@ -15,6 +15,11 @@ const EXT_SCRIPT_INFO = {
 function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
+  /* Dont load scripts for the forums subdomain */
+  if(url.hostname.includes("forums")){
+    return;
+  }
+
   /* If there is the next in hostname, redirect to newUI scripts */
   if (url.hostname.includes("next")) {
     /* start scripts for newUI */
