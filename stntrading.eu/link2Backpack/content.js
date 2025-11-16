@@ -9,7 +9,8 @@ export function link2Backpack() {
   let itemName = document.querySelector("h1").innerHTML; //Get the name of the item
   /* unusual not supported yet */
   if (itemName.includes(ITEMS_QUALITY[4])) {
-    console.log("[TF2TradingUtils] not supported yet.");
+    alert("olaa");
+    console.log("TF2TradingUtils not supported yet.");
     return;
   }
   let placeAddLink = document.getElementsByClassName("card-body")[1]; //place for were i want to add the button in the actual page
