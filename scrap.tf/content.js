@@ -19,11 +19,13 @@ function scriptRouter() {
 
   if (url.pathname.includes("items")) {
     /* start scripts for normal item page */
-    loadScrapItemsTableLinks()
+    loadScrapItemsTableLinks();
     EXT_SCRIPT_INFO.scripts.push("Scrap Items Table List");
   }
 
   /* Start all pages script */
+  loadHoverItemLinks();
+  EXT_SCRIPT_INFO.scripts.push("Hover Item Links");
 }
 
 //Start the script
@@ -40,6 +42,20 @@ function loadScrapItemsTableLinks() {
     );
 
     scrapItemsTableLinks();
+  })();
+}
+
+/* 
+Utility funtions to load scripts
+*/
+function loadHoverItemLinks() {
+  (async () => {
+    // Load module dynamically
+    const { scrapHoverItemLinks } = await import(
+      chrome.runtime.getURL("scrap.tf/scrapHoverItemLinks/content.js")
+    );
+
+    scrapHoverItemLinks();
   })();
 }
 

@@ -1,6 +1,19 @@
 /* 
 @TF2TradingUtils
+Description:
+Utility module that generates Backpack.tf Stats, Classifieds, and Wiki links 
+based on hovered item attributes. Supports:
+- Quality detection (Unique, Vintage, Strange)
+- Killstreak prefixes (KS / S. KS / P. KS)
+- Craftability detection
+- Australium identification
+- Strange Part safety (does not strip "Strange Part:" names)
+This script is injected via the extension router and powers the dynamic tooltip links.
+
+Link:
+https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapHoverItemLinks
 */
+
 
 export function scrapHoverItemLinks() {
   let lastHoveredItem = null;

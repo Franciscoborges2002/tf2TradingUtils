@@ -1,23 +1,32 @@
+/* 
+@TF2TradingUtils
+Description:
+Enhances the Scrap.tf itembanking list table (#itembanking-list) by appending
+quick links for each item to external trading sites.
+
+Link:
+https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapItemsTableLinks
+*/
 var table = document.getElementById("itembanking-list"); //Get the table in the website
 
 /**
  * Main Function to put the links
  */
-function scrapItemsTableLinks() {
+export function scrapItemsTableLinks() {
   var iterateRow = 0, // Iterated row
     column= 0,// Iterated Column
-    itemName;//To have the item name
+    itemName,//To have the item name
+    row,
+    cell;
+
 
   // Iterate for all rows of the table
   while ((row = table.rows[iterateRow++])) {
     //Iterate for all the cells
     while ((cell = row.cells[column++])) {
-      //console.log(cell);
-      console.log("iterateRow" + iterateRow);
-      //console.log(column);
       if (iterateRow >= 2) {
         if (column == 2) {
-          //O nome do item
+          //Item name
           itemName = cell.innerHTML; // to get the item name
           cell.innerHTML =
             itemName +
@@ -317,5 +326,3 @@ function getLinkBackpack(itemName) {
 
   return url;
 }
-
-scrapItemsTableLinks(); //Call the main function
