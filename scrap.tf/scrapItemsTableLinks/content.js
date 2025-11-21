@@ -19,6 +19,11 @@ export function scrapItemsTableLinks() {
     row,
     cell;
 
+    /* Block if the page is the buy page and not the ite m page */
+    if(!table){
+      return
+    }
+
 
   // Iterate for all rows of the table
   while ((row = table.rows[iterateRow++])) {
