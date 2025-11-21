@@ -2,20 +2,20 @@
   "manifest_version": 3,
 
   "name": "tf2TradingUtils",
-  "version": "1.0.1",
+  "version": "1.1.0",
 
   "description": "Some usefull scripts for tf2 trading",
   "author": "Francisco Borges",
 
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/popup.html",
     "default_title": "TF2TradingUtils"
   },
 
   "content_scripts": [
     {
-      "js": ["./scrap.tf/scrapItemLinks/content.js"],
-      "matches": ["https://scrap.tf/items*"]
+      "js": ["scrap.tf/content.js"],
+      "matches": ["https://scrap.tf/*"]
     },
     {
       "js": ["stntrading.eu/content.js"],
@@ -30,11 +30,12 @@
       "matches": [
         "https://steamcommunity.com/profiles/*",
         "https://steamcommunity.com/id/*"
-      ]
+      ],
+      "run_at": "document_idle"
     },
     {
       "matches": ["https://steamcommunity.com/tradeoffer/new/*", "https://steamcommunity.com/profiles/*"],
-      "js": ["./steamTradeHelper/content.js"]
+      "js": ["./steamTradeOffer/content.js"]
     }
   ],
 
@@ -52,8 +53,16 @@
       "matches": ["https://stntrading.eu/*"]
     },
     {
-      "resources": ["steamcommunity.com/**", "steamTradeHelper/**"],
+      "resources": ["steamcommunity.com/**", "steamTradeOffer/**"],
       "matches": ["https://steamcommunity.com/*"]
+    },
+    {
+      "resources": ["scrap.tf/**"],
+      "matches": ["https://scrap.tf/*"]
+    },
+    {
+      "resources": ["utils/**"],
+      "matches": ["https://*.backpack.tf/*", "https://scrap.tf/*", "https://stntrading.eu/*"]
     }
   ],
   "icons": {
