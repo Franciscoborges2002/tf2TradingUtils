@@ -21,11 +21,19 @@ export function scrapHoverItemLinks() {
   const style = document.createElement("style");
   style.textContent = `
     #tf2utils-mini-modal{
-      position:fixed; left:12px; bottom:12px; z-index:2147483647;
-      padding:10px 12px; border-radius:10px; background:#111; color:#fff;
-      border:1px solid #2a2a2a; box-shadow:0 8px 20px rgba(0,0,0,.35);
+      position:fixed;
+      left:12px;
+      bottom:12px;
+      z-index:2147483647;
+      padding:10px 12px;
+      border-radius:10px;
+      background: #201c1a;
+      color:#fff;
+      border:1px solid #2a2a2a;
+      box-shadow:0 8px 20px rgba(0,0,0,.35);
       font:12px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial;
-      max-width:260px; display:block;
+      max-width:260px;
+      display:block;
     }
     #tf2utils-mini-modal .ttl{
       font-weight:700; margin-bottom:8px;
@@ -34,12 +42,16 @@ export function scrapHoverItemLinks() {
       display:flex; gap:8px; flex-wrap:wrap;
     }
     #tf2utils-mini-modal .btn{
-      border:1px solid #2e2e2e; background:#1b1b1b; color:#eaeaea;
-      padding:5px 8px; border-radius:6px;
-      text-decoration:none; font-size:12px;
+      border:1px solid #2e2e2e;
+      background: #352f2cff;
+      color:#eaeaea;
+      padding:5px 8px;
+      border-radius:6px;
+      text-decoration:none;
+      font-size:12px;
     }
     #tf2utils-mini-modal .btn:hover{
-      background:#222;
+      background: #201c1a;
     }
   `;
   document.head.appendChild(style);
