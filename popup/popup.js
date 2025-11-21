@@ -1,8 +1,3 @@
-async function getActiveTab() {
-  const [tab] = await chrome.tabs.query({});/* { active: true, currentWindow: true } */
-  return tab;
-}
-
 (() => {
   const { version } = chrome.runtime.getManifest();
   const badge = document.getElementById("version-badge");
