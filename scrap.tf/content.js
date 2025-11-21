@@ -15,7 +15,10 @@ const EXT_SCRIPT_INFO = {
 function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
-  /* If there is the next in hostname, redirect to newUI scripts */
+  /* Dont load scripts for the forums subdomain */
+  if(url.hostname.includes("merch")){
+    return;
+  }
 
   if (url.pathname.includes("items")) {
     /* start scripts for normal item page */
