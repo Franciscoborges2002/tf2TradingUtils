@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.0] - 2025-11-02
+## [1.1.0] - 2025-11-23
 ### Added
 - Script scrapHoverItemLinks for scrap.tf website
 - Script partnerLinks for steam trade helper
