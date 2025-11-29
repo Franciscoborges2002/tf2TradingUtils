@@ -11,6 +11,7 @@
   <a href="https://steamcommunity.com/groups/tf2tradingutils">
     <img src="https://img.shields.io/badge/Steam%20Group-TF2TradingUtils-1b2838?logo=steam&logoColor=white" alt="Steam Group">
   </a>
+  <img src="https://img.shields.io/badge/Downloads-50+-1b2838?logoColor=white" alt="Downloads">
 </p>
 
 ---
