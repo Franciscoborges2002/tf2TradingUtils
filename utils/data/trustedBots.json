@@ -1,3 +1,52 @@
 {
-    
+  "76561198068475408": {
+    "steamid": "76561198068475408",
+    "name": "Little Scrappy ",
+    "belongs": "https://scrap.tf",
+    "label": "Scrap.TF #1 Weapons bot (#1)",
+    "trust": "trusted"
+  },
+  "76561198068574872": {
+    "steamid": "76561198068574872",
+    "name": "A Scrapandemic",
+    "belongs": "https://scrap.tf",
+    "label": "Scrap.TF #2 Weapons bot (#2)",
+    "trust": "trusted"
+  },
+  "76561198069063823": {
+    "steamid": "76561198069063823",
+    "name": "Han Scrapo",
+    "belongs": "https://scrap.tf",
+    "label": "Scrap.TF #3 Weapons bot (#5)",
+    "trust": "trusted"
+  },
+  "76561198078210457": {
+    "steamid": "76561198078210457",
+    "name": "Scrapta Clause",
+    "belongs": "https://scrap.tf",
+    "label": "Scrap.TF #4 Weapons bot (#7)",
+    "trust": "trusted"
+  },
+  "76561198078813403": {
+    "steamid": "76561198078813403",
+    "name": "Penultiscrap",
+    "belongs": "https://scrap.tf",
+    "label": "Scrap.TF #1 Hats bot (#9)",
+    "trust": "trusted"
+  },
+  "76561198078971230": {
+    "steamid": "76561198078971230",
+    "name": "Scraponomy Crasher",
+    "belongs": "https://scrap.tf",
+    "label": "Scrap.TF #1 Keys bot (#10)",
+    "trust": "trusted"
+  }
+  ,
+  "76561198923653623": {
+    "steamid": "76561198923653623",
+    "name": "Beep Boop! I'm a Bot",
+    "belongs": "https://stntrading.eu",
+    "label": "Stntrading.eu Items category bot",
+    "trust": "trusted"
+  }
 }
