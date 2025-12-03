@@ -45,23 +45,33 @@ ul {
 
 #scripts-list div {
   background: none;
-  padding: 4px 0;
+  padding: 4px 6px;
   font-size: 0.9rem;
   text-align: left;
+
   display: flex;
   align-items: center;
+  justify-content: space-between; /* name left, icon/link right */
   gap: 6px;
+
+  width: 100%;
+  border-radius: 4px;
+
+  transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
 #scripts-list div:last-child {
   border-bottom: none;
 }
 
-/* Hover effect */
-#scripts-list div:hover {
-  color: #a3a3a3;
-  transform: translateX(3px);
-  transition: all 0.2s ease;
+#scripts-list a {
+  display: inline-flex;
+  align-items: center;
+}
+
+.gh-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .version-badge{
