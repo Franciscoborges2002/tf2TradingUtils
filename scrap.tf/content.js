@@ -16,19 +16,25 @@ function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
   /* Dont load scripts for the forums subdomain */
-  if(url.hostname.includes("merch")){
+  if (url.hostname.includes("merch")) {
     return;
   }
 
   if (url.pathname.includes("items")) {
     /* start scripts for normal item page */
     loadScrapItemsTableLinks();
-    EXT_SCRIPT_INFO.scripts.push("Scrap Items Table List");
+    EXT_SCRIPT_INFO.scripts.push([
+      "Scrap Items Table List",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapItemsTableLinks"
+    ]);
   }
 
   /* Start all pages script */
   loadHoverItemLinks();
-  EXT_SCRIPT_INFO.scripts.push("Hover Item Links");
+  EXT_SCRIPT_INFO.scripts.push([
+    "Hover Item Links",
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapHoverItemLinks"
+  ]);
 }
 
 //Start the script

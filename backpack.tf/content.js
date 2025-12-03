@@ -16,7 +16,7 @@ function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
   /* Dont load scripts for the forums subdomain */
-  if(url.hostname.includes("forums")){
+  if (url.hostname.includes("forums")) {
     return;
   }
 
@@ -26,8 +26,11 @@ function scriptRouter() {
   } else {
     /* start scripts for oldUI */
     //createKSButtons(url);
-    loadAddKSButtons(url)
-    EXT_SCRIPT_INFO.scripts.push("Killstreak Buttons");
+    loadAddKSButtons(url);
+    EXT_SCRIPT_INFO.scripts.push([
+      "Killstreak Buttons",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/addKSButtons",
+    ]);
   }
 }
 
