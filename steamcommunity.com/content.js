@@ -17,7 +17,10 @@ function scriptRouter() {
   let url = new URL(window.location.href);
   /* If there is the next in hostname, redirect to newUI scripts */
   loadSteamLinks();
-  EXT_SCRIPT_INFO.scripts.push("loadSteamLinks");
+  EXT_SCRIPT_INFO.scripts.push([
+    "loadSteamLinks",
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks"
+  ]);
 }
 
 //Start the script

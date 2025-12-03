@@ -23,10 +23,16 @@ function scriptRouter() {
   if (url.pathname.includes("item") && url.pathname.includes("tf2")) {
     /* start scripts for normal item page */
     loadLink2Backpack();
-    EXT_SCRIPT_INFO.scripts.push("Links to Bacpack.tf");
+    EXT_SCRIPT_INFO.scripts.push([
+      "Links to backpack.tf",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/stntrading.eu/link2Backpack",
+    ]);
 
     loadCopyClipboard();
-    EXT_SCRIPT_INFO.scripts.push("Copy to clipboard");
+    EXT_SCRIPT_INFO.scripts.push([
+      "Copy to clipboard",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/stntrading.eu/copyClipboard",
+    ]);
   }
 
   /* Start all pages script */

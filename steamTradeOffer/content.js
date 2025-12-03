@@ -15,13 +15,18 @@ const EXT_SCRIPT_INFO = {
 function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
-  if(url.pathname.includes("tradeoffer") || url.pathname.includes("tradeoffers")){
+  if (
+    url.pathname.includes("tradeoffer") ||
+    url.pathname.includes("tradeoffers")
+  ) {
     //loadShowDenominations();
     loadPartnerLinks();
-    EXT_SCRIPT_INFO.scripts.push("Partner Links");
+    EXT_SCRIPT_INFO.scripts.push([
+      "Partner Links",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/partnerLinks",
+    ]);
   }
   /* If there is the next in hostname, redirect to newUI scripts */
-  
 }
 
 //Start the script
