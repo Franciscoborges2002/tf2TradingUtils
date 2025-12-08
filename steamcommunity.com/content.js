@@ -12,14 +12,22 @@ const EXT_SCRIPT_INFO = {
 /**
 @description: Function to route the pathname to the scripts
 */
-function scriptRouter() {
+async function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
+
+  bots = await loadBotDb();
+  console.log(bots);
   /* If there is the next in hostname, redirect to newUI scripts */
   loadSteamLinks();
   EXT_SCRIPT_INFO.scripts.push([
     "loadSteamLinks",
-    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks"
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks",
+  ]);
+  loadBotRep(bots);
+  EXT_SCRIPT_INFO.scripts.push([
+    "botRep",
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks" /* CHANGEEEE THE LINK */,
   ]);
 }
 
@@ -32,12 +40,40 @@ Utility funtions to load scripts
 function loadSteamLinks() {
   (async () => {
     // Load module dynamically
-    const { showUsefullLinks } = await import(
+    const { steamLinks } = await import(
       chrome.runtime.getURL("steamcommunity.com/steamLinks/content.js")
     );
 
-    showUsefullLinks();
+    steamLinks();
   })();
+}
+
+function loadBotRep(bots) {
+  (async () => {
+    // Load module dynamically
+    const { showBotRepProfile } = await import(
+      chrome.runtime.getURL("steamcommunity.com/botRep/content.js")
+    );
+
+    showBotRepProfile(bots);
+  })();
+}
+
+// Small helper so it works in Chrome + Firefox
+const api = typeof browser !== "undefined" ? browser : chrome;
+
+// Load bot DB JSON from extension package
+async function loadBotDb() {
+  try {
+    return await fetch(
+      "https://raw.githubusercontent.com/Franciscoborges2002/tf2TradingUtils/refs/heads/main/utils/data/trustedBots.json"
+    ).then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch bots info");
+      return res.json();
+    });
+  } catch {
+    console.warn("[TF2TradingUtils]: Bot list failed to fetch");
+  }
 }
 
 /* 
