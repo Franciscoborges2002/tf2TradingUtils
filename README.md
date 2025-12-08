@@ -11,7 +11,10 @@
   <a href="https://steamcommunity.com/groups/tf2tradingutils">
     <img src="https://img.shields.io/badge/Steam%20Group-TF2TradingUtils-1b2838?logo=steam&logoColor=white" alt="Steam Group">
   </a>
-  <img src="https://img.shields.io/badge/Downloads-50+-1b2838?logoColor=white" alt="Downloads">
+  <!-- Chrome downloads -->
+  <img src="https://img.shields.io/badge/Downloads_Chrome-50+-4285F4?logo=googlechrome&logoColor=#4285F4" alt="Downloads Chrome">
+  <!-- Firefox downloads -->
+  <img src="https://img.shields.io/badge/Downloads_Firefox-4-FF7139?logo=firefoxbrowser&logoColor=#FF7139" alt="Downloads Firefox">
 </p>
 
 ---
@@ -19,6 +22,16 @@
 ## Overview
 
 **TF2 Trading Utils** is a collection of small browser utilities and scripts to make Team Fortress 2 trading easier and more efficient.
+
+---
+
+## Installation
+
+Get it directly from the Chrome Web Store:  
+👉 [**TF2 Trading Utils on Chrome**](https://chromewebstore.google.com/detail/tf2tradingutils/pjfeekdjhfcpaphlmapjeamcakidicjf)
+
+Get it directly from the Firefox Addons:  
+👉 [**TF2 Trading Utils on Firefox**](https://addons.mozilla.org/pt-PT/firefox/addon/tf2tradingutils/)
 
 ---
 
@@ -41,30 +54,10 @@
 
 ---
 
-## Installation
-
-Get it directly from the Chrome Web Store:  
-👉 [**TF2 Trading Utils on Chrome**](https://chromewebstore.google.com/detail/tf2tradingutils/pjfeekdjhfcpaphlmapjeamcakidicjf)
-
-Get it directly from the Firefox Addons:  
-👉 [**TF2 Trading Utils on Firefox**]([https://chromewebstore.google.com/detail/tf2tradingutils/pjfeekdjhfcpaphlmapjeamcakidicjf](https://addons.mozilla.org/pt-PT/firefox/addon/tf2tradingutils/))
-
----
-
 ## Community
 
 Join our Steam group to share feedback, get updates, or suggest new features:  
 [**TF2TradingUtils Steam Group**](https://steamcommunity.com/groups/tf2tradingutils)
-
----
-
-## Roadmap
-
-### V1.1.0
-- [x] Popup of the extension with the scripts loaded into that page
-- [x] Partner Links in the trade offer page
-- [] scrap.tf links on hovering
-- [] unusual support to links2Backpack script
 
 ---
 
