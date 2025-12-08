@@ -40,13 +40,19 @@
     "belongs": "https://scrap.tf",
     "label": "Scrap.TF #1 Keys bot (#10)",
     "trust": "trusted"
-  }
-  ,
+  },
   "76561198923653623": {
     "steamid": "76561198923653623",
     "name": "Beep Boop! I'm a Bot",
     "belongs": "https://stntrading.eu",
     "label": "Stntrading.eu Items category bot",
+    "trust": "trusted"
+  },
+  "76561199063491873": {
+    "steamid": "76561199063491873",
+    "name": "Baba Yaga Items",
+    "belongs": "https://steamcommunity.com/profiles/76561198151942857",
+    "label": "Independent trading bot",
     "trust": "trusted"
   }
 }
