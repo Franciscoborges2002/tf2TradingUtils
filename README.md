@@ -46,6 +46,9 @@
 Get it directly from the Chrome Web Store:  
 👉 [**TF2 Trading Utils on Chrome**](https://chromewebstore.google.com/detail/tf2tradingutils/pjfeekdjhfcpaphlmapjeamcakidicjf)
 
+Get it directly from the Firefox Addons:  
+👉 [**TF2 Trading Utils on Firefox**]([https://chromewebstore.google.com/detail/tf2tradingutils/pjfeekdjhfcpaphlmapjeamcakidicjf](https://addons.mozilla.org/pt-PT/firefox/addon/tf2tradingutils/))
+
 ---
 
 ## Community
