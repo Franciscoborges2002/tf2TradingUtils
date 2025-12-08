@@ -17,9 +17,15 @@ const linksInfo = [
     classes: ["btn_profile_action", "btn_medium"],
     dropdown_classes: ["popup_menu_item"],
   },
+  {
+    label: "steamdb.info",
+    href: (id) => `https://steamdb.info/calculator/${id}`,
+    classes: ["btn_profile_action", "btn_medium"],
+    dropdown_classes: ["popup_menu_item"],
+  },
 ];
 
-export function showUsefullLinks() {
+export function steamLinks() {
   let url = window.location.toString(); // Get the url of the page
 
   if (
