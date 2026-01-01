@@ -14,9 +14,10 @@ Link:
 https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapHoverItemLinks
 */
 
+export function ItemLinks() {
+  // store pending hover info
+  let pendingItemEl = null;
 
-export function scrapHoverItemLinks() {
-  let lastHoveredItem = null;
   // Inject CSS
   const style = document.createElement("style");
   style.textContent = `
@@ -35,12 +36,8 @@ export function scrapHoverItemLinks() {
       max-width:260px;
       display:block;
     }
-    #tf2utils-mini-modal .ttl{
-      font-weight:700; margin-bottom:8px;
-    }
-    #tf2utils-mini-modal .row{
-      display:flex; gap:8px; flex-wrap:wrap;
-    }
+    #tf2utils-mini-modal .tf2utils-mini-modal-name{ font-weight:700; margin-bottom:8px; }
+    #tf2utils-mini-modal .tf2utils-mini-modal-btns{ display:flex; gap:8px; flex-wrap:wrap; padding: 4px; }
     #tf2utils-mini-modal .btn{
       border:1px solid #2e2e2e;
       background: #352f2cff;
@@ -50,9 +47,7 @@ export function scrapHoverItemLinks() {
       text-decoration:none;
       font-size:12px;
     }
-    #tf2utils-mini-modal .btn:hover{
-      background: #201c1a;
-    }
+    #tf2utils-mini-modal .btn:hover{ background: #201c1a; }
   `;
   document.head.appendChild(style);
 
@@ -60,67 +55,110 @@ export function scrapHoverItemLinks() {
   const modal = document.createElement("div");
   modal.id = "tf2utils-mini-modal";
   modal.innerHTML = `
-    <div class="ttl">Hover an item…</div>
-    <div class="row"></div>
+    <div class="tf2utils-mini-modal-name">Hover an item…</div>
+    <div class="tf2utils-mini-modal-btns"></div>
   `;
   document.documentElement.appendChild(modal);
 
-  // Update modal content
-  function updateModal(name) {
-    const ttl = modal.querySelector(".ttl");
-    const row = modal.querySelector(".row");
+  function updateModal(name, itemEl) {
+    const className = modal.querySelector(".tf2utils-mini-modal-name");
+    const classBtns = modal.querySelector(".tf2utils-mini-modal-btns");
 
-    ttl.textContent = name;
-    row.innerHTML = "";
+    className.textContent = name;
+    classBtns.innerHTML = "";
 
-    makeLinks(name, lastHoveredItem).forEach(({ label, href }) => {
+    makeLinks(name, itemEl).forEach(({ label, href }) => {
       const btn = document.createElement("a");
       btn.className = "btn";
       btn.textContent = label;
       btn.href = href;
       btn.target = "_blank";
-      row.appendChild(btn);
+      classBtns.appendChild(btn);
     });
   }
 
-  // Watch for Scrap.tf hover tooltip becoming visible
+  // Watch for hover tooltip becoming visible
   const hoverEl = document.querySelector(".hover-over");
-
   if (!hoverEl) {
     console.warn("[TF2Utils] Scrap.tf hover-over not found.");
     return;
   }
 
-  // Observe changes to hover-over style (Scrap.tf toggles inline display)
-  const observer = new MutationObserver(() => {
-    const display = hoverEl.style.display;
-
-    if (display !== "none") {
-      const nameEl =
-        hoverEl.querySelector(".hover-over-title span") ||
-        hoverEl.querySelector(".hover-over-title");
-
-      if (nameEl) {
-        const itemName = nameEl.textContent.trim();
-
-        // Grab the item element THAT CREATED THE HOVER
-        lastHoveredItem = document.querySelector(".item.hoverable:hover");
-
-        updateModal(itemName);
-      }
-    }
+  /* Get the item information */
+  document.addEventListener("mouseover", (e) => {
+    const item = e.target.closest(".item.hoverable");
+    if (!item) return;
+    pendingItemEl = item;
   });
 
-  observer.observe(hoverEl, { attributes: true, attributeFilter: ["style"] });
+  document.addEventListener("mouseout", (e) => {
+    if (e.target.closest(".item.hoverable")) pendingItemEl = null;
+  });
 
-  console.log("[TF2Utils] Hover-observer active.");
+  // Updates the modal when the user clicks with the mouse wheel on the item when hovering
+  document.addEventListener(
+    "mousedown",
+    (e) => {
+      //Verify if there is any pending item to be displayed
+      if (!pendingItemEl) return;
+
+      //Check eaither if is pressing the mouse wheel or the control
+      //CtrlKey: Windows/linux, metaKey: Mac
+      const isActivate =
+        e.button === 1 || (e.button === 0 && (e.ctrlKey || e.metaKey));
+      //Verify if one of the 2 options were pressed in order to update the modal
+      if (!isActivate) return;
+
+      const hoverEl = document.querySelector(".hover-over");
+      if (!hoverEl) return;
+
+      // tooltip must be visible (Scrap uses display:none)
+      if (hoverEl.style.display === "none") return;
+
+      const titleSpan = hoverEl.querySelector(".hover-over-title span");
+      const titleDiv = hoverEl.querySelector(".hover-over-title");
+      const contentDiv = hoverEl.querySelector(".hover-over-content");
+
+      const name = (
+        titleSpan?.textContent ||
+        titleDiv?.textContent ||
+        ""
+      ).trim();
+      const contentHtml = contentDiv?.innerHTML || "";
+
+      if (!name) return;
+
+      // If you want quality class directly from tooltip:
+      const qualityClass = titleSpan
+        ? [...titleSpan.classList].find((c) => c.startsWith("quality"))
+        : null;
+      console.log({ name, qualityClass, contentHtml, pendingItemEl });
+
+      // update modal
+      updateModal(name, pendingItemEl);
+
+      // prevent auto-scroll(mouse wheel)  or redirection to new page(ctrl)
+      e.preventDefault();
+    },
+    true
+  );
+
+  console.log("[TF2Utils] Hover capture + wheel-click to update active.");
 }
 
+/* 
+Function to create the links to be displayed
+@args:
+  - name: Name of the item
+  - itemEl: HTML item element (get more information about the item, ks, paint, unu effect)
+*/
 function makeLinks(name, itemEl) {
   // --- QUALITY DETECTION ---
   // Default: Unique (6)
   let qualityName = "Unique";
   let qualityId = 6;
+  let unusualEffectName = null;
+  //let unusualEffectId = null;
 
   if (itemEl.classList.contains("quality0")) {
     qualityName = "Normal";
@@ -137,6 +175,9 @@ function makeLinks(name, itemEl) {
   if (itemEl.classList.contains("quality5")) {
     qualityName = "Unusual";
     qualityId = 5;
+    unusualEffectName = getUnusualEffectName(itemEl);
+    //unusualEffectId = unusualIdByName[unusualEffectName] ?? null;
+    //console.log("unusualEffectId", unusualEffectId);
   }
   if (itemEl.classList.contains("quality6")) {
     qualityName = "Unique";
@@ -183,7 +224,10 @@ function makeLinks(name, itemEl) {
 
   // --- AUSTRALIUM DETECTION ---
   const dataTitle = itemEl.getAttribute("data-title") || "";
-  const imgUrl = itemEl.style.backgroundImage || "";
+  //const imgUrl = itemEl.style.backgroundImage || "";
+
+  console.log("dataTitle " + dataTitle);
+  console.log("name ", name);
 
   const isAustralium =
     name.includes("Australium") || dataTitle.includes("Australium");
@@ -216,14 +260,34 @@ function makeLinks(name, itemEl) {
 
   return [
     {
-      label: "Stats",
+      label: "Bp Stats",
       href: `https://backpack.tf/stats/${qualityName}/${encodedStatsName}/Tradable/${craftPathSegment}`,
     },
     {
-      label: "Classifieds",
+      label: "Bp Classifieds",
       href:
         `https://backpack.tf/classifieds?item=${encodedClassifiedsName}` +
         `&quality=${qualityId}&tradable=1&craftable=${craftParam}&australium=${australiumParam}&killstreak_tier=${ksTier}`,
+    },
+    {
+      label: "Next Bp Stats",
+      href:
+        `https://next.backpack.tf/stats?item=${encodedClassifiedsName}` +
+        `&quality=${qualityId}&tradable=1&craftable=${craftParam}&${
+          isAustralium ? `australium=${australiumParam}` : ``
+        }&killstreakTier=${ksTier}`,
+    },
+    {
+      label: "Next Bp Classifieds",
+      href:
+        `https://next.backpack.tf/classifieds?itemName=${encodedClassifiedsName}` +
+        `&quality=${qualityId}&tradable=1&craftable=${craftParam}&australium=${australiumParam}&killstreakTier=${ksTier}`,
+    },
+    {
+      label: "Steam Market",
+      href:
+        `https://steamcommunity.com/market/listings/440/` +
+        `${encodeURIComponent(baseName)}`,
     },
     {
       label: "Wiki",
@@ -232,4 +296,23 @@ function makeLinks(name, itemEl) {
       )}`,
     },
   ];
+}
+
+/* Function to extract the effect name */
+function getUnusualEffectName() {
+  const hoverEl = document.querySelector(".hover-over");
+  if (!hoverEl || hoverEl.style.display === "none") return null;
+
+  const contentEl = hoverEl.querySelector(".hover-over-content");
+  if (!contentEl) return null;
+
+  // Convert <br> into newlines, then strip any remaining tags.
+  const text = contentEl.innerHTML
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+
+  // Grab ONLY the effect line
+  const match = text.match(/^Effect:\s*(.+)$/im);
+  return match ? match[1].trim() : null;
 }
