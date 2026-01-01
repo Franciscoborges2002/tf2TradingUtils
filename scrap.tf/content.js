@@ -30,10 +30,10 @@ function scriptRouter() {
   }
 
   /* Start all pages script */
-  loadHoverItemLinks();
+  loadItemLinks();
   EXT_SCRIPT_INFO.scripts.push([
     "Hover Item Links",
-    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapHoverItemLinks"
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/ItemLinks"
   ]);
 }
 
@@ -57,14 +57,14 @@ function loadScrapItemsTableLinks() {
 /* 
 Utility funtions to load scripts
 */
-function loadHoverItemLinks() {
+function loadItemLinks() {
   (async () => {
     // Load module dynamically
-    const { scrapHoverItemLinks } = await import(
-      chrome.runtime.getURL("scrap.tf/scrapHoverItemLinks/content.js")
+    const { ItemLinks } = await import(
+      chrome.runtime.getURL("scrap.tf/ItemLinks/content.js")
     );
 
-    scrapHoverItemLinks();
+    ItemLinks();
   })();
 }
 
