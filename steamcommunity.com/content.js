@@ -16,19 +16,29 @@ async function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
 
+  if(url.pathname.includes("inventory")){
+    loadItemLinks();
+    EXT_SCRIPT_INFO.scripts.push([
+      "itemLinks",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/itemLinks",
+    ]);
+  }
+
+  if(url.pathname.includes("profile") || url.pathname.includes("id")){
   bots = await loadBotDb();
   console.log(bots);
   /* If there is the next in hostname, redirect to newUI scripts */
   loadSteamLinks();
-  EXT_SCRIPT_INFO.scripts.push([
-    "loadSteamLinks",
-    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks",
-  ]);
-  loadBotRep(bots);
-  EXT_SCRIPT_INFO.scripts.push([
-    "botRep",
-    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks" /* CHANGEEEE THE LINK */,
-  ]);
+    EXT_SCRIPT_INFO.scripts.push([
+      "loadSteamLinks",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks",
+    ]);
+    loadBotRep(bots);
+    EXT_SCRIPT_INFO.scripts.push([
+      "botRep",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/botRep",
+    ]);
+  }
 }
 
 //Start the script
@@ -56,6 +66,24 @@ function loadBotRep(bots) {
     );
 
     showBotRepProfile(bots);
+  })();
+}
+
+function loadItemLinks() {
+  (async () => {
+    // Load module dynamically
+    const { showItemLinks } = await import(
+      chrome.runtime.getURL("steamcommunity.com/itemLinks/content.js")
+    );
+
+    showItemLinks();
+
+    const target = document.querySelector("#iteminfo0") ||
+                   document.querySelector("#iteminfo1") ||
+                   document.body;
+
+    new MutationObserver(() => showItemLinks())
+      .observe(target, { childList: true, subtree: true });
   })();
 }
 
