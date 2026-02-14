@@ -61,5 +61,19 @@
     "belongs": "Unknown",
     "label": "Independent trading bot",
     "trust": "trusted"
+  },
+  "76561199013715460": {
+    "steamid": "76561199013715460",
+    "name": "⚡Hex #1⚡⇄[24/7]",
+    "belongs": "https://steamcommunity.com/id/HexOfficial",
+    "label": "Independent trading bot",
+    "trust": "trusted"
+  },
+  "76561198274895819": {
+    "steamid": "76561198274895819",
+    "name": "⚡Hex #2⚡⇄[24/7]",
+    "belongs": "https://steamcommunity.com/id/HexOfficial",
+    "label": "Independent trading bot",
+    "trust": "trusted"
   }
 }
