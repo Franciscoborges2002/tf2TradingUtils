@@ -2,13 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-02-14
+I lost the changnes I was doing, when I was transitioning OS :(
+### Added
+- Added botRep script on steamcommunity.com and tradeoffers scripts folders
+- Added itemLinks script on steamcommunity.com scripts folder
+- Published extension on firefox
+
+### Updated
+- Added steamdb.info in steamLinks script
+' Better handling itemLinks in scrap.tf
+
 ## [1.1.0] - 2025-11-24
 ### Added
 - Script scrapHoverItemLinks for scrap.tf website
 - Script partnerLinks for steam trade helper
 - Script links2Backpack (stntrading.eu) now supports unusal linking to backpack.tf websites
 - Popup to the extension to showcase the current scripts that were loaded
-- Added itemLinks script on steamcommunity.com scripts folder
 
 ### Updated
 - Minor changes
