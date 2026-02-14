@@ -11,7 +11,7 @@ I lost the changnes I was doing, when I was transitioning OS :(
 
 ### Updated
 - Added steamdb.info in steamLinks script
-' Better handling itemLinks in scrap.tf
+- Better handling itemLinks in scrap.tf
 
 ## [1.1.0] - 2025-11-24
 ### Added
