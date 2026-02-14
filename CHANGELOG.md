@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - Script partnerLinks for steam trade helper
 - Script links2Backpack (stntrading.eu) now supports unusal linking to backpack.tf websites
 - Popup to the extension to showcase the current scripts that were loaded
+- Added itemLinks script on steamcommunity.com scripts folder
 
 ### Updated
 - Minor changes

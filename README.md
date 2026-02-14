@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/badge/Steam%20Group-TF2TradingUtils-1b2838?logo=steam&logoColor=white" alt="Steam Group">
   </a>
   <!-- Chrome downloads -->
-  <img src="https://img.shields.io/badge/Downloads_Chrome-50+-4285F4?logo=googlechrome&logoColor=white" alt="Downloads Chrome">
+  <img src="https://img.shields.io/badge/Downloads_Chrome-100+-4285F4?logo=googlechrome&logoColor=white" alt="Downloads Chrome">
   <!-- Firefox downloads -->
   <img src="https://img.shields.io/badge/Downloads_Firefox-4-FF7139?logo=firefoxbrowser&logoColor=white" alt="Downloads Firefox">
 </p>
