@@ -1,6 +1,6 @@
 # Version 1.0.2
 
-* Added filterSpecialListings script to show and hide special items
+* Added filterSpecialListings script to show and hide special items in both UIs
 
 # Version 1.0.1
 
