@@ -22,7 +22,12 @@ async function scriptRouter() {
     url.pathname.includes("tradeoffer") ||
     url.pathname.includes("tradeoffers")
   ) {
-    //loadShowDenominations();
+    loadShowTradeDetails();
+    EXT_SCRIPT_INFO.scripts.push([
+      "Show Denominations",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/showTradeDetails",
+    ]);
+
     loadPartnerLinks();
     EXT_SCRIPT_INFO.scripts.push([
       "Partner Links",
@@ -31,9 +36,15 @@ async function scriptRouter() {
 
     loadBotRep(bots);
     EXT_SCRIPT_INFO.scripts.push([
-      "Partner Links",
+      "Bots Trust",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/",
     ]);
+
+/*     loadAddCurrency();
+    EXT_SCRIPT_INFO.scripts.push([
+      "Add Currency",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/addCurrency",
+    ]); */
   }
   /* If there is the next in hostname, redirect to newUI scripts */
 }
@@ -42,19 +53,17 @@ async function scriptRouter() {
 scriptRouter();
 
 /* 
-Utility funtions to load scripts
+Utility function to load the denomination summary script
 */
-/* function loadShowDenominations() {
+function loadShowTradeDetails() {
   (async () => {
-    // Load module dynamically
-    const { showDenominationsUsers } = await import(
-      chrome.runtime.getURL("steamTradeHelper/showDenominations/content.js")
+    const { showTradeDetails } = await import(
+      chrome.runtime.getURL("steamTradeOffer/showTradeDetails/content.js")
     );
-
-    showDenominationsUsers();
+    showTradeDetails();
   })();
-} */
-
+}
+ 
 /* 
 Utility funtions to load scripts
 */
@@ -68,6 +77,15 @@ function loadPartnerLinks() {
     showPartnerLinks();
   })();
 }
+
+/* function loadAddCurrency() {
+  (async () => {
+    const { addCurrency } = await import(
+      chrome.runtime.getURL("steamTradeOffer/addCurrency/content.js")
+    );
+    addCurrency();
+  })();
+} */
 
 /* 
 Utility funtions to load scripts
