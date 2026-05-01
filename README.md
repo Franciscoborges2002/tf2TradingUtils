@@ -59,6 +59,9 @@ Get it directly from the Firefox Addons:
 Join our Steam group to share feedback, get updates, or suggest new features:  
 [**TF2TradingUtils Steam Group**](https://steamcommunity.com/groups/tf2tradingutils)
 
+* [**GitHub**](https://github.com/Franciscoborges2002/tf2TradingUtils)
+* [**Codeberg**](https://codeberg.org/fborges02/tf2TradingUtils)
+
 ---
 
 ## Contributing
