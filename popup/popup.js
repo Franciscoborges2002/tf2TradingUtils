@@ -4,79 +4,89 @@
   if (badge) badge.textContent = `v${version}`;
 })();
 
-/*
- * To get the scripts loaded from a website
- */
 document.addEventListener("DOMContentLoaded", async () => {
-  const hostEl = document.getElementById("host"); //page hostname
+  const hostEl      = document.getElementById("host");
   const scriptListEl = document.getElementById("scripts-list");
-  scriptListEl.textContent = "Loading...";
+  const statusBadge  = document.getElementById("status-badge");
 
-  /* Get the current tab to get theloaded scripts */
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab || !tab?.id) {
-    scriptListEl.textContent = "No active tab.";
-    return;
+  function setInactive(message) {
+    // Badge
+    statusBadge.textContent = "inactive";
+    statusBadge.className   = "badge badge--inactive";
+
+    // Body
+    scriptListEl.innerHTML = `
+      <div id="inactive-state">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p>${message}</p>
+      </div>`;
   }
 
-  try {
-    /* Get the loaded scripts from the page content.js */
-    const resp = await chrome.tabs.sendMessage(tab.id, {
-      type: "GET_LOADED_SCRIPTS",
-    });
+  function setActive(site, scripts) {
+    // Badge
+    statusBadge.textContent = "active";
+    statusBadge.className   = "badge badge--active";
 
-    /*No script was found */
-    if (chrome.runtime.lastError) {
-      container.textContent = "No content script detected on this page.";
-      return;
-    }
+    // Host label
+    if (hostEl) hostEl.textContent = site;
 
-    /* Nothing was loaded */
-    if (!resp || !resp.scripts?.length) {
-      scriptListEl.textContent = "No active scripts found.";
-      return;
-    }
-
-    hostEl.textContent = resp.site;
+    // Script rows
     scriptListEl.innerHTML = "";
 
-    console.log(resp.scripts);
-
-    resp.scripts.forEach((script) => {
-      console.log("script", script); // will log the array
-
-      // unpack [name, url]
+    scripts.forEach((script) => {
       const [name, repoUrl] = script;
 
       const wrapper = document.createElement("div");
       wrapper.className = "script-item";
 
-      // Script name
       const nameSpan = document.createElement("span");
       nameSpan.textContent = name;
 
-      // GitHub link
       const link = document.createElement("a");
-      link.href = repoUrl;
+      link.href   = repoUrl;
       link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.title = "View script on GitHub";
+      link.rel    = "noopener noreferrer";
+      link.title  = "View on GitHub";
 
-      // GitHub icon (store this file in your extension, e.g. public/logos/github.svg)
       const icon = document.createElement("img");
-      icon.src = "../public/logos/github.svg"; // path must be correct relative to popup.html
-      icon.alt = "GitHub";
+      icon.src       = "../public/logos/github.svg";
+      icon.alt       = "GitHub";
       icon.className = "gh-icon";
 
       link.appendChild(icon);
-
       wrapper.appendChild(nameSpan);
       wrapper.appendChild(link);
       scriptListEl.appendChild(wrapper);
     });
-  } catch (err) {
-    scriptListEl.textContent =
-      "No response from content script. Maybe not injected yet?";
-    console.warn("[Popup]", err);
+  }
+
+  // Loading state
+  scriptListEl.innerHTML = `<div id="inactive-state"><p>Loading…</p></div>`;
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    setInactive("No active tab.");
+    return;
+  }
+
+  try {
+    const resp = await chrome.tabs.sendMessage(tab.id, { type: "GET_LOADED_SCRIPTS" });
+
+    if (chrome.runtime.lastError || !resp) {
+      setInactive("Extension not active in this tab.");
+      return;
+    }
+
+    if (!resp.scripts?.length) {
+      setInactive("No active scripts on this page.");
+      return;
+    }
+
+    setActive(resp.site, resp.scripts);
+
+  } catch {
+    setInactive("Extension not active in this tab.");
   }
 });
