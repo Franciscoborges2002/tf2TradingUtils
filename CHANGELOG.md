@@ -2,11 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.2.0] - 2026-04-29
+## [1.2.0] - 2026-05-02
  
 ### Added
 - showTradeDDetails script
-- addCurrency script
 - pageContext script
 - filterSpecialItems script for backpack.tf
 
