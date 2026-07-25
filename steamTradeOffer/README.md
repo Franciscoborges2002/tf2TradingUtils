@@ -7,5 +7,5 @@
 | botRep     | Shows information if it's an registered bot, and the trustubility.    | [botRep](./botRep/)     | [changeLog](./botRep/changeLog.md)     |
 | partnerLinks | Show useful patner links in trade page. | [partnerLinks](./partnerLinks/) | [changeLog](./partnerLinks/changeLog.md) |
 | showTradeDetails | show Trade items and details, making a summary of the trade. | [showTradeDetails](./showTradeDetails/) | [changeLog](./showTradeDetails/changeLog.md) |
-| addCurrency | Add currency to the trade. | [addCurrency](./addCurrency/) | [changeLog](./addCurrency/changeLog.md) |
+| tradeOfferPanel | Panel of trade offer utilities — currently, add currency to the trade. | [tradeOfferPanel](./tradeOfferPanel/) | [changeLog](./tradeOfferPanel/CHANGELOG.md) |
 | pageContext | Utility script to have the inventory of the users loaded to get information. | [pageContext](./pageContext/) | [changeLog](./pageContext/changeLog.md) |
