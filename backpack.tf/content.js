@@ -28,6 +28,11 @@ function scriptRouter() {
       "Filter Special Listings",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/filterSpecialListings",
     ]);
+    loadOneClickOfferNewUI();
+    EXT_SCRIPT_INFO.scripts.push([
+      "One-Click Offer",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/oneClickOffer",
+    ]);
   } else {
     /* start scripts for oldUI */
 
@@ -43,6 +48,11 @@ function scriptRouter() {
       EXT_SCRIPT_INFO.scripts.push([
         "Filter Special Listings",
         "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/filterSpecialListings",
+      ]);
+      loadOneClickOffer();
+      EXT_SCRIPT_INFO.scripts.push([
+        "One-Click Offer",
+        "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/oneClickOffer",
       ]);
     }
   }
@@ -74,12 +84,30 @@ function loadFilterSpecialListingsOldUI() {
   })();
 }
 
+function loadOneClickOffer() {
+  (async () => {
+    const { addOneClickOffer } = await import(
+      chrome.runtime.getURL("backpack.tf/oldUI/oneClickOffer/content.js")
+    );
+    addOneClickOffer();
+  })();
+}
+
 function loadFilterSpecialListingsNewUI() {
   (async () => {
     const { filterSpecialListingsNewUI } = await import(
       chrome.runtime.getURL("backpack.tf/newUI/filterSpecialListings/content.js")
     );
     filterSpecialListingsNewUI();
+  })();
+}
+
+function loadOneClickOfferNewUI() {
+  (async () => {
+    const { addOneClickOfferNewUI } = await import(
+      chrome.runtime.getURL("backpack.tf/newUI/oneClickOffer/content.js")
+    );
+    addOneClickOfferNewUI();
   })();
 }
 

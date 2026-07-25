@@ -1,3 +1,7 @@
+# Version 1.1.0
+
+* Added oneClickOffer script to instantly send a trade offer with the correct currency for bot-managed listings, in both oldUI and newUI
+
 # Version 1.0.2
 
 * Added filterSpecialListings script to show and hide special items in both UIs
