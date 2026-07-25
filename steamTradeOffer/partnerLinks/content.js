@@ -86,7 +86,7 @@ export function showPartnerLinks() {
     div.appendChild(makeButtonLinkEl(info, steamid64));
   });
 
-  //append the buttons to the page
-  if (parent) traderPartnerHeaderDiv.insertBefore(div, parent.lastElementChild);
+  //append the buttons to the page, before the final clear div
+  traderPartnerHeaderDiv.insertBefore(div, traderPartnerHeaderDiv.lastElementChild);
   return;
 }
