@@ -16,12 +16,11 @@ async function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
 
-  bots = await loadBotDb();
-  
   if (
     url.pathname.includes("tradeoffer") ||
     url.pathname.includes("tradeoffers")
   ) {
+    // Load visual scripts immediately — don't block on bot DB fetch
     loadShowTradeDetails();
     EXT_SCRIPT_INFO.scripts.push([
       "Show Denominations",
@@ -34,17 +33,19 @@ async function scriptRouter() {
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/partnerLinks",
     ]);
 
+    loadTradeOfferPanel();
+    EXT_SCRIPT_INFO.scripts.push([
+      "Trade Offer Panel",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/tradeOfferPanel",
+    ]);
+
+    // botRep needs the bot DB — fetch after other scripts are running
+    const bots = await loadBotDb();
     loadBotRep(bots);
     EXT_SCRIPT_INFO.scripts.push([
       "Bots Trust",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/",
     ]);
-
-/*     loadAddCurrency();
-    EXT_SCRIPT_INFO.scripts.push([
-      "Add Currency",
-      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/addCurrency",
-    ]); */
   }
   /* If there is the next in hostname, redirect to newUI scripts */
 }
@@ -78,14 +79,14 @@ function loadPartnerLinks() {
   })();
 }
 
-/* function loadAddCurrency() {
+function loadTradeOfferPanel() {
   (async () => {
     const { addCurrency } = await import(
-      chrome.runtime.getURL("steamTradeOffer/addCurrency/content.js")
+      chrome.runtime.getURL("steamTradeOffer/tradeOfferPanel/content.js")
     );
     addCurrency();
   })();
-} */
+}
 
 /* 
 Utility funtions to load scripts
