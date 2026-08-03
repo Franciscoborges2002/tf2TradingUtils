@@ -34,6 +34,9 @@
  * https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/oneClickOffer
  */
 
+import { COLOR_ACCENT } from "../../../utils/constants/colors.js";
+import { TF2_APPID, TF2_CONTEXTID } from "../../../utils/constants/tf2Economy.js";
+
 const BTN_CLASS = "tf2utils-oco-btn";
 
 /** Item name as shown on the listing header, cleaned up for matching. */
@@ -54,9 +57,10 @@ function getListingIntent(listingEl) {
 
 /** Seller's real Steam assetid for a sell listing, from the item link. */
 function getSellListingAssetid(listingEl) {
-  const itemLink = listingEl.querySelector('a.item[href^="/classifieds/440_"]');
-  const match    = itemLink?.getAttribute("href")?.match(/^\/classifieds\/440_(\d+)$/);
-  return match ? match[1] : null;
+  const prefix   = `/classifieds/${TF2_APPID}_`;
+  const itemLink = listingEl.querySelector(`a.item[href^="${prefix}"]`);
+  const rest     = itemLink?.getAttribute("href")?.slice(prefix.length);
+  return rest && /^\d+$/.test(rest) ? rest : null;
 }
 
 /** Price text as shown on the listing, e.g. "21.44 ref" or "2 keys, 5.33 ref". */
@@ -95,7 +99,7 @@ function addButtonToListing(listingEl) {
   if (intent === "sell") {
     const assetid = getSellListingAssetid(listingEl);
     if (!assetid) return false;
-    url.searchParams.set("for_item", `440_2_${assetid}`);
+    url.searchParams.set("for_item", `${TF2_APPID}_${TF2_CONTEXTID}_${assetid}`);
   } else {
     const itemName = getListingItemName(listingEl);
     if (!itemName) return false;
@@ -113,7 +117,7 @@ function addButtonToListing(listingEl) {
   const btn = actionLink.cloneNode(true);
   btn.classList.add(BTN_CLASS);
   btn.setAttribute("href", url.toString());
-  btn.style.color = "#B35112";
+  btn.style.color = COLOR_ACCENT;
   btn.setAttribute("title", "One-Click Offer");
 
   actionsDiv.appendChild(btn);

@@ -1,4 +1,6 @@
 // itemLinks.js
+import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
+
 function pickContainer() {
   const c0 = document.querySelector("#iteminfo0");
   const c1 = document.querySelector("#iteminfo1");
@@ -49,7 +51,7 @@ export function showItemLinks() {
   const btnStyle =
     "display:inline-flex;align-items:center;justify-content:center;" +
     "padding:6px 12px;border-radius:6px;text-decoration:none;" +
-    "background:#201C1A;color:#ffffff;font-weight:600;font-size:12px;" +
+    `background:${COLOR_PANEL_BG};color:#ffffff;font-weight:600;font-size:12px;` +
     "border:1px solid rgba(255,255,255,0.15);transition:0.15s ease;";
 
   links.innerHTML = `
