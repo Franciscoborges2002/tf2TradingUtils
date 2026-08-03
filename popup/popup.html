@@ -19,14 +19,72 @@
 
   <div id="scripts-list">Loading...</div>
 
+  <div id="calculator-view" class="hidden-view">
+    <button class="back-btn" data-back>← Back</button>
+
+    <div id="calc-compact-form" class="calc-entry-form">
+      <input type="text" id="calc-input-compact" placeholder='e.g. &quot;2.5 keys&quot; or &quot;2 keys, 55 refs&quot;'>
+      <button id="calc-add-compact" class="calc-add-btn">Add</button>
+    </div>
+
+    <div id="calc-detailed-form" class="calc-entry-form calc-entry-form--hidden">
+      <div class="calc-input-grid">
+        <label><span>Keys</span><input type="number" id="calc-input-keys" min="0" step="0.01" value="0"></label>
+        <label><span>Ref</span><input type="number" id="calc-input-ref" min="0" value="0"></label>
+        <label><span>Rec</span><input type="number" id="calc-input-rec" min="0" value="0"></label>
+        <label><span>Scrap</span><input type="number" id="calc-input-scrap" min="0" value="0"></label>
+      </div>
+      <button id="calc-add-detailed" class="calc-add-btn">Add</button>
+    </div>
+
+    <button id="calc-mode-toggle" class="calc-mode-toggle" title="Switch input style">detailed</button>
+
+    <div id="calc-entries-section">
+      <div id="calc-empty-state">No entries yet.</div>
+      <div id="calc-entries-list"></div>
+    </div>
+
+    <div id="calc-total-section">
+      <div class="calc-total-label">Total</div>
+      <div id="calc-total-detailed" class="calc-total-value">Nothing</div>
+
+      <div class="calc-total-label calc-total-label--secondary">As keys (using settings price)</div>
+      <div id="calc-total-keyed" class="calc-total-value">Nothing</div>
+      <div id="calc-total-keyed-hint" class="calc-total-hint"></div>
+
+      <button id="calc-clear-all" class="calc-clear-btn">Clear</button>
+    </div>
+  </div>
+
+  <div id="settings-view" class="hidden-view">
+    <button class="back-btn" data-back>← Back</button>
+
+    <label class="settings-label">
+      <span>Key price (ref)</span>
+      <input type="number" id="settings-key-price" min="0" step="0.01" placeholder="e.g. 62">
+    </label>
+    <div class="settings-actions">
+      <button id="settings-save" class="calc-add-btn">Save</button>
+      <span id="settings-saved-msg" class="settings-saved-msg"></span>
+    </div>
+  </div>
+
   <footer>
     <span id="version-badge" class="version-badge">v1.1.0</span>
-    <a href="https://github.com/Franciscoborges2002/tf2TradingUtils" target="_blank" title="View on GitHub">
-      <img src="../public/logos/github.svg" alt="GitHub" />
-    </a>
+    <div class="footer-links">
+      <button id="calculator-toggle" class="icon-btn" title="Currency Calculator">
+        <img src="../public/logos/calculator.svg" alt="Calculator" />
+      </button>
+      <button id="settings-toggle" class="icon-btn" title="Settings">
+        <img src="../public/logos/settings.svg" alt="Settings" />
+      </button>
+      <a href="https://github.com/Franciscoborges2002/tf2TradingUtils" target="_blank" title="View on GitHub">
+        <img src="../public/logos/github.svg" alt="GitHub" />
+      </a>
+    </div>
   </footer>
 
-  <script src="popup.js"></script>
+  <script type="module" src="popup.js"></script>
 </body>
 
 </html>

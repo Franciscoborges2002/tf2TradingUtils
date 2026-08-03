@@ -204,7 +204,14 @@ footer {
   background: rgba(0, 0, 0, 0.18);
 }
 
-footer a {
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+footer a,
+.icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -214,11 +221,18 @@ footer a {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   transition: background 0.15s ease, transform 0.1s ease;
+  cursor: pointer;
 }
 
-footer a:hover {
+footer a:hover,
+.icon-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: scale(1.06);
+}
+
+.icon-btn--active {
+  background: rgba(179, 81, 18, 0.18);
+  border-color: rgba(179, 81, 18, 0.5);
 }
 
 footer img {
@@ -227,7 +241,12 @@ footer img {
   opacity: 0.65;
 }
 
-footer a:hover img {
+footer a:hover img,
+.icon-btn:hover img {
+  opacity: 1;
+}
+
+.icon-btn--active img {
   opacity: 1;
 }
 
@@ -242,4 +261,295 @@ footer a:hover img {
   font-weight: 700;
   font-size: 10px;
   letter-spacing: 0.04em;
+}
+
+/* ── CALCULATOR VIEW ── */
+.hidden-view {
+  display: none !important;
+}
+
+#calculator-view {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 8px;
+}
+
+.back-btn {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  color: #b35112;
+}
+
+.calc-entry-form {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.calc-entry-form--hidden {
+  display: none !important;
+}
+
+.calc-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  flex: 1;
+}
+
+.calc-input-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a7f74;
+}
+
+#calculator-view input[type="number"],
+#calculator-view input[type="text"] {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #f0e8de;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 7px;
+  outline: none;
+  width: 100%;
+}
+
+#calculator-view input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+#calculator-view input::-webkit-inner-spin-button,
+#calculator-view input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+#calculator-view input:focus {
+  border-color: #b35112;
+}
+
+.calc-input-error {
+  border-color: #9d312f !important;
+  animation: calc-shake 0.3s;
+}
+
+@keyframes calc-shake {
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+#calc-compact-form {
+  width: 100%;
+}
+
+.calc-add-btn {
+  background: #b35112;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 7px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.calc-add-btn:hover {
+  background: #c95d18;
+}
+
+.calc-mode-toggle {
+  align-self: flex-end;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: inherit;
+  font-size: 9px;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+
+.calc-mode-toggle:hover {
+  border-color: #b35112;
+  color: #b35112;
+}
+
+#calc-entries-section {
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+#calc-empty-state {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+  text-align: center;
+  padding: 6px 0;
+}
+
+#calc-entries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 110px;
+  overflow-y: auto;
+}
+
+.calc-entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.calc-entry-label {
+  color: #c8bdb0;
+}
+
+.calc-entry-remove {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.calc-entry-remove:hover {
+  color: #9d312f;
+}
+
+#calc-total-section {
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  text-align: center;
+}
+
+.calc-total-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a7f74;
+  margin-bottom: 4px;
+}
+
+.calc-total-label--secondary {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.calc-total-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f0e8de;
+}
+
+.calc-total-hint {
+  font-size: 10px;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 2px;
+}
+
+.calc-total-value--compact {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8a7f74;
+  margin-top: 2px;
+}
+
+.calc-clear-btn {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.calc-clear-btn:hover {
+  border-color: #9d312f;
+  color: #9d312f;
+}
+
+/* ── SETTINGS VIEW ── */
+#settings-view {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 10px;
+}
+
+.settings-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a7f74;
+}
+
+#settings-view input[type="number"] {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #f0e8de;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 7px 8px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+#settings-view input::-webkit-inner-spin-button,
+#settings-view input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+#settings-view input:focus {
+  border-color: #b35112;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-saved-msg {
+  font-size: 11px;
+  color: #7ab0d0;
+  font-weight: 600;
 }
