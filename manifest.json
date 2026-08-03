@@ -15,6 +15,10 @@
   "permissions": ["declarativeNetRequest", "storage"],
   "host_permissions": ["https://steamcommunity.com/*"],
 
+  "background": {
+    "service_worker": "background.js"
+  },
+
   "content_scripts": [
     {
       "js": ["scrap.tf/content.js"],
