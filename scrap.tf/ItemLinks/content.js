@@ -57,7 +57,7 @@ export function ItemLinks() {
   const modal = document.createElement("div");
   modal.id = "tf2utils-mini-modal";
   modal.innerHTML = `
-    <div class="tf2utils-mini-modal-name">Hover an item…</div>
+    <div class="tf2utils-mini-modal-name">Middle-click or Ctrl+click an item…</div>
     <div class="tf2utils-mini-modal-btns"></div>
   `;
   document.documentElement.appendChild(modal);
