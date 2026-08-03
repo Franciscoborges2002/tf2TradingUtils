@@ -2,10 +2,17 @@
   "manifest_version": 3,
 
   "name": "tf2TradingUtils",
-  "version": "1.2.0",
+  "version": "1.3.0",
 
   "description": "Some usefull scripts for tf2 trading",
   "author": "Francisco Borges",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tf2tradingutils@fborges.dev",
+      "strict_min_version": "109.0"
+    }
+  },
 
   "action": {
     "default_popup": "popup/popup.html",
@@ -41,11 +48,11 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://steamcommunity.com/tradeoffer/new/*"],
+      "matches": ["https://steamcommunity.com/tradeoffer/*"],
       "js": ["./steamTradeOffer/content.js"]
     },
     {
-      "matches": ["https://steamcommunity.com/tradeoffer/new/*"],
+      "matches": ["https://steamcommunity.com/tradeoffer/*"],
       "js": ["./steamTradeOffer/pageContext/content.js"],
       "world": "MAIN",
       "run_at": "document_idle"
