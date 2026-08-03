@@ -14,6 +14,8 @@ Link:
 https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapHoverItemLinks
 */
 
+import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
+
 export function ItemLinks() {
   // store pending hover info
   let pendingItemEl = null;
@@ -28,7 +30,7 @@ export function ItemLinks() {
       z-index:2147483647;
       padding:10px 12px;
       border-radius:10px;
-      background: #201c1a;
+      background: ${COLOR_PANEL_BG};
       color:#fff;
       border:1px solid #2a2a2a;
       box-shadow:0 8px 20px rgba(0,0,0,.35);
@@ -47,7 +49,7 @@ export function ItemLinks() {
       text-decoration:none;
       font-size:12px;
     }
-    #tf2utils-mini-modal .btn:hover{ background: #201c1a; }
+    #tf2utils-mini-modal .btn:hover{ background: ${COLOR_PANEL_BG}; }
   `;
   document.head.appendChild(style);
 

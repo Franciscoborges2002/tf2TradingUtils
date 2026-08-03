@@ -16,6 +16,8 @@
  * https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/oneClickOffer
  */
 
+import { COLOR_ACCENT } from "../../../utils/constants/colors.js";
+
 const BTN_CLASS = "tf2utils-oco-btn";
 
 // Buy orders carrying any of these attributes want a specific
@@ -94,8 +96,8 @@ function addButtonToListing(li) {
   const btn = sendOfferLink.cloneNode(true);
   btn.classList.add(BTN_CLASS);
   btn.setAttribute("href", url.toString());
-  btn.style.backgroundColor = "#B35112";
-  btn.style.borderColor    = "#B35112";
+  btn.style.backgroundColor = COLOR_ACCENT;
+  btn.style.borderColor    = COLOR_ACCENT;
   btn.setAttribute("title", "One-Click Offer");
   btn.setAttribute("data-original-title", "Instantly sends this trade offer with the correct currency — no review step.");
 

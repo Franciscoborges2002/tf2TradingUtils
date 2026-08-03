@@ -9,6 +9,9 @@
  * Link: https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/tradeOfferPanel
  */
 
+import { COLOR_ACCENT, COLOR_DANGER, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
+import { TF2_CURRENCY, TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
+
 const PANEL_ID  = "tf2utils-addcurrency-panel";
 const STYLES_ID = "tf2utils-addcurrency-styles";
 
@@ -16,19 +19,16 @@ const STYLES_ID = "tf2utils-addcurrency-styles";
 // this panel directly above the trade summary.
 const SUMMARY_PANEL_ID = "tf2utils-denominations-panel";
 
-const DENOMS = [
-  { key: "keys",  label: "Keys",  color: "#B35112" },
-  { key: "ref",   label: "Ref",   color: "#c0c0c0" },
-  { key: "rec",   label: "Rec",   color: "#c0c0c0" },
-  { key: "scrap", label: "Scrap", color: "#c0c0c0" },
-];
+const DENOMS = ["keys", "ref", "rec", "scrap"].map((key) => ({
+  key,
+  label: TF2_CURRENCY[key].short,
+  color: key === "keys" ? COLOR_ACCENT : COLOR_METAL,
+}));
 
-const SHORT_TO_NAME = {
-  "Mann Co. Supply Crate Key": "Keys",
-  "Refined Metal":   "Ref",
-  "Reclaimed Metal": "Rec",
-  "Scrap Metal":     "Scrap",
-};
+// Full Steam item name → short label, e.g. "Refined Metal" → "Ref"
+const SHORT_TO_NAME = Object.fromEntries(
+  Object.entries(TF2_CURRENCY_BY_NAME).map(([name, c]) => [name, c.short])
+);
 
 let g_mode       = "detailed"; // "detailed" | "compact"
 let g_activeSide = "me";       // "me" | "them" — whose inventory tab is selected
@@ -441,7 +441,7 @@ function injectStyles() {
       box-sizing: border-box;
       margin: 6px 0;
       border-radius: 6px;
-      background: #201C1A;
+      background: ${COLOR_PANEL_BG};
       border: 1px solid rgba(255,255,255,0.1);
       font: 12px / 1.4 "Motiva Sans", system-ui, Segoe UI, Roboto, sans-serif;
       color: #ffffff;
@@ -472,7 +472,7 @@ function injectStyles() {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: #B35112;
+      color: ${COLOR_ACCENT};
       background: rgba(179,81,18,0.15);
       border: 1px solid rgba(179,81,18,0.4);
       border-radius: 3px;
@@ -488,7 +488,7 @@ function injectStyles() {
       padding: 1px 6px;
       cursor: pointer;
     }
-    .ac-mode-toggle:hover { border-color: #B35112; color: #B35112; }
+    .ac-mode-toggle:hover { border-color: ${COLOR_ACCENT}; color: ${COLOR_ACCENT}; }
 
     .ac-clear-side-btn {
       background: none;
@@ -500,7 +500,7 @@ function injectStyles() {
       padding: 1px 6px;
       cursor: pointer;
     }
-    .ac-clear-side-btn:hover { border-color: #9D312F; color: #9D312F; }
+    .ac-clear-side-btn:hover { border-color: ${COLOR_DANGER}; color: ${COLOR_DANGER}; }
 
     /* Body */
     .ac-body {
@@ -545,7 +545,7 @@ function injectStyles() {
     }
     .ac-input::-webkit-inner-spin-button,
     .ac-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-    .ac-input:focus   { border-color: #B35112; }
+    .ac-input:focus   { border-color: ${COLOR_ACCENT}; }
     .ac-input:disabled { opacity: 0.3; cursor: not-allowed; }
     .ac-btn {
       background: rgba(255,255,255,0.06);
@@ -556,7 +556,7 @@ function injectStyles() {
       padding: 2px 5px;
       cursor: pointer;
     }
-    .ac-btn:hover  { border-color: #B35112; color: #B35112; }
+    .ac-btn:hover  { border-color: ${COLOR_ACCENT}; color: ${COLOR_ACCENT}; }
     .ac-btn--dim   { color: rgba(255,255,255,0.3); }
 
     /* Compact mode */
@@ -576,7 +576,7 @@ function injectStyles() {
       font-size: 12px;
       outline: none;
     }
-    .ac-compact-input:focus { border-color: #B35112; }
+    .ac-compact-input:focus { border-color: ${COLOR_ACCENT}; }
 
     /* Footer */
     .ac-footer {
@@ -588,7 +588,7 @@ function injectStyles() {
     .ac-add-btn {
       flex: 1;
       padding: 5px 0;
-      background: #B35112;
+      background: ${COLOR_ACCENT};
       border: none;
       border-radius: 4px;
       color: #fff;
@@ -607,7 +607,7 @@ function injectStyles() {
       font-size: 11px;
       cursor: pointer;
     }
-    .ac-clear-btn:hover { border-color: #9D312F; color: #9D312F; }
+    .ac-clear-btn:hover { border-color: ${COLOR_DANGER}; color: ${COLOR_DANGER}; }
 
     /* Missing items popup */
     .ac-popup {
@@ -615,8 +615,8 @@ function injectStyles() {
       top: 0;
       left: 0;
       right: 0;
-      background: #201C1A;
-      border: 1px solid #9D312F;
+      background: ${COLOR_PANEL_BG};
+      border: 1px solid ${COLOR_DANGER};
       border-radius: 6px;
       padding: 10px 12px;
       z-index: 9999;
@@ -634,11 +634,11 @@ function injectStyles() {
       padding: 0 2px;
       line-height: 1;
     }
-    .ac-popup-close:hover { color: #9D312F; }
+    .ac-popup-close:hover { color: ${COLOR_DANGER}; }
     .ac-popup-title {
       font-weight: 700;
       font-size: 12px;
-      color: #9D312F;
+      color: ${COLOR_DANGER};
       margin-bottom: 6px;
       padding-right: 16px;
     }

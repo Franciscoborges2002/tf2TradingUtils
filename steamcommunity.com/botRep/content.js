@@ -1,4 +1,6 @@
-/* 
+import { BOT_STATUS_COLORS } from "../../utils/constants/colors.js";
+
+/*
 Funtion to show the bot repulitation on the steamProfiles
 */
 export async function showBotRepProfile(bots) {
@@ -21,13 +23,11 @@ export async function showBotRepProfile(bots) {
     if (botInfo.trust) {
       statusText = "Trusted Bot";
       detailsText = botInfo.label || "This bot is in your trusted list.";
-      bgColor = "rgba(46, 204, 113, 0.1)"; // greenish
-      borderColor = "#2ecc71";
+      ({ background: bgColor, border: borderColor } = BOT_STATUS_COLORS.trusted);
     } else {
       statusText = "⚠ Known Bot (Not Trusted)";
       detailsText = botInfo.label || "This bot is marked as NOT trusted.";
-      bgColor = "rgba(231, 76, 60, 0.1)"; // reddish
-      borderColor = "#e74c3c";
+      ({ background: bgColor, border: borderColor } = BOT_STATUS_COLORS.untrusted);
     }
   } else {
     return;

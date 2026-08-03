@@ -5,15 +5,11 @@
  * Link: https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/showTradeDetails
  */
 
+import { COLOR_ACCENT, COLOR_DANGER, COLOR_INFO, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
+import { TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
+
 const PANEL_ID  = "tf2utils-denominations-panel";
 const STYLES_ID = "tf2utils-denom-styles";
-
-const CURRENCY = {
-  "Mann Co. Supply Crate Key": { short: "Key",   scrap: null, icon: "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEMfvFAz-K1wRIaGRXY_GrPIGIFyBfPAhBtm4V0JYGb18_LbFgXMvb_fFjSJN-S4HmhFuJcLR-Y1M2Z4MCA" },
-  "Refined Metal":             { short: "Ref",   scrap: 9  },
-  "Reclaimed Metal":           { short: "Rec",   scrap: 3  },
-  "Scrap Metal":               { short: "Scrap", scrap: 1  },
-};
 
 // ─────────────────────────────────────────────────────────────
 // Entry point
@@ -221,10 +217,10 @@ function renderCurrency(el, items) {
   let scrap = 0;
 
   for (const item of items) {
-    const cur = CURRENCY[item.name];
+    const cur = TF2_CURRENCY_BY_NAME[item.name];
     if (!cur) continue;
-    if (cur.scrap === null) keys++;
-    else scrap += cur.scrap;
+    if (cur.scrapValue === null) keys++;
+    else scrap += cur.scrapValue;
   }
 
   if (!keys && !scrap) return;
@@ -267,7 +263,7 @@ function renderCompact(el, keys, scrap) {
   const parts = [];
 
   if (keys) {
-    parts.push({ label: `${keys} Key${keys > 1 ? "s" : ""}`, color: "#B35112" });
+    parts.push({ label: `${keys} Key${keys > 1 ? "s" : ""}`, color: COLOR_ACCENT });
   }
 
   if (scrap) {
@@ -277,7 +273,7 @@ function renderCompact(el, keys, scrap) {
     const rem     = scrap % 9;
     // Express remainder as hundredths: e.g. 4 scrap = 44, 3 scrap = 33
     const decimal = String(Math.round((rem / 9) * 100)).padStart(2, "0");
-    parts.push({ label: `${ref}.${decimal} ref`, color: "#c0c0c0" });
+    parts.push({ label: `${ref}.${decimal} ref`, color: COLOR_METAL });
   }
 
   parts.forEach((p, i) => {
@@ -304,10 +300,10 @@ function renderDetailed(el, keys, scrap) {
   const scraps = rem % 3;
 
   const parts = [];
-  if (keys)   parts.push({ label: `${keys} Key${keys > 1 ? "s" : ""}`, color: "#B35112" });
-  if (ref)    parts.push({ label: `${ref} Ref`,                          color: "#c0c0c0" });
-  if (rec)    parts.push({ label: `${rec} Rec`,                          color: "#c0c0c0" });
-  if (scraps) parts.push({ label: `${scraps} Scrap`,                     color: "#c0c0c0" });
+  if (keys)   parts.push({ label: `${keys} Key${keys > 1 ? "s" : ""}`, color: COLOR_ACCENT });
+  if (ref)    parts.push({ label: `${ref} Ref`,                          color: COLOR_METAL });
+  if (rec)    parts.push({ label: `${rec} Rec`,                          color: COLOR_METAL });
+  if (scraps) parts.push({ label: `${scraps} Scrap`,                     color: COLOR_METAL });
 
   parts.forEach((p, i) => {
     const chip = document.createElement("span");
@@ -354,7 +350,7 @@ function injectStyles() {
     #${PANEL_ID} {
       margin: 8px 0;
       border-radius: 6px;
-      background: #201C1A;
+      background: ${COLOR_PANEL_BG};
       border: 1px solid rgba(255,255,255,0.1);
       font: 12px / 1.4 "Motiva Sans", system-ui, Segoe UI, Roboto, sans-serif;
       color: #ffffff;
@@ -392,8 +388,8 @@ function injectStyles() {
       padding: 8px 10px;
       min-width: 0;
     }
-    #tf2d-me   { border-left: 3px solid #9D312F; }
-    #tf2d-them { border-left: 3px solid #395C78; }
+    #tf2d-me   { border-left: 3px solid ${COLOR_DANGER}; }
+    #tf2d-them { border-left: 3px solid ${COLOR_INFO}; }
 
     .tf2d-side-label {
       font-weight: 700;
@@ -405,8 +401,8 @@ function injectStyles() {
       align-items: baseline;
       gap: 5px;
     }
-    #tf2d-me   .tf2d-side-label { color: #9D312F; }
-    #tf2d-them .tf2d-side-label { color: #395C78; }
+    #tf2d-me   .tf2d-side-label { color: ${COLOR_DANGER}; }
+    #tf2d-them .tf2d-side-label { color: ${COLOR_INFO}; }
 
     .tf2d-count-badge {
       font-weight: 400;
@@ -463,7 +459,7 @@ function injectStyles() {
       transition: border-color 0.12s;
     }
     .tf2d-img-wrap:hover {
-      border-color: #B35112;
+      border-color: ${COLOR_ACCENT};
     }
 
     .tf2d-img {
@@ -542,8 +538,8 @@ function injectStyles() {
       flex-shrink: 0;
     }
     .tf2d-currency-toggle:hover {
-      border-color: #B35112;
-      color: #B35112;
+      border-color: ${COLOR_ACCENT};
+      color: ${COLOR_ACCENT};
     }
   `;
   document.head.appendChild(style);
