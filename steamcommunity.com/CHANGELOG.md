@@ -1,13 +1,17 @@
+# Version 1.0.3
+
+- Added groupTradeItems
+
 # Version 1.0.2
 
-Added botRep and itemLinks
+- Added botRep and itemLinks
 
 # Version 1.0.1
 
-Forked steamTradeHelper to steamTradeHelper script page
-Added routerof scripts in content.js
+- Forked steamTradeHelper to steamTradeHelper script page
+- Added routerof scripts in content.js
 
 # Version 1.0.0
 
-Added steamLinks
-Added steamTradeHelper
+- Added steamLinks
+- Added steamTradeHelper
