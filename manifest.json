@@ -12,6 +12,9 @@
     "default_title": "TF2TradingUtils"
   },
 
+  "permissions": ["declarativeNetRequest", "storage"],
+  "host_permissions": ["https://steamcommunity.com/*"],
+
   "content_scripts": [
     {
       "js": ["scrap.tf/content.js"],
@@ -68,7 +71,7 @@
     },
     {
       "resources": ["utils/**"],
-      "matches": ["https://*.backpack.tf/*", "https://scrap.tf/*", "https://stntrading.eu/*"]
+      "matches": ["https://*.backpack.tf/*", "https://scrap.tf/*", "https://stntrading.eu/*", "https://steamcommunity.com/*"]
     }
   ],
   "icons": {
