@@ -16,38 +16,42 @@ async function scriptRouter() {
   //Get the location of the website
   let url = new URL(window.location.href);
 
-  if (
-    url.pathname.includes("tradeoffer") ||
-    url.pathname.includes("tradeoffers")
-  ) {
-    // Load visual scripts immediately — don't block on bot DB fetch
-    loadShowTradeDetails();
-    EXT_SCRIPT_INFO.scripts.push([
-      "Show Denominations",
-      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/showTradeDetails",
-    ]);
+  if (!url.pathname.includes("tradeoffer")) return;
 
-    loadPartnerLinks();
-    EXT_SCRIPT_INFO.scripts.push([
-      "Partner Links",
-      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/partnerLinks",
-    ]);
+  // /tradeoffer/new/* — composing a new offer.
+  // /tradeoffer/<id>/* — viewing one specific offer, read-only.
+  const isNewOffer = url.pathname.includes("/tradeoffer/new");
 
-    loadTradeOfferPanel();
-    EXT_SCRIPT_INFO.scripts.push([
-      "Trade Offer Panel",
-      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/tradeOfferPanel",
-    ]);
+  // Trade summary applies to both — it's just a read of whatever
+  // items are currently in the slots.
+  loadShowTradeDetails();
+  EXT_SCRIPT_INFO.scripts.push([
+    "Show Denominations",
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/showTradeDetails",
+  ]);
 
-    // botRep needs the bot DB — fetch after other scripts are running
-    const bots = await loadBotDb();
-    loadBotRep(bots);
-    EXT_SCRIPT_INFO.scripts.push([
-      "Bots Trust",
-      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/",
-    ]);
-  }
-  /* If there is the next in hostname, redirect to newUI scripts */
+  // Everything else only makes sense while actively composing an offer.
+  if (!isNewOffer) return;
+
+  loadPartnerLinks();
+  EXT_SCRIPT_INFO.scripts.push([
+    "Partner Links",
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/partnerLinks",
+  ]);
+
+  loadTradeOfferPanel();
+  EXT_SCRIPT_INFO.scripts.push([
+    "Trade Offer Panel",
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/tradeOfferPanel",
+  ]);
+
+  // botRep needs the bot DB — fetch after other scripts are running
+  const bots = await loadBotDb();
+  loadBotRep(bots);
+  EXT_SCRIPT_INFO.scripts.push([
+    "Bots Trust",
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/",
+  ]);
 }
 
 //Start the script
