@@ -39,6 +39,14 @@ async function scriptRouter() {
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/botRep",
     ]);
   }
+
+  if (url.pathname.includes("tradeoffers") || url.pathname.includes("tradehistory")) {
+    loadGroupTradeItems();
+    EXT_SCRIPT_INFO.scripts.push([
+      "groupTradeItems",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/groupTradeItems",
+    ]);
+  }
 }
 
 //Start the script
@@ -66,6 +74,24 @@ function loadBotRep(bots) {
     );
 
     showBotRepProfile(bots);
+  })();
+}
+
+function loadAcceptTradeOffers() {
+  (async () => {
+    const { addAcceptTradeOffers } = await import(
+      chrome.runtime.getURL("steamcommunity.com/acceptTradeOffers/content.js")
+    );
+    addAcceptTradeOffers();
+  })();
+}
+
+function loadGroupTradeItems() {
+  (async () => {
+    const { groupTradeItems } = await import(
+      chrome.runtime.getURL("steamcommunity.com/groupTradeItems/content.js")
+    );
+    groupTradeItems();
   })();
 }
 
