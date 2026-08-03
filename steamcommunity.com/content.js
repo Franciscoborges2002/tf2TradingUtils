@@ -40,6 +40,14 @@ async function scriptRouter() {
     ]);
   }
 
+  if (url.pathname.includes("tradeoffers")) {
+    loadAcceptTradeOffers();
+    EXT_SCRIPT_INFO.scripts.push([
+      "acceptTradeOffers",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/acceptTradeOffers",
+    ]);
+  }
+
   if (url.pathname.includes("tradeoffers") || url.pathname.includes("tradehistory")) {
     loadGroupTradeItems();
     EXT_SCRIPT_INFO.scripts.push([
