@@ -146,18 +146,25 @@ document.addEventListener("DOMContentLoaded", () => {
 // under the "settings" key.
 // ─────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  const keyPriceInput = document.getElementById("settings-key-price");
-  const saveBtn       = document.getElementById("settings-save");
-  const savedMsg      = document.getElementById("settings-saved-msg");
+  const keyPriceInput     = document.getElementById("settings-key-price");
+  const earbudsKeysInput  = document.getElementById("settings-earbuds-keys");
+  const earbudsRefInput   = document.getElementById("settings-earbuds-ref");
+  const saveBtn           = document.getElementById("settings-save");
+  const savedMsg          = document.getElementById("settings-saved-msg");
 
   chrome.storage.local.get(["settings"], (result) => {
-    const keyPriceRef = result.settings?.keyPriceRef;
-    if (keyPriceRef != null) keyPriceInput.value = keyPriceRef;
+    const settings = result.settings ?? {};
+    if (settings.keyPriceRef != null)      keyPriceInput.value    = settings.keyPriceRef;
+    if (settings.earbudsPriceKeys != null) earbudsKeysInput.value = settings.earbudsPriceKeys;
+    if (settings.earbudsPriceRef != null)  earbudsRefInput.value  = settings.earbudsPriceRef;
   });
 
   function saveSettings() {
-    const keyPriceRef = parseFloat(keyPriceInput.value) || 0;
-    chrome.storage.local.set({ settings: { keyPriceRef } }, () => {
+    const keyPriceRef      = parseFloat(keyPriceInput.value) || 0;
+    const earbudsPriceKeys = parseFloat(earbudsKeysInput.value) || 0;
+    const earbudsPriceRef  = parseFloat(earbudsRefInput.value) || 0;
+
+    chrome.storage.local.set({ settings: { keyPriceRef, earbudsPriceKeys, earbudsPriceRef } }, () => {
       currentKeyPriceRef = keyPriceRef || null;
       onKeyPriceChanged();
       savedMsg.textContent = "Saved";
@@ -166,7 +173,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   saveBtn.addEventListener("click", saveSettings);
-  keyPriceInput.addEventListener("keydown", (e) => { if (e.key === "Enter") saveSettings(); });
+  [keyPriceInput, earbudsKeysInput, earbudsRefInput].forEach((el) => {
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") saveSettings(); });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────

@@ -312,6 +312,7 @@ footer a:hover img,
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
@@ -530,6 +531,7 @@ footer a:hover img,
   font-size: 12px;
   padding: 7px 8px;
   outline: none;
+  width: 100%;
   -moz-appearance: textfield;
 }
 

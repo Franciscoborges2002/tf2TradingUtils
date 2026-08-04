@@ -1,3 +1,7 @@
+# Version 1.0.4
+
+- Added inventoryCurrencyCounter
+
 # Version 1.0.3
 
 - Added groupTradeItems

@@ -22,6 +22,12 @@ async function scriptRouter() {
       "itemLinks",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/itemLinks",
     ]);
+
+    loadInventoryCurrencyCounter();
+    EXT_SCRIPT_INFO.scripts.push([
+      "inventoryCurrencyCounter",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/inventoryCurrencyCounter",
+    ]);
   }
 
   if(url.pathname.includes("profile") || url.pathname.includes("id")){
@@ -100,6 +106,15 @@ function loadGroupTradeItems() {
       chrome.runtime.getURL("steamcommunity.com/groupTradeItems/content.js")
     );
     groupTradeItems();
+  })();
+}
+
+function loadInventoryCurrencyCounter() {
+  (async () => {
+    const { showInventoryCurrencyCounter } = await import(
+      chrome.runtime.getURL("steamcommunity.com/inventoryCurrencyCounter/content.js")
+    );
+    showInventoryCurrencyCounter();
   })();
 }
 
