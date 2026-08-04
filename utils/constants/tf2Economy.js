@@ -21,11 +21,26 @@ export const TF2_CURRENCY = {
     name:       "Mann Co. Supply Crate Key",
     short:      "Keys",
     scrapValue: null,
-    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEMfvFAz-K1wRIaGRXY_GrPIGIFyBfPAhBtm4V0JYGb18_LbFgXMvb_fFjSJN-S4HmhFuJcLR-Y1M2Z4MCA",
+    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEAaR4uURrwvz0N252yVaDVWrRTno9m4ccG2GNqxlQoZrC2aG9hcVGUWflbX_drrVu5UGki5sAij6tOtQ",
   },
-  ref:   { name: "Refined Metal",   short: "Ref",   scrapValue: 9 },
-  rec:   { name: "Reclaimed Metal", short: "Rec",   scrapValue: 3 },
-  scrap: { name: "Scrap Metal",     short: "Scrap", scrapValue: 1 },
+  ref: {
+    name:       "Refined Metal",
+    short:      "Ref",
+    scrapValue: 9,
+    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsO1Mv6NGucF1Ygzt8ZQijJukFMiMrbhYDEwI1yRVKNfD6xorQ3qW3Jr6546DNPuou9IOVK4p4kWJaA",
+  },
+  rec: {
+    name:       "Reclaimed Metal",
+    short:      "Rec",
+    scrapValue: 3,
+    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsO0Mv6NGucF1YJlscMEgDdvxVYsMLPkMmFjI1OSUvMHDPBp9lu0CnVluZQxA9Gwp-hIOVK4sMMNWF4",
+  },
+  scrap: {
+    name:       "Scrap Metal",
+    short:      "Scrap",
+    scrapValue: 1,
+    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsPZAfOeD-VOn4phtsdQ32ZtxFYoN7PkYmVmIgeaUKNaX_Rjpwy8UHMz6pcxAIfnovUWJ1t9nYFqYw",
+  },
 };
 
 /** Same data as TF2_CURRENCY, indexed by full Steam item name instead. */
