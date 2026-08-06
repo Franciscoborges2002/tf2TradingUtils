@@ -1,3 +1,35 @@
+import { KILLSTREAK_WEAPONS_SET } from "../../../utils/constants/killstreakWeapons.js";
+import { KS_TIER_COLORS } from "../../../utils/constants/colors.js";
+import { backpackStatsUrl } from "../../../utils/itemLinks.js";
+
+const KS_PREFIXES = [
+  "Killstreak ",
+  "Specialized Killstreak ",
+  "Professional Killstreak ",
+];
+
+/** Strips a killstreak-tier prefix and an "Australium " prefix, leaving the bare weapon name to check against KILLSTREAK_WEAPONS_SET. */
+function toBaseWeaponName(name) {
+  const prefix = KS_PREFIXES.find((p) => name.startsWith(p));
+  let stripped = prefix ? name.slice(prefix.length) : name;
+  if (stripped.startsWith("Australium ")) stripped = stripped.slice("Australium ".length);
+  return stripped;
+}
+
+/** Extracts the bare weapon name shown on a /stats or /classifieds page, for the KILLSTREAK_WEAPONS_SET check. */
+function getBaseWeaponName(url) {
+  if (url.pathname.includes("stats")) {
+    const parts = url.pathname.split("/");
+    const itemSeg = decodeURIComponent(parts[3] || "");
+    return toBaseWeaponName(itemSeg);
+  }
+  if (url.pathname.includes("classifieds")) {
+    const item = url.searchParams.get("item");
+    return item ? toBaseWeaponName(item) : null;
+  }
+  return null;
+}
+
 /**
  * Array object to contain information for the 4 buttons
  */
@@ -6,25 +38,25 @@ let ksInformation = [
     label: "No Kit",
     urlCompletitionClassifieds: "&killstreak_tier=0",
     urlCompletitionStats: "",
-    color: "#000000",
+    color: KS_TIER_COLORS.none,
   },
   {
     label: "Normal KS",
     urlCompletitionClassifieds: "&killstreak_tier=1",
     urlCompletitionStats: "Killstreak ", // The final space is to join th %20 automatically
-    color: "#5B6060",
+    color: KS_TIER_COLORS.killstreak,
   },
   {
     label: "Specialized KS",
     urlCompletitionClassifieds: "&killstreak_tier=2",
     urlCompletitionStats: "Specialized Killstreak ", // The final space is to join th %20 automatically
-    color: "#68765C",
+    color: KS_TIER_COLORS.specialized,
   },
   {
     label: "Professional KS",
     urlCompletitionClassifieds: "&killstreak_tier=3",
     urlCompletitionStats: "Professional Killstreak ", // The final space is to join th %20 automatically
-    color: "#B15820",
+    color: KS_TIER_COLORS.professional,
   },
 ];
 
@@ -35,6 +67,22 @@ let ksInformation = [
  */
 export function createKSButtons(locationURL) {
   const url = new URL(locationURL);
+
+  // "My Listings" (/classifieds?steamid=...) and "Archived Listings"
+  // (/classifieds/archive) both list many different items at once —
+  // a killstreak-tier filter for a single item doesn't belong there.
+  // Skip both for now (relist / initial-listing pages still TODO).
+  if (url.pathname.includes("classifieds")) {
+    const isArchive = url.pathname.includes("/classifieds/archive");
+    const isMyListings = url.searchParams.has("steamid");
+    if (isArchive || isMyListings) return;
+  }
+
+  // Only weapons that actually have a Killstreak Kit / Kit Fabricator
+  // in the game get the buttons — cosmetics, keys, metal, etc. can't
+  // be killstreak-ified at all.
+  const weaponName = getBaseWeaponName(url);
+  if (!weaponName || !KILLSTREAK_WEAPONS_SET.has(weaponName)) return;
 
   //Redirect to the different functions
   if (url.pathname.includes("stats")) {
@@ -57,18 +105,17 @@ function createButtonsStats(url) {
   );
   const parentHead = headerControls[0];
   const firstDiv = parentHead.querySelector("div"); //Quality div
-  const parts = url.pathname.split("/"); //Have the url pathname splitted
-  const itemSeg = decodeURIComponent(parts[3] || "");
 
-  // known prefixes
-  const KS_PREFIXES = [
-    "Killstreak ",
-    "Specialized Killstreak ",
-    "Professional Killstreak ",
-  ];
+  // ['', 'stats', Quality, Item, 'Tradable', 'Craftable'|'Non-Craftable', EffectId?]
+  const parts = url.pathname.split("/").map(decodeURIComponent);
+  const quality = parts[2];
+  const itemSeg = parts[3] || "";
+  const craftable = parts[5] !== "Non-Craftable";
+  const effectId = parts[6];
 
   // find current prefix ("" if none)
   const currentPrefix = KS_PREFIXES.find((p) => itemSeg.startsWith(p)) || "";
+  const baseItemName = itemSeg.slice(currentPrefix.length);
 
   //Create the wrapper for all buttons and append all backpack.tf classes styles
   const divButtons = document.createElement("div");
@@ -79,23 +126,28 @@ function createButtonsStats(url) {
   );
 
   /* MAKE THE SAME FUNCTION FOR ALL BUTTONS */
-  ksInformation.forEach((ksInformation, index) => {
+  ksInformation.forEach((info) => {
     const link = document.createElement("a"); //create the element
     link.type = "button";
-    link.textContent = ksInformation.label;
+    link.textContent = info.label;
 
     /* Add styling to the button */
     link.classList.add("btn", "btn-variety");
 
     /* verify if there is  */
-    if ((ksInformation.urlCompletitionStats || "") === currentPrefix) {
+    if ((info.urlCompletitionStats || "") === currentPrefix) {
       link.classList.add("active");
     }
-    link.style.color = ksInformation.color; // Add text color
+    link.style.color = info.color; // Add text color
 
-    /* Add linking */
-    let newUrl = url;
-    link.href = addKsURL(newUrl, ksInformation.urlCompletitionStats);
+    /* Add linking — classic backpack.tf/stats has no separate
+       killstreak-tier field, so the tier prefix is baked into name */
+    link.href = backpackStatsUrl({
+      name: (info.urlCompletitionStats || "") + baseItemName,
+      quality,
+      craftable,
+      effectId,
+    });
 
     /* Append to the overall div of the buttons */
     divButtons.appendChild(link);
@@ -134,24 +186,27 @@ function createButtonsClassifieds(url) {
   navWrap.style.padding = "8px 0px"
 
   /* MAKE THE SAME FUNCTION FOR ALL BUTTONS */
-  ksInformation.forEach((ksInformation, i) => {
+  ksInformation.forEach((info, i) => {
     const link = document.createElement("a");
     link.className = "btn btn-default";
-    link.textContent = ksInformation.label;
-    link.style.color = ksInformation.color;
+    link.textContent = info.label;
+    link.style.color = info.color;
 
-    // keep all filters, just set killstreak_tier
+    // keep all filters, just set killstreak_tier — and reset back to
+    // page 1, since switching tier changes the result set and the old
+    // page number may no longer exist in it
     const p = new URLSearchParams(url.search);
     p.set(
       "killstreak_tier",
-      ksInformation.urlCompletitionClassifieds.replace("&killstreak_tier=", "")
+      info.urlCompletitionClassifieds.replace("&killstreak_tier=", "")
     );
+    p.set("page", "1");
     link.href = url.pathname + "?" + p.toString();
 
     // active state using page's class
     if (
       currentTier ===
-      ksInformation.urlCompletitionClassifieds.replace("&killstreak_tier=", "")
+      info.urlCompletitionClassifieds.replace("&killstreak_tier=", "")
     ) {
       link.classList.add("active");
     }
@@ -169,42 +224,4 @@ function createButtonsClassifieds(url) {
   } else {
     panelBody.prepend(navWrap);
   }
-}
-
-/**
- * Insert or replace the Killstreak segment after /stats/{Quality}/
- * @param {URL|string} inputUrl
- * @param {string} ksSegment - e.g. "Killstreak", "Specialized Killstreak", "Professional Killstreak"
- * @returns {URL}
- */
-function addKsURL(inputUrl, ksSegment) {
-  const newUrl =
-    inputUrl instanceof URL ? inputUrl : new URL(inputUrl, location.origin);
-  const segsUrl = newUrl.pathname
-    .split("/")
-    .filter(Boolean)
-    .map(decodeURIComponent); // ['stats','Quality','Item','Tradable','Craftable']
-
-  // 1) strip any existing KS prefix from the item name
-  // matches: "Killstreak ", "Specialized Killstreak ", "Professional Killstreak " (case-insensitive)
-  let itemName = segsUrl[2].replace(
-    /^(?:Professional|Specialized)?\s*Killstreak\s+/i,
-    ""
-  );
-
-  //Ensure it is in stats page and has a ksSegment from the object
-  if (segsUrl[0] === "stats") {
-    // 2) apply prefix (can be "", "Killstreak ", etc.)
-    let prefix = ksSegment || ""; // accept "" as valid
-    if (prefix && !prefix.endsWith(" ")) {
-      prefix += " "; // ensure trailing space
-    }
-
-    segsUrl[2] = prefix + itemName;
-
-    // Re-encode and rebuild the pathname
-    newUrl.pathname = "/" + segsUrl.map(encodeURIComponent).join("/");
-  }
-
-  return newUrl;
 }
