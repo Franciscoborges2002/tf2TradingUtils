@@ -15,7 +15,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 */
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
-import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, wikiUrl } from "../../utils/itemLinks.js";
+import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, wikiUrl } from "../../utils/itemLinks.js";
 
 export function ItemLinks() {
   // store pending hover info
@@ -67,17 +67,29 @@ export function ItemLinks() {
     const className = modal.querySelector(".tf2utils-mini-modal-name");
     const classBtns = modal.querySelector(".tf2utils-mini-modal-btns");
 
-    className.textContent = name;
+    // Killstreak tier and Festivized don't always show up as literal
+    // text in the tooltip name (same issue as Genuine quality) — add
+    // them if missing. Steam's own order is Festivized, then Killstreak
+    // tier, then the item name.
+    const { prefix: ksPrefix } = getKillstreakInfo(itemEl);
+    let displayName = name;
+    if (ksPrefix && !displayName.includes(ksPrefix.trim())) displayName = ksPrefix + displayName;
+    if (isFestivized() && !displayName.includes("Festivized")) displayName = "Festivized " + displayName;
+    className.textContent = displayName;
     classBtns.innerHTML = "";
 
-    makeLinks(name, itemEl).forEach(({ label, href }) => {
-      const btn = document.createElement("a");
-      btn.className = "btn";
-      btn.textContent = label;
-      btn.href = href;
-      btn.target = "_blank";
-      classBtns.appendChild(btn);
-    });
+    makeLinks(name, itemEl)
+      .then((links) => {
+        links.forEach(({ label, href }) => {
+          const btn = document.createElement("a");
+          btn.className = "btn";
+          btn.textContent = label;
+          btn.href = href;
+          btn.target = "_blank";
+          classBtns.appendChild(btn);
+        });
+      })
+      .catch((err) => console.warn("[TF2Utils] Failed to build item links:", err));
   }
 
   // Watch for hover tooltip becoming visible
@@ -155,70 +167,43 @@ Function to create the links to be displayed
   - name: Name of the item
   - itemEl: HTML item element (get more information about the item, ks, paint, unu effect)
 */
-function makeLinks(name, itemEl) {
+async function makeLinks(name, itemEl) {
   // --- QUALITY DETECTION ---
-  // Default: Unique (6)
+  // Default: Unique
   let qualityName = "Unique";
-  let qualityId = 6;
   let unusualEffectName = null;
-  //let unusualEffectId = null;
 
   if (itemEl.classList.contains("quality0")) {
     qualityName = "Normal";
-    qualityId = 0;
   }
   if (itemEl.classList.contains("quality1")) {
     qualityName = "Genuine";
-    qualityId = 1;
   }
   if (itemEl.classList.contains("quality3")) {
     qualityName = "Vintage";
-    qualityId = 3;
   }
   if (itemEl.classList.contains("quality5")) {
     qualityName = "Unusual";
-    qualityId = 5;
     unusualEffectName = getUnusualEffectName(itemEl);
-    //unusualEffectId = unusualIdByName[unusualEffectName] ?? null;
-    //console.log("unusualEffectId", unusualEffectId);
   }
   if (itemEl.classList.contains("quality6")) {
     qualityName = "Unique";
-    qualityId = 6;
   }
   if (itemEl.classList.contains("quality0")) {
     qualityName = "Self Made";
-    qualityId = 9;
   }
   if (itemEl.classList.contains("quality11")) {
     qualityName = "Strange";
-    qualityId = 11;
   }
   if (itemEl.classList.contains("quality14")) {
     qualityName = "Haunted";
-    qualityId = 13;
   }
   if (itemEl.classList.contains("quality14")) {
     qualityName = "Collector's";
-    qualityId = 14;
   }
 
   // --- KILLSTREAK DETECTION ---
-  let ksPrefix = "";
-  let ksTier = 0; // default "no killstreak" (matches classifieds filters style)
-
-  if (itemEl.classList.contains("killstreak1")) {
-    ksPrefix = "Killstreak ";
-    ksTier = 1;
-  }
-  if (itemEl.classList.contains("killstreak2")) {
-    ksPrefix = "Specialized Killstreak ";
-    ksTier = 2;
-  }
-  if (itemEl.classList.contains("killstreak3")) {
-    ksPrefix = "Professional Killstreak ";
-    ksTier = 3;
-  }
+  const { prefix: ksPrefix, tier: ksTier } = getKillstreakInfo(itemEl);
 
   // --- CRAFTABILITY DETECTION ---
   const isUncraft = itemEl.classList.contains("uncraft");
@@ -233,36 +218,73 @@ function makeLinks(name, itemEl) {
   const isAustralium =
     name.includes("Australium") || dataTitle.includes("Australium");
 
+  // --- FESTIVIZED DETECTION --- (same text-match approach as Australium)
+  const isFestivizedItem = isFestivized();
+  const festivizedPrefix = isFestivizedItem ? "Festivized " : "";
+
   // === STRANGE PART SAFEGUARD ===
   const isStrangePart = /^Strange Part:/i.test(name);
 
   // --- CLEAN NAME LOGIC ---
+  // Strip Festivized/killstreak-tier/quality prefixes from the front,
+  // repeatedly — items can stack more than one (e.g. "Collector's
+  // Festivized Professional Killstreak Beggar's Bazooka"), and a single
+  // one-shot regex only ever catches whichever one happens to be first.
   let baseName = name;
 
   if (!isStrangePart) {
-    // Remove existing killstreak or qualities prefixes from name to avoid duplication
-    baseName = name.replace(
-      /^(Killstreak |Specialized Killstreak |Professional Killstreak |Strange |Vintage |Collector's )/i,
-      ""
-    );
+    const PREFIX_PATTERNS = [
+      /^Festivized\s+/i,
+      /^(?:Killstreak|Specialized Killstreak|Professional Killstreak)\s+/i,
+      /^(?:Strange|Vintage|Collector's)\s+/i,
+    ];
+    let stripped = true;
+    while (stripped) {
+      stripped = false;
+      for (const pattern of PREFIX_PATTERNS) {
+        const next = baseName.replace(pattern, "");
+        if (next !== baseName) {
+          baseName = next;
+          stripped = true;
+        }
+      }
+    }
   }
 
-  // Remove "Australium " for classifieds
+  // Remove "Australium " — not part of the bare schema name the
+  // query-param-based links (Next Bp Stats, marketplace.tf) expect
   const classifiedsName = baseName.replace(/^Australium /i, "");
 
-  // Name used for Stats: include KS prefix if any
-  const statsName = ksPrefix + baseName;
+  // Full descriptive name (Festivized + killstreak tier + item name) —
+  // Steam's own order is Festivized, then killstreak tier, then the item
+  // name. Used by anything that wants the whole name in one piece:
+  // classic Bp Stats, Steam Market, mannco.store.
+  const fullDisplayName = festivizedPrefix + ksPrefix + baseName;
 
-  return [
+  // mannco.store wants the Unusual effect name prepended (Steam's own
+  // item name never includes it) — skip the link if we couldn't find one.
+  // Non-Unusual: pass quality straight through, steamMarketUrl()/mannCoStoreUrl()
+  // add the quality word themselves if fullDisplayName's missing it.
+  const manncoHref = qualityName === "Unusual"
+    ? (unusualEffectName ? mannCoStoreUrl({ name: baseName, effectName: unusualEffectName }) : null)
+    : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName });
+
+  // marketplace.tf needs a network fetch (defindex lookup) — don't let a
+  // failure there (offline, blocked request, etc.) take down every other
+  // link in the modal.
+  let marketplaceHref = null;
+  try {
+    marketplaceHref = await marketplaceTfUrl({
+      name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, festive: isFestivizedItem,
+    });
+  } catch (err) {
+    console.warn("[TF2Utils] marketplace.tf link failed:", err);
+  }
+
+  const links = [
     {
       label: "Bp Stats",
-      href: backpackStatsUrl({ name: statsName, quality: qualityName, craftable: !isUncraft }),
-    },
-    {
-      label: "Bp Classifieds",
-      href: backpackClassifiedsUrl({
-        name: classifiedsName, qualityId, craftable: !isUncraft, australium: isAustralium, ksTier,
-      }),
+      href: backpackStatsUrl({ name: fullDisplayName, quality: qualityName, craftable: !isUncraft }),
     },
     {
       label: "Next Bp Stats",
@@ -271,20 +293,49 @@ function makeLinks(name, itemEl) {
       }),
     },
     {
-      label: "Next Bp Classifieds",
-      href: backpackClassifiedsUrl({
-        name: classifiedsName, qualityId, craftable: !isUncraft, australium: isAustralium, ksTier, next: true,
-      }),
+      label: "mannco.store",
+      href: manncoHref,
+    },
+    {
+      label: "marketplace.tf",
+      href: marketplaceHref,
     },
     {
       label: "Steam Market",
-      href: steamMarketUrl(baseName),
+      href: steamMarketUrl(fullDisplayName, qualityName),
     },
     {
       label: "Wiki",
       href: wikiUrl(baseName),
     },
   ];
+
+  return links.filter((link) => link.href);
+}
+
+/** Killstreak tier prefix + numeric tier from an item's CSS classes — shared by updateModal() (display name) and makeLinks() (URL building). */
+function getKillstreakInfo(itemEl) {
+  if (itemEl.classList.contains("killstreak3")) return { prefix: "Professional Killstreak ", tier: 3 };
+  if (itemEl.classList.contains("killstreak2")) return { prefix: "Specialized Killstreak ", tier: 2 };
+  if (itemEl.classList.contains("killstreak1")) return { prefix: "Killstreak ", tier: 1 };
+  return { prefix: "", tier: 0 };
+}
+
+/**
+ * "Festivized" isn't part of the item's name at all (unlike Strange/
+ * Australium/etc.) — it's a separate indicator line inside the hover
+ * tooltip's content, same place the Unusual "Effect: X" line lives
+ * (see getUnusualEffectName()), e.g.
+ * `<span style="color:#FFD700;">Festivized</span>`.
+ */
+function isFestivized() {
+  const hoverEl = document.querySelector(".hover-over");
+  if (!hoverEl || hoverEl.style.display === "none") return false;
+
+  const contentEl = hoverEl.querySelector(".hover-over-content");
+  if (!contentEl) return false;
+
+  return contentEl.textContent.includes("Festivized");
 }
 
 /* Function to extract the effect name */
