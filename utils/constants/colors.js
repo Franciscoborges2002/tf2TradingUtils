@@ -39,3 +39,11 @@ export const SITE_BRAND_COLORS = {
   wiki:          "#D4AF37", // no logo given yet — placeholder gold accent
   postsTf:       "#E67E22", // orange from their logo — not wired up to any link currently
 };
+
+// backpack.tf's own colors for each killstreak tier (see addKSButtons)
+export const KS_TIER_COLORS = {
+  none:         "#000000", // No Kit
+  killstreak:   "#5B6060", // Normal KS
+  specialized:  "#68765C", // Specialized KS
+  professional: "#B15820", // Professional KS
+};
