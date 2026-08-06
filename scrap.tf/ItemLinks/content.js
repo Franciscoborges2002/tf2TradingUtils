@@ -15,6 +15,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 */
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
+import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, wikiUrl } from "../../utils/itemLinks.js";
 
 export function ItemLinks() {
   // store pending hover info
@@ -221,8 +222,6 @@ function makeLinks(name, itemEl) {
 
   // --- CRAFTABILITY DETECTION ---
   const isUncraft = itemEl.classList.contains("uncraft");
-  const craftPathSegment = isUncraft ? "Non-Craftable" : "Craftable";
-  const craftParam = isUncraft ? -1 : 1;
 
   // --- AUSTRALIUM DETECTION ---
   const dataTitle = itemEl.getAttribute("data-title") || "";
@@ -233,8 +232,6 @@ function makeLinks(name, itemEl) {
 
   const isAustralium =
     name.includes("Australium") || dataTitle.includes("Australium");
-
-  const australiumParam = isAustralium ? 1 : -1;
 
   // === STRANGE PART SAFEGUARD ===
   const isStrangePart = /^Strange Part:/i.test(name);
@@ -255,47 +252,37 @@ function makeLinks(name, itemEl) {
 
   // Name used for Stats: include KS prefix if any
   const statsName = ksPrefix + baseName;
-  const encodedStatsName = encodeURIComponent(statsName);
-
-  // Name used for Classifieds: clean base name (no KS text, KS handled by killstreak_tier)
-  const encodedClassifiedsName = encodeURIComponent(classifiedsName);
 
   return [
     {
       label: "Bp Stats",
-      href: `https://backpack.tf/stats/${qualityName}/${encodedStatsName}/Tradable/${craftPathSegment}`,
+      href: backpackStatsUrl({ name: statsName, quality: qualityName, craftable: !isUncraft }),
     },
     {
       label: "Bp Classifieds",
-      href:
-        `https://backpack.tf/classifieds?item=${encodedClassifiedsName}` +
-        `&quality=${qualityId}&tradable=1&craftable=${craftParam}&australium=${australiumParam}&killstreak_tier=${ksTier}`,
+      href: backpackClassifiedsUrl({
+        name: classifiedsName, qualityId, craftable: !isUncraft, australium: isAustralium, ksTier,
+      }),
     },
     {
       label: "Next Bp Stats",
-      href:
-        `https://next.backpack.tf/stats?item=${encodedClassifiedsName}` +
-        `&quality=${qualityId}&tradable=1&craftable=${craftParam}&${
-          isAustralium ? `australium=${australiumParam}` : ``
-        }&killstreakTier=${ksTier}`,
+      href: backpackStatsUrl({
+        name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, next: true,
+      }),
     },
     {
       label: "Next Bp Classifieds",
-      href:
-        `https://next.backpack.tf/classifieds?itemName=${encodedClassifiedsName}` +
-        `&quality=${qualityId}&tradable=1&craftable=${craftParam}&australium=${australiumParam}&killstreakTier=${ksTier}`,
+      href: backpackClassifiedsUrl({
+        name: classifiedsName, qualityId, craftable: !isUncraft, australium: isAustralium, ksTier, next: true,
+      }),
     },
     {
       label: "Steam Market",
-      href:
-        `https://steamcommunity.com/market/listings/440/` +
-        `${encodeURIComponent(baseName)}`,
+      href: steamMarketUrl(baseName),
     },
     {
       label: "Wiki",
-      href: `https://wiki.teamfortress.com/wiki/${encodeURIComponent(
-        baseName
-      )}`,
+      href: wikiUrl(baseName),
     },
   ];
 }

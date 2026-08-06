@@ -47,3 +47,25 @@ export const TF2_CURRENCY = {
 export const TF2_CURRENCY_BY_NAME = Object.fromEntries(
   Object.values(TF2_CURRENCY).map((c) => [c.name, c])
 );
+
+/**
+ * TF2's quality id per quality name, as used in the game's own item
+ * schema (and the "sku" format — defindex;quality — shared by
+ * backpack.tf, prices.tf, TF2Autobot and marketplace.tf).
+ */
+export const TF2_QUALITY_IDS = {
+  Normal: 0,
+  Genuine: 1,
+  Vintage: 3,
+  Unusual: 5,
+  Unique: 6,
+  Community: 7,
+  Valve: 8,
+  "Self-Made": 9,
+  Customized: 10,
+  Strange: 11,
+  Completed: 12,
+  Haunted: 13,
+  "Collector's": 14,
+  "Decorated Weapon": 15,
+};

@@ -7,6 +7,8 @@ quick links for each item to external trading sites.
 Link:
 https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapItemsTableLinks
 */
+import { backpackStatsUrl, stnTradingUrl } from "../../utils/itemLinks.js";
+
 var table = document.getElementById("itembanking-list"); //Get the table in the website
 
 /**
@@ -52,8 +54,6 @@ export function scrapItemsTableLinks() {
  */
 function getLinkSTN(itemName) {
   var url = null; //initiate var to return
-
-  let baseURL = "https://stntrading.eu/item/tf2/";
 
   //Change put the '
   if (itemName.includes("Vintage Bills Hat")) {
@@ -256,22 +256,14 @@ function getLinkSTN(itemName) {
     itemName = itemName.substr(0, itemName.indexOf("(") - 1);
   }
 
-  //%27
-  let itemNameReplace2Dots = itemName.replace(/:/g, "%3A");
-  let itemName2Link = itemNameReplace2Dots.replace(/ /g, "+");
-  itemName2Link = itemName2Link.replace(/'/g, "%27");
-
-  if (
+  const isNonCraftable =
     itemName.includes("Key") ||
     itemName.includes("Squad Surplus Voucher") ||
     itemName.includes("Civilian Grade Stat Clock") ||
     itemName.includes("Festivizer") ||
-    itemName.includes("Duck Journal")
-  ) {
-    url = baseURL + "Non-Craftable+" + itemName2Link;
-  } else {
-    url = baseURL + itemName2Link;
-  }
+    itemName.includes("Duck Journal");
+
+  url = stnTradingUrl({ name: itemName, craftable: !isNonCraftable });
 
   if (itemName.includes("Collectors")) {
     //stntrading doesnt have collectors items
@@ -285,49 +277,28 @@ function getLinkSTN(itemName) {
  * Function to generate the links to backpack.tf
  */
 function getLinkBackpack(itemName) {
-  var url = null; //initiate var to return
-
-  let baseURL = "https://backpack.tf/stats/";
-  let restURL = null;
+  let quality = "Unique";
 
   //if the name includes vintage
   if (itemName.includes("Vintage")) {
-    restURL = "Vintage";
+    quality = "Vintage";
     itemName = itemName.replace("Vintage ", "");
   } else if (itemName.includes("Genuine")) {
-    restURL = "Genuine";
+    quality = "Genuine";
     itemName = itemName.replace("Genuine ", "");
   } else if (itemName.includes("Strange")) {
-    restURL = "Strange";
+    quality = "Strange";
     itemName = itemName.replace("Strange ", "");
   } else if (itemName.includes("Collectors")) {
-    restURL = "Collector%27s";
+    quality = "Collector's";
     itemName = itemName.replace("Collectors ", "");
-  } else {
-    restURL = "Unique";
   }
 
-  if (itemName.includes("Taunt:")) {
-    restURL = restURL + "/Taunt%3A";
-    itemName = itemName.replace("Taunt:", "");
-  }
-  //let itemName2Link = itemNameReplace2Dots.replace(/ /g, "+");
-  //put the name into the restURL
-  console.log("before " + restURL);
-  if (restURL.includes("/")) {
-    restURL =
-      restURL +
-      itemName.replace(/ /g, "%20").replace(/!/g, "%21") +
-      "/Tradable/Craftable"; //replaceEvery(itemName, " ", "%20");
-  } else {
-    restURL =
-      restURL +
-      "/" +
-      itemName.replace("The ", "").replace(/ /g, "%20").replace(/!/g, "%21") +
-      "/Tradable/Craftable"; //replaceEvery(itemName, " ", "%20");
-  }
-  console.log(restURL);
-  url = baseURL + restURL;
+  // Taunts keep their "Taunt: " prefix as part of the name; everything
+  // else has a leading "The " (if any) dropped, matching backpack.tf's
+  // own URL convention.
+  const isTaunt = itemName.includes("Taunt:");
+  const name = isTaunt ? itemName : itemName.replace("The ", "");
 
-  return url;
+  return backpackStatsUrl({ name, quality, craftable: true });
 }
