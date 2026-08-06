@@ -23,3 +23,19 @@ export const BOT_STATUS_COLORS = {
   untrusted: { border: COLOR_BOT_UNTRUSTED, background: "rgba(231, 76, 60, 0.1)" },
   unknown:   { border: COLOR_BOT_UNKNOWN,   background: "rgba(241, 196, 15, 0.1)" },
 };
+
+/**
+ * Approximate brand colors for external trading/reference sites, used
+ * to color-code links to them (see stntrading.eu/itemLinks). Picked by
+ * eye from each site's actual logo where one was available — not
+ * guaranteed pixel-accurate, just enough to visually tell the
+ * destinations apart at a glance.
+ */
+export const SITE_BRAND_COLORS = {
+  backpackTf:    "#5B6D7E", // slate blue-gray, from their ribbon/flag logo mark
+  steam:         "#1B2838", // Steam's dark navy
+  marketplaceTf: "#2D7DD2", // blue half of their crossing blue/red logo
+  manncoStore:   "#2D9CDB", // blue background of their "M" logo
+  wiki:          "#D4AF37", // no logo given yet — placeholder gold accent
+  postsTf:       "#E67E22", // orange from their logo — not wired up to any link currently
+};

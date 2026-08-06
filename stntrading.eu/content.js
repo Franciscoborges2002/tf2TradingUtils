@@ -22,10 +22,10 @@ function scriptRouter() {
 
   if (url.pathname.includes("item") && url.pathname.includes("tf2")) {
     /* start scripts for normal item page */
-    loadLink2Backpack();
+    loadItemLinks();
     EXT_SCRIPT_INFO.scripts.push([
-      "Links to backpack.tf",
-      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/stntrading.eu/link2Backpack",
+      "itemLinks",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/stntrading.eu/itemLinks",
     ]);
 
     loadCopyClipboard();
@@ -55,14 +55,14 @@ function loadCopyClipboard() {
   })();
 }
 
-function loadLink2Backpack() {
+function loadItemLinks() {
   (async () => {
     // Load module dynamically
-    const { link2Backpack } = await import(
-      chrome.runtime.getURL("stntrading.eu/link2Backpack/content.js")
+    const { showItemLinks } = await import(
+      chrome.runtime.getURL("stntrading.eu/itemLinks/content.js")
     );
 
-    link2Backpack();
+    showItemLinks();
   })();
 }
 

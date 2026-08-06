@@ -2,5 +2,5 @@
 
 | Name              | What it does                                                   | Link                                                                     |
 | ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| copyNameClipboard | Copy the name of the item to the clipboard                     | [link](./copyClipboard/) \| [changeLog](./copyClipboard//changeLog.md)   |
-| link2Backpack     | Provides links for backpack.tf item page                       | [link](./link2Backpack) \| [changeLog](./link2Backpack/changeLog.md)     |
+| copyNameClipboard | Copy the name of the item to the clipboard, via an icon next to the item name | [link](./copyClipboard/) \| [changeLog](./copyClipboard/CHANGELOG.md) |
+| itemLinks         | Provides links for backpack.tf, mannco.store, marketplace.tf, Steam Market and the Wiki, for the item page | [link](./itemLinks) \| [changeLog](./itemLinks/CHANGELOG.md) |
