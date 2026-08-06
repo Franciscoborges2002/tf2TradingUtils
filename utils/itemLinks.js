@@ -14,8 +14,29 @@
 
 import { TF2_APPID, TF2_QUALITY_IDS } from "./constants/tf2Economy.js";
 
-/** Steam Community Market listing for an item (full name, quality prefix included). */
-export function steamMarketUrl(fullName) {
+/**
+ * Steam Market and mannco.store both key off the item's full descriptive
+ * name — quality word included (e.g. "Strange Australium Flame Thrower",
+ * "Genuine Short Circuit") — unlike backpack.tf's stats page, which takes
+ * quality as its own separate field. Some sites' DOM doesn't always show
+ * the quality word as literal text in the name (Genuine in particular),
+ * so this prepends it if it's missing rather than assuming it's there.
+ * Internal helper — steamMarketUrl() and mannCoStoreUrl() apply this
+ * themselves when given a `quality`, callers don't need to call it.
+ */
+function ensureQualityPrefix(name, quality) {
+  const trimmed = name.trim();
+  if (!quality || quality === "Unique" || quality === "Unusual") return trimmed;
+  return trimmed.startsWith(`${quality} `) ? trimmed : `${quality} ${trimmed}`;
+}
+
+/**
+ * Steam Community Market listing for an item.
+ * @param {string} name - item name (quality prefix present or not)
+ * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures the name starts with this quality word
+ */
+export function steamMarketUrl(name, quality) {
+  const fullName = ensureQualityPrefix(name, quality);
   return `https://steamcommunity.com/market/listings/${TF2_APPID}/${encodeURIComponent(fullName)}`;
 }
 
@@ -128,15 +149,18 @@ export function stnTradingUrl({ name, craftable = true }) {
  *
  * @param {object} opts
  * @param {string} opts.name - full item name, as Steam displays it (no effect name) — include "Non-Craftable " if applicable
+ * @param {string} [opts.quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
  * @param {string} [opts.effectName] - Unusual effect name, e.g. "Frostbite"
  * @param {number} [opts.appId] - defaults to TF2
  */
-export function mannCoStoreUrl({ name, effectName, appId = TF2_APPID }) {
-  const fullName = effectName ? `${effectName} ${name}` : name;
+export function mannCoStoreUrl({ name, quality, effectName, appId = TF2_APPID }) {
+  const qualifiedName = ensureQualityPrefix(name, quality);
+  const fullName = effectName ? `${effectName} ${qualifiedName}` : qualifiedName;
   const slug = fullName
     .replace(/non-craftable/gi, "Uncraftable")
     .toLowerCase()
     .replace(/'/g, " ")
+    .replace(/\:/g, "")
     .trim()
     .replace(/\s+/g, "-");
   return `https://mannco.store/item/${appId}-${slug}`;
@@ -145,11 +169,15 @@ export function mannCoStoreUrl({ name, effectName, appId = TF2_APPID }) {
 // name (schema's item_name, no quality/killstreak/etc. prefix) -> defindex.
 // Bundled locally (utils/data/tf2ItemDefindexes.json, ~180KB) rather than
 // fetched from a live API, extracted from schema.autobot.tf's full TF2
-// schema. A few hundred names (mostly untradeable stock class weapons,
-// plus Mann Co. Supply Crate Key's many historical reissues) map to more
-// than one defindex — the first one found in the schema is used, which
-// for Keys lands on the defindex (5021) everyone else's pricing already
-// keys off of.
+// schema. Many weapon names map to more than one defindex — most
+// commonly a "stock" class-loadout defindex (item_quality 0, untradeable)
+// alongside the actual tradable one (item_quality 6, Unique), e.g. Knife
+// is both 4 (stock) and 194 (tradable). Picking the wrong one is exactly
+// how a Strange/Australium Knife link used to resolve to the stock
+// defindex instead of the real one — so wherever a name has a
+// quality-6 candidate, that one is used; only names with none (no
+// tradable version exists at all) fall back to whichever defindex the
+// schema listed first.
 let defindexSchemaPromise = null;
 function loadDefindexSchema() {
   if (!defindexSchemaPromise) {
@@ -192,8 +220,8 @@ export async function marketplaceTfUrl({
   const sku = [defindex, qualityId];
 
   if (!craftable) sku.push("uncraftable");
-  if (ksTier) sku.push(`kt-${ksTier}`);
   if (australium) sku.push("australium");
+  if (ksTier) sku.push(`kt-${ksTier}`);
   if (festive) sku.push("festive");
   if (effectId != null) sku.push(`u${effectId}`);
 
