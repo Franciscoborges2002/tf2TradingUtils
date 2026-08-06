@@ -1,6 +1,7 @@
-# Version 1.1.0
+# Version 1.1.0 (v1.3.0)
 
 * Added oneClickOffer script to instantly send a trade offer with the correct currency for bot-managed listings, in both oldUI and newUI
+* Reafactored addKSButons for oldUI, and removed for newUI.
 
 # Version 1.0.2
 
