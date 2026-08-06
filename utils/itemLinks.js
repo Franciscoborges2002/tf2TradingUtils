@@ -34,7 +34,7 @@ export function wikiUrl(fullName) {
  * link, so `next: true` always builds that shape now.
  *
  * @param {object} opts
- * @param {string} opts.name - base item name, no quality/killstreak/Non-Craftable prefix
+ * @param {string} opts.name - base item name, no quality/Non-Craftable prefix. For classic backpack.tf (next: false), bake any killstreak-tier prefix ("Killstreak ", "Specialized Killstreak ", "Professional Killstreak ") into this directly — the classic URL has no separate field for it.
  * @param {string} [opts.quality="Unique"]
  * @param {boolean} [opts.craftable=true]
  * @param {string|number} [opts.effectId] - Unusual effect id, appended as a trailing path segment (classic backpack.tf only — next.backpack.tf's stats query has no equivalent)
