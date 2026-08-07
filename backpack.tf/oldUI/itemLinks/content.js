@@ -126,15 +126,19 @@ function processPopover(popover) {
 
   // stntrading.eu bakes craftability into its own name/prefix — strip
   // "Non-Craftable " back out of the title so it isn't duplicated. It
-  // also has no separate item page for the Festivized variant of a
-  // weapon — Festivized items are just listed under the base item's
-  // page — so that word is stripped too. Not anchored to the start:
-  // "Festivized" doesn't always lead (e.g. "Vintage Festivized
-  // Kritzkrieg" — quality word first), unlike Non-Craftable, which
-  // always does.
+  // also has no separate item page per Festivized variant or killstreak
+  // tier — a weapon's page lists every killstreak tier together, and
+  // Festivized items are just listed under the base item's page — so
+  // both are stripped too. Neither is anchored to the start: "Festivized"
+  // and the killstreak-tier words don't always lead (e.g. "Vintage
+  // Festivized Professional Killstreak Kritzkrieg" — quality word
+  // first), unlike Non-Craftable, which always does. The killstreak
+  // alternatives are ordered longest-first so "Professional Killstreak"
+  // doesn't get half-matched by the plain "Killstreak" alternative.
   const stnName = fullDisplayName
     .replace(/^Non-Craftable\s+/i, "")
-    .replace(/Festivized\s+/i, "");
+    .replace(/Festivized\s+/i, "")
+    .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
 
   const links = [
     { label: "mannco.store", href: manncoHref },

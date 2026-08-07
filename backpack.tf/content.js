@@ -33,6 +33,11 @@ function scriptRouter() {
       "One-Click Offer",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/oneClickOffer",
     ]);
+    loadItemLinksNewUI();
+    EXT_SCRIPT_INFO.scripts.push([
+      "Item Links",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/itemLinks",
+    ]);
   } else {
     /* start scripts for oldUI */
 
@@ -127,6 +132,15 @@ function loadOneClickOfferNewUI() {
       chrome.runtime.getURL("backpack.tf/newUI/oneClickOffer/content.js")
     );
     addOneClickOfferNewUI();
+  })();
+}
+
+function loadItemLinksNewUI() {
+  (async () => {
+    const { addItemLinksNewUI } = await import(
+      chrome.runtime.getURL("backpack.tf/newUI/itemLinks/content.js")
+    );
+    addItemLinksNewUI();
   })();
 }
 
