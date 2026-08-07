@@ -37,6 +37,11 @@ const LINK_ACCENTS = {
  * Renamed from link2Backpack — same page, now covers more sites.
  */
 export async function showItemLinks() {
+  // For a mistyped/unknown item (e.g. a stale link), stntrading.eu
+  // renders a ".error-box" page instead — there's no <h1> at all here,
+  // so grabbing it directly below would throw.
+  if (document.querySelector(".error-box")) return;
+
   const itemName = document.querySelector("h1").innerHTML; //Get the name of the item
   const placeAddLink = document.getElementsByClassName("card-body")[1]; //place for were i want to add the links in the actual page
   if (!placeAddLink) return;
