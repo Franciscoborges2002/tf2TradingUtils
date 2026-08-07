@@ -2,6 +2,7 @@
 
 - Renamed from link2Backpack to itemLinks, reflecting its broader scope
 - Added mannco.store, marketplace.tf, backpack.tf classifieds (classic + next), Steam Market, and Wiki links, alongside the existing backpack.tf stats links
+- Fixed: crates (e.g. "Mann Co. Supply Crate Series #34") linked to a broken bp.tf stats URL — the " Series #N" suffix isn't part of the schema name, so it's now stripped and re-attached as the trailing series-number path segment instead
 
 # Version 1.0.1
 

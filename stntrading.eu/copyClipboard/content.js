@@ -1,16 +1,16 @@
 /**
- * Adds a small copy icon right after the item's <h3> title (instead of
+ * Adds a small copy icon right after the item's <h1> title (instead of
  * a separate "Copy to Clipboard" button down with the other links) —
  * clicking it copies the cleaned item name to the clipboard.
  */
 export function copyNameClipboard() {
   // Anchored to the same container itemLinks/content.js uses (not just
-  // "the page's first <h3>") — the page renders a second, hidden
+  // "the page's first <h1>") — the page renders a second, hidden
   // mobile-layout copy of this same card (Bootstrap's "d-none d-sm-block"
   // implies a "d-block d-sm-none" twin elsewhere), each with its own
-  // <h3>. Picking the wrong one puts the icon somewhere invisible.
+  // <h1>. Picking the wrong one puts the icon somewhere invisible.
   const cardBody = document.getElementsByClassName("card-body")[1];
-  const title = cardBody?.querySelector("h3");
+  const title = cardBody?.querySelector("h1");
   if (!title) return;
 
   injectStyles();
@@ -22,7 +22,7 @@ export function copyNameClipboard() {
   icon.setAttribute("aria-label", "Copy item name");
   icon.innerHTML = COPY_SVG;
 
-  // Capture the clean name up front — the h3's own text, before the
+  // Capture the clean name up front — the h1's own text, before the
   // icon is anywhere near it.
   const itemName = removeNonImportantWords(title.textContent || "");
 
@@ -31,11 +31,11 @@ export function copyNameClipboard() {
     flashCopied(icon);
   });
 
-  // The icon must never become a child of the <h3> — itemLinks/content.js
-  // reads the card's <h3>.innerHTML to get the item name, and an icon
-  // nested inside it would corrupt that string (this broke itemLinks
-  // entirely). Instead, wrap the <h3> and the icon together in a flex
-  // row, leaving the <h3> itself untouched.
+  // The icon must never become a child of the <h1> — itemLinks/content.js
+  // reads document.querySelector("h1").innerHTML to get the item name,
+  // and an icon nested inside it would corrupt that string (this broke
+  // itemLinks entirely). Instead, wrap the <h1> and the icon together in
+  // a flex row, leaving the <h1> itself untouched.
   const wrapper = document.createElement("div");
   wrapper.className = "tf2utils-copy-wrapper";
   title.insertAdjacentElement("beforebegin", wrapper);
