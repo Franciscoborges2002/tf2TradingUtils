@@ -16,6 +16,7 @@
  * @property {boolean} [steamMarketNeedsThePrefix] - Steam Community Market needs "The " prepended — but ONLY for the plain (no killstreak) version; killstreak variants drop it again (confirmed for C.A.P.P.E.R)
  * @property {string} [manncoStoreName] - mannco.store uses this short name instead of the item's real name (e.g. "Capper" instead of "C.A.P.P.E.R"). Apostrophes don't need a quirk entry for this anymore — mannCoStoreUrl() strips them outright now (see utils/itemLinks.js).
  * @property {boolean} [manncoStoreNeedsThePrefix] - same "The"-only-when-no-killstreak rule as steamMarketNeedsThePrefix, but tracked separately per site — confirmed independently, not assumed to match
+ * @property {string} [backpackName] - backpack.tf needs this exact casing instead of the name as some site displays it (e.g. "Force-a-Nature" — lowercase "a" — not "Force-A-Nature", which is how stntrading.eu auto-capitalizes it)
  */
 
 /** @type {Record<string, ItemNameQuirk>} */
@@ -33,5 +34,10 @@ export const ITEM_NAME_QUIRKS = {
   },
   "Festivizer": {
     manncoStoreNeedsThePrefix: true,
+  },
+  // Keyed by stntrading.eu's own (wrongly-capitalized) casing — see
+  // backpackName above.
+  "Force-A-Nature": {
+    backpackName: "Force-a-Nature",
   },
 };

@@ -6,6 +6,7 @@ import {
   wikiUrl,
 } from "../../utils/itemLinks.js";
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
+import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 
 const ITEMS_QUALITY = ["Unique", "Strange", "Vintage", "Haunted", "Unusual"];
 const ITEMS_CRAFTABILITY = ["Craftable", "Non-Craftable"];
@@ -93,11 +94,14 @@ function injectLinkStyles() {
 }
 
 /**
- * Strips "The " and the recognized quality word, and separates out
- * craftability — but keeps killstreak/Australium text baked into the
- * name (stntrading.eu item names don't carry killstreak text at all;
- * see parseItemAttributes() for the deeper parse the query-param-based
- * links need). Used for classic + next backpack.tf stats and Wiki.
+ * Strips "The ", the recognized quality word, and "Festive " (e.g.
+ * "Festive Force-A-Nature" -> "Force-A-Nature" — backpack.tf's stats
+ * page doesn't distinguish the Festive promotional variant in the
+ * name), and separates out craftability — but keeps killstreak/
+ * Australium text baked into the name (stntrading.eu item names don't
+ * carry killstreak text at all; see parseItemAttributes() for the
+ * deeper parse the query-param-based links need). Used for classic +
+ * next backpack.tf stats and Wiki.
  */
 function parseShallow(itemNameRaw) {
   let name = String(itemNameRaw || "").trim();
@@ -113,6 +117,8 @@ function parseShallow(itemNameRaw) {
       break;
     }
   }
+
+  if (name.startsWith("Festive ")) name = name.slice("Festive ".length);
 
   if (isNonCraftable) {
     name = name.replace(ITEMS_CRAFTABILITY[1] + " ", "").trim();
@@ -167,7 +173,8 @@ async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
   }
 
   const { name, quality, craftable } = parseShallow(itemNameRaw);
-  return backpackStatsUrl({ name, quality, craftable, next: useNext });
+  const quirk = ITEM_NAME_QUIRKS[name];
+  return backpackStatsUrl({ name: quirk?.backpackName ?? name, quality, craftable, next: useNext });
 }
 
 /**
