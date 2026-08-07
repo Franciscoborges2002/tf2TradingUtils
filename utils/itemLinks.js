@@ -136,8 +136,11 @@ export function stnTradingUrl({ name, craftable = true }) {
  * becomes "warriors-spirit", not "warrior-s-spirit"), accented letters
  * folded down to their plain ASCII base (e.g. "Quäckenbirdt" becomes
  * "quackenbirdt", not "qu%C3%A4ckenbirdt" — unlike backpack.tf, which
- * keeps the accent as-is), and every run of whitespace turned into a
- * single "-".
+ * keeps the accent as-is), and every run of whitespace and/or literal
+ * "-" turned into a single "-" (so a name with its own dash, e.g.
+ * "Noise Maker - Winter Holiday", collapses to one "-" between words
+ * instead of leaving the spaces around it as extra dashes:
+ * "noise-maker-winter-holiday", not "noise-maker---winter-holiday").
  *
  * Unusuals are the one exception: Steam's own item name never includes
  * the effect (it's "Unusual Virtual Viewfinder", with the effect only
@@ -168,7 +171,7 @@ export function mannCoStoreUrl({ name, quality, effectName, appId = TF2_APPID })
     .replace(/\./g, "")
     .replace(/\:/g, "")
     .trim()
-    .replace(/\s+/g, "-");
+    .replace(/[\s-]+/g, "-");
   return `https://mannco.store/item/${appId}-${slug}`;
 }
 

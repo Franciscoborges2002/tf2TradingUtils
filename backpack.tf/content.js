@@ -55,6 +55,16 @@ function scriptRouter() {
         "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/oneClickOffer",
       ]);
     }
+
+    // Unlike the scripts above, item hover popovers show up all over the
+    // site (classifieds, stats, a user's own backpack/listings, search
+    // results, ...) — not just stats/classifieds pages — so this one
+    // isn't gated to that pathname check.
+    loadItemLinks();
+    EXT_SCRIPT_INFO.scripts.push([
+      "Item Links",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/itemLinks",
+    ]);
   }
 }
 
@@ -90,6 +100,15 @@ function loadOneClickOffer() {
       chrome.runtime.getURL("backpack.tf/oldUI/oneClickOffer/content.js")
     );
     addOneClickOffer();
+  })();
+}
+
+function loadItemLinks() {
+  (async () => {
+    const { addItemLinks } = await import(
+      chrome.runtime.getURL("backpack.tf/oldUI/itemLinks/content.js")
+    );
+    addItemLinks();
   })();
 }
 

@@ -38,6 +38,8 @@ export const SITE_BRAND_COLORS = {
   manncoStore:   "#2D9CDB", // blue background of their "M" logo
   wiki:          "#D4AF37", // no logo given yet — placeholder gold accent
   postsTf:       "#E67E22", // orange from their logo — not wired up to any link currently
+  stnTrading:    "#8E2A2A", // no logo given yet — placeholder dark red accent
+  scrapTf:       "#C0392B", // no logo given yet — placeholder red accent
 };
 
 // backpack.tf's own colors for each killstreak tier (see addKSButtons)
