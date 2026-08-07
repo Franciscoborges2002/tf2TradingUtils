@@ -12,13 +12,18 @@ const ITEMS_QUALITY = ["Unique", "Strange", "Vintage", "Haunted", "Unusual"];
 const ITEMS_CRAFTABILITY = ["Craftable", "Non-Craftable"];
 let effectsDataPromise = null; //to get the utils effects ids
 
-// Crates (e.g. "Mann Co. Supply Crate Series #34") carry their series
-// number as a trailing " Series #N" — that's not part of the schema
-// name at all, so it's stripped along with everything after it before
-// the usual parse, then re-attached as the trailing path segment
-// backpack.tf's stats page expects (the same slot Unusual effect ids
-// use, below).
-const CRATE_SERIES_RE = /\s+Series\s+#(\d+)\s*$/i;
+// Crates carry their series/case number as a trailing "#N" — sometimes
+// with a "Series " word first (base supply crates, e.g. "Mann Co.
+// Supply Crate Series #34" — "Series" isn't part of the schema name
+// either, unlike themed cosmetic cases, e.g. "Bone-Chilling Bonanza
+// Case #142", whose "Case" IS part of the name and stays). Matches
+// either shape; whichever's present is stripped along with the number
+// before the usual parse, then the number's re-attached wherever each
+// destination site wants it: backpack.tf's stats page takes it as a
+// trailing path segment (same slot Unusual effect ids use), marketplace.tf
+// as a "c<N>" sku modifier — mannco.store doesn't distinguish by it at
+// all, so it's just dropped for that one.
+const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
 
 // A distinct accent color per destination site, so the row reads as a
 // set of different places rather than one undifferentiated button mass.
@@ -185,7 +190,7 @@ async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
     });
   }
 
-  const crateMatch = itemNameRaw.match(CRATE_SERIES_RE);
+  const crateMatch = itemNameRaw.match(CRATE_NUMBER_RE);
   const nameWithoutSeries = crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw;
 
   const { name, quality, craftable } = parseShallow(nameWithoutSeries);
@@ -206,10 +211,15 @@ async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
  * based links (classifieds, marketplace.tf) need.
  *
  * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier?: number, australium?: boolean, festive?: boolean, effectId?: string}|null>}
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier?: number, australium?: boolean, festive?: boolean, effectId?: string, crateNumber?: string}|null>}
  */
 async function parseItemAttributes(itemNameRaw) {
-  let name = String(itemNameRaw || "").trim();
+  // Crate series/case number always trails at the very end, after
+  // everything else — strip it first so it can't interfere with the
+  // rest of the parse below.
+  const crateMatch = String(itemNameRaw || "").match(CRATE_NUMBER_RE);
+  const crateNumber = crateMatch ? crateMatch[1] : undefined;
+  let name = String(crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw || "").trim();
 
   // detect + strip craftability
   const isNonCraftable = name.includes(ITEMS_CRAFTABILITY[1]);
@@ -260,7 +270,7 @@ async function parseItemAttributes(itemNameRaw) {
   const festive = name.startsWith("Festive ");
   if (festive) name = name.slice("Festive ".length);
 
-  return { name, quality: matchedQuality, craftable: !isNonCraftable, ksTier, australium, festive };
+  return { name, quality: matchedQuality, craftable: !isNonCraftable, ksTier, australium, festive, crateNumber };
 }
 
 /**
@@ -282,9 +292,14 @@ async function createManncoLink(itemNameRaw, isUnusual, effect) {
     return mannCoStoreUrl({ name: `Unusual ${baseName}`, effectName: effect.name });
   }
 
+  // mannco.store doesn't distinguish crates by series/case number the
+  // way marketplace.tf and backpack.tf do — drop it if present.
+  const crateMatch = name.match(CRATE_NUMBER_RE);
+  const manncoName = crateMatch ? name.slice(0, crateMatch.index) : name;
+
   // "Non-Craftable " (if present) is kept as-is — mannCoStoreUrl()
   // turns it into mannco.store's "uncraftable" slug word.
-  return mannCoStoreUrl({ name });
+  return mannCoStoreUrl({ name: manncoName });
 }
 
 /**
