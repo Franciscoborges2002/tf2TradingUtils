@@ -298,9 +298,11 @@ async function makeLinks(name, itemEl) {
   // uses the short name "Capper" instead). See utils/constants/itemNameQuirks.js.
   const quirk = ITEM_NAME_QUIRKS[baseName];
 
-  const steamMarketName = quirk?.steamMarketNeedsThePrefix && !ksPrefix && !baseName.startsWith("The ")
-    ? craftabilityPrefix + festivizedPrefix + `The ${baseName}`
-    : craftableAwareDisplayName;
+  const steamMarketName = quirk?.steamMarketOmitsNonCraftablePrefix
+    ? fullDisplayName
+    : quirk?.steamMarketNeedsThePrefix && !ksPrefix && !baseName.startsWith("The ")
+      ? craftabilityPrefix + festivizedPrefix + `The ${baseName}`
+      : craftableAwareDisplayName;
 
   // mannco.store wants the Unusual effect name prepended (Steam's own
   // item name never includes it) — skip the link if we couldn't find one.
