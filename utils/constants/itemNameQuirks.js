@@ -27,6 +27,7 @@ export const ITEM_NAME_QUIRKS = {
     manncoStoreNeedsThePrefix: true,
   },
   "Dead Head": {
+    manncoStoreNeedsThePrefix: true,
     steamMarketNeedsThePrefix: true,
   },
   "Quäckenbirdt": {
