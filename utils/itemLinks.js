@@ -131,10 +131,13 @@ export function stnTradingUrl({ name, craftable = true }) {
  *
  * The slug is just the full item name (quality/killstreak/Collector's/
  * Festivized prefixes included, in the same order Steam itself shows
- * them) lowercased, with apostrophes turned into a word break and
- * every run of whitespace turned into a single "-". e.g. "Collector's
- * Festivized Professional Killstreak Beggar's Bazooka" becomes
- * "collector-s-festivized-professional-killstreak-beggar-s-bazooka".
+ * them) lowercased, with apostrophes ("'") and exclamation marks ("!")
+ * removed outright (not replaced with a space/dash — "Warrior's Spirit"
+ * becomes "warriors-spirit", not "warrior-s-spirit"), accented letters
+ * folded down to their plain ASCII base (e.g. "Quäckenbirdt" becomes
+ * "quackenbirdt", not "qu%C3%A4ckenbirdt" — unlike backpack.tf, which
+ * keeps the accent as-is), and every run of whitespace turned into a
+ * single "-".
  *
  * Unusuals are the one exception: Steam's own item name never includes
  * the effect (it's "Unusual Virtual Viewfinder", with the effect only
@@ -158,8 +161,11 @@ export function mannCoStoreUrl({ name, quality, effectName, appId = TF2_APPID })
   const fullName = effectName ? `${effectName} ${qualifiedName}` : qualifiedName;
   const slug = fullName
     .replace(/non-craftable/gi, "Uncraftable")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // fold accents to plain ASCII (ä -> a)
     .toLowerCase()
-    .replace(/'/g, " ")
+    .replace(/'/g, "")
+    .replace(/!/g, "")
+    .replace(/\./g, "")
     .replace(/\:/g, "")
     .trim()
     .replace(/\s+/g, "-");

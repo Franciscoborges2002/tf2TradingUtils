@@ -15,6 +15,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 */
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
+import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, wikiUrl } from "../../utils/itemLinks.js";
 
 export function ItemLinks() {
@@ -67,14 +68,18 @@ export function ItemLinks() {
     const className = modal.querySelector(".tf2utils-mini-modal-name");
     const classBtns = modal.querySelector(".tf2utils-mini-modal-btns");
 
-    // Killstreak tier and Festivized don't always show up as literal
-    // text in the tooltip name (same issue as Genuine quality) — add
-    // them if missing. Steam's own order is Festivized, then Killstreak
-    // tier, then the item name.
+    // Killstreak tier, Festivized and Non-Craftable don't always show up
+    // as literal text in the tooltip name (same issue as Genuine
+    // quality) — add them if missing. Order: Non-Craftable, then
+    // Festivized, then Killstreak tier, then the item name.
     const { prefix: ksPrefix } = getKillstreakInfo(itemEl);
+    const isUncraftItem = itemEl.classList.contains("uncraft") || isUncraftable();
     let displayName = name;
     if (ksPrefix && !displayName.includes(ksPrefix.trim())) displayName = ksPrefix + displayName;
     if (isFestivized() && !displayName.includes("Festivized")) displayName = "Festivized " + displayName;
+    if (isUncraftItem && !displayName.includes("Non-Craftable") && !displayName.includes("Uncraftable")) {
+      displayName = "Non-Craftable " + displayName;
+    }
     className.textContent = displayName;
     classBtns.innerHTML = "";
 
@@ -206,7 +211,13 @@ async function makeLinks(name, itemEl) {
   const { prefix: ksPrefix, tier: ksTier } = getKillstreakInfo(itemEl);
 
   // --- CRAFTABILITY DETECTION ---
-  const isUncraft = itemEl.classList.contains("uncraft");
+  // "Uncraftable" isn't part of the item's name either — same as
+  // Festivized, it's a separate indicator line in the hover tooltip's
+  // content (e.g. Duck Journal's title is just "Duck Journal", with
+  // `<span style="color:rgba(231, 76, 60, 0.8);">Uncraftable</span>`
+  // inside .hover-over-content). Checked alongside the CSS class in
+  // case one signal is more reliable than the other for a given item.
+  const isUncraft = itemEl.classList.contains("uncraft") || isUncraftable();
 
   // --- AUSTRALIUM DETECTION ---
   const dataTitle = itemEl.getAttribute("data-title") || "";
@@ -236,8 +247,17 @@ async function makeLinks(name, itemEl) {
     const PREFIX_PATTERNS = [
       /^Festivized\s+/i,
       /^(?:Killstreak|Specialized Killstreak|Professional Killstreak)\s+/i,
-      /^(?:Strange|Vintage|Collector's)\s+/i,
     ];
+    // Only strip the quality word if it's the one actually detected via
+    // the item's CSS class — some items (e.g. "Strange Count Transfer
+    // Tool") have a quality WORD baked into their literal name while
+    // their real TF2 quality is Unique. Blindly stripping any
+    // "Strange"/"Vintage"/"Collector's" text regardless of the item's
+    // real quality would wrongly cut real name text off those.
+    if (qualityName === "Strange" || qualityName === "Vintage" || qualityName === "Collector's") {
+      const escaped = qualityName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      PREFIX_PATTERNS.push(new RegExp(`^${escaped}\\s+`, "i"));
+    }
     let stripped = true;
     while (stripped) {
       stripped = false;
@@ -257,17 +277,43 @@ async function makeLinks(name, itemEl) {
 
   // Full descriptive name (Festivized + killstreak tier + item name) —
   // Steam's own order is Festivized, then killstreak tier, then the item
-  // name. Used by anything that wants the whole name in one piece:
-  // classic Bp Stats, Steam Market, mannco.store.
+  // name. Used for classic Bp Stats, which takes craftability as its own
+  // separate URL field (craftable: !isUncraft below) — Non-Craftable
+  // must NOT be baked into this one, or Bp Stats would end up saying it
+  // twice.
   const fullDisplayName = festivizedPrefix + ksPrefix + baseName;
+
+  // Steam Market and mannco.store don't have a separate craftability
+  // field — like Festivized/killstreak, "Non-Craftable" doesn't show up
+  // as literal text in the tooltip name at all (confirmed: Duck Journal's
+  // title is just "Duck Journal"), so it's added here from isUncraft.
+  // mannCoStoreUrl() converts "Non-Craftable" text into "uncraftable" in
+  // the slug itself.
+  const craftabilityPrefix = isUncraft ? "Non-Craftable " : "";
+  const craftableAwareDisplayName = craftabilityPrefix + fullDisplayName;
+
+  // A handful of items have confirmed, non-derivable naming quirks per
+  // destination site (e.g. C.A.P.P.E.R needs "The " on Steam Market —
+  // but only for the plain, no-killstreak version — and mannco.store
+  // uses the short name "Capper" instead). See utils/constants/itemNameQuirks.js.
+  const quirk = ITEM_NAME_QUIRKS[baseName];
+
+  const steamMarketName = quirk?.steamMarketNeedsThePrefix && !ksPrefix && !baseName.startsWith("The ")
+    ? craftabilityPrefix + festivizedPrefix + `The ${baseName}`
+    : craftableAwareDisplayName;
 
   // mannco.store wants the Unusual effect name prepended (Steam's own
   // item name never includes it) — skip the link if we couldn't find one.
   // Non-Unusual: pass quality straight through, steamMarketUrl()/mannCoStoreUrl()
   // add the quality word themselves if fullDisplayName's missing it.
+  const manncoBaseName = quirk?.manncoStoreName ?? baseName;
+  const manncoDisplayName = quirk?.manncoStoreNeedsThePrefix && !ksPrefix && !manncoBaseName.startsWith("The ")
+    ? craftabilityPrefix + festivizedPrefix + `The ${manncoBaseName}`
+    : craftabilityPrefix + festivizedPrefix + ksPrefix + manncoBaseName;
+
   const manncoHref = qualityName === "Unusual"
     ? (unusualEffectName ? mannCoStoreUrl({ name: baseName, effectName: unusualEffectName }) : null)
-    : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName });
+    : mannCoStoreUrl({ name: manncoDisplayName, quality: qualityName });
 
   // marketplace.tf needs a network fetch (defindex lookup) — don't let a
   // failure there (offline, blocked request, etc.) take down every other
@@ -302,7 +348,7 @@ async function makeLinks(name, itemEl) {
     },
     {
       label: "Steam Market",
-      href: steamMarketUrl(fullDisplayName, qualityName),
+      href: steamMarketUrl(steamMarketName, qualityName),
     },
     {
       label: "Wiki",
@@ -322,28 +368,42 @@ function getKillstreakInfo(itemEl) {
 }
 
 /**
+ * The currently-visible hover tooltip's content element, or null if
+ * there isn't one — shared by isFestivized(), isUncraftable() and
+ * getUnusualEffectName(), which all read indicator lines out of it
+ * (Festivized/Uncraftable/"Effect: X" are none of them part of the
+ * item's own name — see isFestivized() for why).
+ */
+function getHoverContentEl() {
+  const hoverEl = document.querySelector(".hover-over");
+  if (!hoverEl || hoverEl.style.display === "none") return null;
+  return hoverEl.querySelector(".hover-over-content");
+}
+
+/**
  * "Festivized" isn't part of the item's name at all (unlike Strange/
  * Australium/etc.) — it's a separate indicator line inside the hover
- * tooltip's content, same place the Unusual "Effect: X" line lives
- * (see getUnusualEffectName()), e.g.
- * `<span style="color:#FFD700;">Festivized</span>`.
+ * tooltip's content, e.g. `<span style="color:#FFD700;">Festivized</span>`.
  */
 function isFestivized() {
-  const hoverEl = document.querySelector(".hover-over");
-  if (!hoverEl || hoverEl.style.display === "none") return false;
+  const contentEl = getHoverContentEl();
+  return contentEl ? contentEl.textContent.includes("Festivized") : false;
+}
 
-  const contentEl = hoverEl.querySelector(".hover-over-content");
-  if (!contentEl) return false;
-
-  return contentEl.textContent.includes("Festivized");
+/**
+ * Same story as isFestivized() — "Uncraftable" isn't part of the name
+ * either (e.g. Duck Journal's title is just "Duck Journal"), it's
+ * `<span style="color:rgba(231, 76, 60, 0.8);">Uncraftable</span>`
+ * inside the hover tooltip's content.
+ */
+function isUncraftable() {
+  const contentEl = getHoverContentEl();
+  return contentEl ? contentEl.textContent.includes("Uncraftable") : false;
 }
 
 /* Function to extract the effect name */
 function getUnusualEffectName() {
-  const hoverEl = document.querySelector(".hover-over");
-  if (!hoverEl || hoverEl.style.display === "none") return null;
-
-  const contentEl = hoverEl.querySelector(".hover-over-content");
+  const contentEl = getHoverContentEl();
   if (!contentEl) return null;
 
   // Convert <br> into newlines, then strip any remaining tags.
