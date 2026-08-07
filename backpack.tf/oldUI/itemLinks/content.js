@@ -88,11 +88,14 @@ function processPopover(popover) {
   // unrelated tooltip that happens to share the id shape).
   if (!content.querySelector("dl.item-popover")) return;
 
-  // backpack.tf suffixes crates with their case number (e.g.
-  // "Bone-Chilling Bonanza Case #142"), but mannco.store and
-  // stntrading.eu don't distinguish crates by case number in their own
-  // pages/slugs — strip it before building either link.
-  const fullDisplayName = titleEl.textContent.trim().replace(/\s*#\d+\s*$/, "");
+  // backpack.tf suffixes crates with their case/series number — with a
+  // "Series" word for base supply crates (e.g. "Mann Co. Supply Crate
+  // Series #34") but not for themed cosmetic cases (e.g. "Bone-Chilling
+  // Bonanza Case #142", where "Case" stays as part of the name). Neither
+  // mannco.store nor stntrading.eu distinguish crates by this number in
+  // their own pages/slugs, so it — and "Series" when present — is
+  // stripped before building either link.
+  const fullDisplayName = titleEl.textContent.trim().replace(/\s+(?:Series\s+)?#\d+\s*$/i, "");
 
   // Non-Tradable items (gifted/trade-locked, etc.) can't be sold on any
   // of these sites — skip the row entirely rather than link to a

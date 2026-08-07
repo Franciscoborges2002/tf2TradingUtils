@@ -203,6 +203,44 @@ export async function getItemDefindex(name) {
   return schema[name] ?? null;
 }
 
+// Crate/case name -> every series number that name has ever been used
+// for (utils/data/tf2CrateSeriesNumbers.json). Most crate types
+// (themed cases, coolers, etc.) got a unique name per series, so map
+// to a single-entry array — but several, most notably the base "Mann
+// Co. Supply Crate", reused one name across dozens of different
+// series, so those map to many.
+let crateSeriesPromise = null;
+function loadCrateSeriesNumbers() {
+  if (!crateSeriesPromise) {
+    crateSeriesPromise = fetch(
+      chrome.runtime.getURL("utils/data/tf2CrateSeriesNumbers.json")
+    ).then((res) => res.json());
+  }
+  return crateSeriesPromise;
+}
+
+/**
+ * Looks up a crate/case's series number from the bundled table above —
+ * a fallback for pages that don't show the number themselves (e.g.
+ * steamcommunity.com's newer inventory UI; see steamcommunity.com/itemLinks).
+ * Sites that already show the number as literal text (backpack.tf,
+ * stntrading.eu) should keep parsing it straight off the page instead
+ * of calling this — it's only a fallback, not a replacement.
+ *
+ * Only resolves names mapped to exactly one series number. A name like
+ * "Mann Co. Supply Crate" maps to dozens, and there's no way to tell
+ * which specific one an item is from its name alone — those return
+ * null rather than guess.
+ *
+ * @param {string} name - bare crate/case name (no quality/Non-Craftable prefix, no "#N"/"Series #N" suffix)
+ * @returns {Promise<number|null>}
+ */
+export async function getKnownCrateNumber(name) {
+  const table = await loadCrateSeriesNumbers();
+  const numbers = table[name];
+  return numbers?.length === 1 ? numbers[0] : null;
+}
+
 /**
  * marketplace.tf item page — the one site here that's keyed by "sku"
  * (defindex;quality[;modifiers]) rather than a name-based slug, so this
@@ -216,10 +254,11 @@ export async function getItemDefindex(name) {
  * @param {boolean} [opts.australium=false]
  * @param {boolean} [opts.festive=false]
  * @param {string|number} [opts.effectId] - Unusual effect id
+ * @param {string|number} [opts.crateNumber] - crate/case series number (the "#142" backpack.tf shows, "Series #34" on stntrading.eu) — several crate types share one defindex and are only distinguished by this, e.g. "Bone-Chilling Bonanza Case" -> `5952;6;c142`
  * @returns {Promise<string|null>} null if the item name isn't in the schema
  */
 export async function marketplaceTfUrl({
-  name, quality = "Unique", craftable = true, ksTier, australium = false, festive = false, effectId,
+  name, quality = "Unique", craftable = true, ksTier, australium = false, festive = false, effectId, crateNumber,
 }) {
   const schema = await loadDefindexSchema();
   const defindex = schema[name];
@@ -233,6 +272,7 @@ export async function marketplaceTfUrl({
   if (ksTier) sku.push(`kt-${ksTier}`);
   if (festive) sku.push("festive");
   if (effectId != null) sku.push(`u${effectId}`);
+  if (crateNumber != null) sku.push(`c${crateNumber}`);
 
   return `https://marketplace.tf/items/tf2/${sku.join(";")}`;
 }

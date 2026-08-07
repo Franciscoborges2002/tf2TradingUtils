@@ -80,10 +80,10 @@ function processTooltip(popper) {
   const linksContainers = tooltip.querySelectorAll(".item-tooltip__content__links");
   if (!titleEl || !linksContainers.length) return;
 
-  // Same crate case-number issue as backpack.tf oldUI (see that
-  // script's itemLinks for the full explanation) — strip it before
-  // building either link.
-  const fullDisplayName = titleEl.textContent.trim().replace(/\s*#\d+\s*$/, "");
+  // Same crate case/series-number issue as backpack.tf oldUI (see that
+  // script's itemLinks for the full explanation) — strip it, and the
+  // "Series" word when present, before building either link.
+  const fullDisplayName = titleEl.textContent.trim().replace(/\s+(?:Series\s+)?#\d+\s*$/i, "");
 
   if (/Non-Tradable/i.test(fullDisplayName)) return;
 
