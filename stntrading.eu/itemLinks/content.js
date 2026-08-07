@@ -29,9 +29,17 @@ const LINK_ACCENTS = {
  * Renamed from link2Backpack — same page, now covers more sites.
  */
 export async function showItemLinks() {
-  const itemName = document.querySelector("h1").innerHTML; //Get the name of the item
+  // The page renders a second, hidden mobile-layout copy of this same
+  // card (Bootstrap's "d-none d-sm-block" implies a "d-block d-sm-none"
+  // twin elsewhere), each with its own <h3> title — so this is scoped to
+  // card-body[1] (the same one copyClipboard/content.js targets) rather
+  // than just grabbing the page's first <h3>.
   const placeAddLink = document.getElementsByClassName("card-body")[1]; //place for were i want to add the links in the actual page
   if (!placeAddLink) return;
+
+  const titleEl = placeAddLink.querySelector("h3");
+  if (!titleEl) return;
+  const itemName = titleEl.innerHTML; //Get the name of the item
 
   const isUnusual = itemName.includes(ITEMS_QUALITY[4]);
   // Fetched once and reused — Bp Stats, Next Bp Stats and mannco.store
