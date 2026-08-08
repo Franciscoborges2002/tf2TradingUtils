@@ -2,6 +2,7 @@
 
 * Fixed: buttons no longer appear on "My Listings" (/classifieds?steamid=...) or "Archived Listings" (/classifieds/archive) — both list many different items at once, so a single-item killstreak-tier filter didn't belong there
 * Added list of possible ks's to only appear in possible weapons.
+* Fixed: corrected to identify KS weapons that weren't being identified before (Festive weapons, SMG, Nostromo Napalmer)
 
 ## Version 1.0.0
 

@@ -8,11 +8,12 @@ const KS_PREFIXES = [
   "Professional Killstreak ",
 ];
 
-/** Strips a killstreak-tier prefix and an "Australium " prefix, leaving the bare weapon name to check against KILLSTREAK_WEAPONS_SET. */
+/** Strips a killstreak-tier prefix, then an "Australium "/"Festive " prefix, leaving the bare weapon name to check against KILLSTREAK_WEAPONS_SET. */
 function toBaseWeaponName(name) {
   const prefix = KS_PREFIXES.find((p) => name.startsWith(p));
   let stripped = prefix ? name.slice(prefix.length) : name;
   if (stripped.startsWith("Australium ")) stripped = stripped.slice("Australium ".length);
+  if (stripped.startsWith("Festive ")) stripped = stripped.slice("Festive ".length);
   return stripped;
 }
 
