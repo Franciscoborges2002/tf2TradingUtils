@@ -9,6 +9,10 @@ export function copyNameClipboard() {
   // mobile-layout copy of this same card (Bootstrap's "d-none d-sm-block"
   // implies a "d-block d-sm-none" twin elsewhere), each with its own
   // <h1>. Picking the wrong one puts the icon somewhere invisible.
+  // For a mistyped/unknown item, stntrading.eu renders a ".error-box"
+  // page instead, with no <h1> at all — nothing useful to copy there.
+  if (document.querySelector(".error-box")) return;
+
   const cardBody = document.getElementsByClassName("card-body")[1];
   const title = cardBody?.querySelector("h1");
   if (!title) return;

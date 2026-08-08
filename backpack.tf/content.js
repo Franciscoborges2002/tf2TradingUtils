@@ -33,6 +33,11 @@ function scriptRouter() {
       "One-Click Offer",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/oneClickOffer",
     ]);
+    loadItemLinksNewUI();
+    EXT_SCRIPT_INFO.scripts.push([
+      "Item Links",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/itemLinks",
+    ]);
   } else {
     /* start scripts for oldUI */
 
@@ -55,6 +60,16 @@ function scriptRouter() {
         "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/oneClickOffer",
       ]);
     }
+
+    // Unlike the scripts above, item hover popovers show up all over the
+    // site (classifieds, stats, a user's own backpack/listings, search
+    // results, ...) — not just stats/classifieds pages — so this one
+    // isn't gated to that pathname check.
+    loadItemLinks();
+    EXT_SCRIPT_INFO.scripts.push([
+      "Item Links",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/itemLinks",
+    ]);
   }
 }
 
@@ -93,6 +108,15 @@ function loadOneClickOffer() {
   })();
 }
 
+function loadItemLinks() {
+  (async () => {
+    const { addItemLinks } = await import(
+      chrome.runtime.getURL("backpack.tf/oldUI/itemLinks/content.js")
+    );
+    addItemLinks();
+  })();
+}
+
 function loadFilterSpecialListingsNewUI() {
   (async () => {
     const { filterSpecialListingsNewUI } = await import(
@@ -108,6 +132,15 @@ function loadOneClickOfferNewUI() {
       chrome.runtime.getURL("backpack.tf/newUI/oneClickOffer/content.js")
     );
     addOneClickOfferNewUI();
+  })();
+}
+
+function loadItemLinksNewUI() {
+  (async () => {
+    const { addItemLinksNewUI } = await import(
+      chrome.runtime.getURL("backpack.tf/newUI/itemLinks/content.js")
+    );
+    addItemLinksNewUI();
   })();
 }
 

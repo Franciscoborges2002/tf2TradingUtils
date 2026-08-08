@@ -2,6 +2,7 @@
 
 * Added oneClickOffer script to instantly send a trade offer with the correct currency for bot-managed listings, in both oldUI and newUI
 * Reafactored addKSButons for oldUI, and removed for newUI.
+* Added itemLinks script (oldUI and newUI) to add mannco.store and stntrading.eu links to the item hover popover/tooltip
 
 # Version 1.0.2
 
