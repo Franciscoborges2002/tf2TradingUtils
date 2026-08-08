@@ -57,13 +57,12 @@ function applyVisibility(ul, hidden) {
  * Works for both the Sell Orders and Buy Orders columns.
  */
 export function filterSpecialListings() {
-  // backpack.tf renders two .media-list columns (sell + buy)
+  // backpack.tf renders two .media-list columns (sell + buy) — but not
+  // at all for currency (Scrap/Reclaimed/Refined Metal can't be listed
+  // on Classifieds in the first place), so finding none here is a
+  // normal, expected state rather than something worth a warning.
   const lists = document.querySelectorAll("ul.media-list");
-
-  if (!lists.length) {
-    console.warn("[TF2TradingUtils] filterSpecialListings: no listing columns found.");
-    return;
-  }
+  if (!lists.length) return;
 
   lists.forEach((ul) => {
     const specials = [...ul.querySelectorAll("li.listing")].filter(isSpecialListing);
