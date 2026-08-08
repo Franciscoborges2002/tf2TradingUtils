@@ -91,11 +91,13 @@ function processPopover(popover) {
   // backpack.tf suffixes crates with their case/series number — with a
   // "Series" word for base supply crates (e.g. "Mann Co. Supply Crate
   // Series #34") but not for themed cosmetic cases (e.g. "Bone-Chilling
-  // Bonanza Case #142", where "Case" stays as part of the name). Neither
-  // mannco.store nor stntrading.eu distinguish crates by this number in
-  // their own pages/slugs, so it — and "Series" when present — is
-  // stripped before building either link.
-  const fullDisplayName = titleEl.textContent.trim().replace(/\s+(?:Series\s+)?#\d+\s*$/i, "");
+  // Bonanza Case #142", where "Case" stays as part of the name).
+  // mannco.store doesn't distinguish crates by this number in its own
+  // slugs, so it's stripped for that one — but stntrading.eu is the
+  // opposite: it has a separate page per series/case number, so it
+  // needs the number kept (see rawTitle/stnName below).
+  const rawTitle = titleEl.textContent.trim();
+  const fullDisplayName = rawTitle.replace(/\s+(?:Series\s+)?#\d+\s*$/i, "");
 
   // Non-Tradable items (gifted/trade-locked, etc.) can't be sold on any
   // of these sites — skip the row entirely rather than link to a
@@ -138,7 +140,9 @@ function processPopover(popover) {
   // first), unlike Non-Craftable, which always does. The killstreak
   // alternatives are ordered longest-first so "Professional Killstreak"
   // doesn't get half-matched by the plain "Killstreak" alternative.
-  const stnName = fullDisplayName
+  // Built from rawTitle, not fullDisplayName — unlike mannco.store,
+  // stntrading.eu keeps a crate's case/series number as part of the name.
+  const stnName = rawTitle
     .replace(/^Non-Craftable\s+/i, "")
     .replace(/Festivized\s+/i, "")
     .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");

@@ -81,9 +81,13 @@ function processTooltip(popper) {
   if (!titleEl || !linksContainers.length) return;
 
   // Same crate case/series-number issue as backpack.tf oldUI (see that
-  // script's itemLinks for the full explanation) — strip it, and the
-  // "Series" word when present, before building either link.
-  const fullDisplayName = titleEl.textContent.trim().replace(/\s+(?:Series\s+)?#\d+\s*$/i, "");
+  // script's itemLinks for the full explanation): mannco.store doesn't
+  // distinguish crates by that number, so it's stripped for
+  // fullDisplayName — but stntrading.eu is the opposite (a separate
+  // page per series/case number), so stnName below is built from
+  // rawTitle instead, keeping it.
+  const rawTitle = titleEl.textContent.trim();
+  const fullDisplayName = rawTitle.replace(/\s+(?:Series\s+)?#\d+\s*$/i, "");
 
   if (/Non-Tradable/i.test(fullDisplayName)) return;
 
@@ -123,8 +127,9 @@ function processTooltip(popper) {
   // "Vintage Festivized Professional Killstreak Kritzkrieg"). The
   // killstreak alternatives are ordered longest-first so "Professional
   // Killstreak" doesn't get half-matched by the plain "Killstreak"
-  // alternative.
-  const stnName = fullDisplayName
+  // alternative. Built from rawTitle, not fullDisplayName — unlike
+  // mannco.store, stntrading.eu keeps a crate's case/series number.
+  const stnName = rawTitle
     .replace(/^Non-Craftable\s+/i, "")
     .replace(/Festivized\s+/i, "")
     .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
