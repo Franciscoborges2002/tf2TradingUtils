@@ -30,6 +30,14 @@ async function scriptRouter() {
     "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/showTradeDetails",
   ]);
 
+  // The item action menu (and itemLinks' extra links in it) exists on
+  // a read-only sent/received offer too, not just while composing.
+  loadItemLinks();
+  EXT_SCRIPT_INFO.scripts.push([
+    "Item Links",
+    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/itemLinks",
+  ]);
+
   // Everything else only makes sense while actively composing an offer.
   if (!isNewOffer) return;
 
@@ -43,12 +51,6 @@ async function scriptRouter() {
   EXT_SCRIPT_INFO.scripts.push([
     "Trade Offer Panel",
     "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/tradeOfferPanel",
-  ]);
-
-  loadItemLinks();
-  EXT_SCRIPT_INFO.scripts.push([
-    "Item Links",
-    "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/itemLinks",
   ]);
 
   // botRep needs the bot DB — fetch after other scripts are running
