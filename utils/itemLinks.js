@@ -108,19 +108,24 @@ export function backpackClassifiedsUrl({ name, qualityId, craftable = true, aust
 /**
  * stntrading.eu item page.
  *
- * Spaces are encoded as "+" (not %20), colons as %3A and apostrophes
- * as %27 — that's the URL shape stntrading.eu actually expects,
- * reverse-engineered from the site itself rather than documented
- * anywhere.
+ * Spaces are encoded as "+" (not %20), colons as %3A, apostrophes as
+ * %27 and "#" as %23 (unlike every other site here, stntrading.eu
+ * keeps a crate's "Series #N"/"#N" suffix as part of the name itself —
+ * it has a separate page per series/case number, not one per crate
+ * type — so that character shows up for real and has to be escaped:
+ * unescaped, it'd truncate the URL at the fragment) — that's the URL
+ * shape stntrading.eu actually expects, reverse-engineered from the
+ * site itself rather than documented anywhere.
  *
  * @param {object} opts
- * @param {string} opts.name - full item name (quality prefix included, as stntrading.eu shows it)
+ * @param {string} opts.name - full item name (quality prefix included, as stntrading.eu shows it — keep any "Series #N"/"#N" crate suffix too, unlike mannco.store/marketplace.tf's separate crate handling)
  * @param {boolean} [opts.craftable=true]
  */
 export function stnTradingUrl({ name, craftable = true }) {
   const encoded = name
     .replace(/:/g, "%3A")
     .replace(/'/g, "%27")
+    .replace(/#/g, "%23")
     .replace(/ /g, "+");
   const prefix = craftable ? "" : "Non-Craftable+";
   return `https://stntrading.eu/item/tf2/${prefix}${encoded}`;
@@ -201,6 +206,41 @@ function loadDefindexSchema() {
 export async function getItemDefindex(name) {
   const schema = await loadDefindexSchema();
   return schema[name] ?? null;
+}
+
+// defindex -> name, built once by inverting the bundled name -> defindex
+// schema above. Where more than one name shares a defindex (the same
+// "stock vs. tradable" ambiguity noted on loadDefindexSchema), whichever
+// name is encountered first wins — same convention as that lookup.
+let nameByDefindexPromise = null;
+function loadNameByDefindex() {
+  if (!nameByDefindexPromise) {
+    nameByDefindexPromise = loadDefindexSchema().then((schema) => {
+      const reverse = {};
+      for (const [name, defindex] of Object.entries(schema)) {
+        if (!(defindex in reverse)) reverse[defindex] = name;
+      }
+      return reverse;
+    });
+  }
+  return nameByDefindexPromise;
+}
+
+/**
+ * Looks up an item's name from its defindex — the reverse of
+ * getItemDefindex() above. Meant for pages that expose a defindex
+ * somewhere (e.g. a Wiki redirect link's "?id=<defindex>") but no name
+ * text at all, such as a Steam trade offer's action menu for currency
+ * items (Scrap/Reclaimed/Refined Metal aren't listed on Steam Market,
+ * so that menu's usual name source — its "View in Community Market"
+ * link — doesn't exist for them).
+ *
+ * @param {string|number} defindex
+ * @returns {Promise<string|null>}
+ */
+export async function getItemNameByDefindex(defindex) {
+  const reverse = await loadNameByDefindex();
+  return reverse[defindex] ?? null;
 }
 
 // Crate/case name -> every series number that name has ever been used
