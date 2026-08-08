@@ -5,6 +5,9 @@
 - Fixed: crates (e.g. "Mann Co. Supply Crate Series #34") linked to a broken bp.tf stats URL — the " Series #N" suffix isn't part of the schema name, so it's now stripped and re-attached as the trailing series-number path segment instead
 - Fixed: an unknown/mistyped item page has no `<h1>` at all
 - Fixed: marketplace.tf and mannco.store links for crates included the raw "Series #N"/"#N" suffix, breaking the schema lookup — marketplace.tf now gets it as a `c<N>` sku modifier, mannco.store drops it (matches how it already worked for bp.tf stats)
+- Fixed: bp.tf stats and marketplace.tf links for Festive weapons (e.g. "Festive Eyelander") dropped the "Festive " and linked to the plain weapon instead
+- Fixed: bp.tf stats for "Festive Force-A-Nature" used the wrong casing ("Festive Force-A-Nature" instead of "Festive Force-a-Nature")
+- Fixed: Genuine and Collector's quality weren't recognized at all
 
 # Version 1.0.1
 

@@ -8,7 +8,9 @@ import {
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 
-const ITEMS_QUALITY = ["Unique", "Strange", "Vintage", "Haunted", "Unusual"];
+// Index 4 ("Unusual") is referenced directly below (ITEMS_QUALITY[4]) —
+// new entries go at the end so that index stays put.
+const ITEMS_QUALITY = ["Unique", "Strange", "Vintage", "Haunted", "Unusual", "Genuine", "Collector's"];
 const ITEMS_CRAFTABILITY = ["Craftable", "Non-Craftable"];
 let effectsDataPromise = null; //to get the utils effects ids
 
@@ -112,14 +114,17 @@ function injectLinkStyles() {
 }
 
 /**
- * Strips "The ", the recognized quality word, and "Festive " (e.g.
- * "Festive Force-A-Nature" -> "Force-A-Nature" — backpack.tf's stats
- * page doesn't distinguish the Festive promotional variant in the
- * name), and separates out craftability — but keeps killstreak/
- * Australium text baked into the name (stntrading.eu item names don't
- * carry killstreak text at all; see parseItemAttributes() for the
- * deeper parse the query-param-based links need). Used for classic +
- * next backpack.tf stats and Wiki.
+ * Strips "The " and the recognized quality word, and separates out
+ * craftability — but keeps killstreak/Australium/"Festive " text baked
+ * into the name (stntrading.eu item names don't carry killstreak text
+ * at all; see parseItemAttributes() for the deeper parse the query-
+ * param-based links need). "Festive " is deliberately NOT stripped:
+ * unlike "Festivized" (the killstreak-fabricator effect, which keeps
+ * the base weapon's own defindex), a Festive weapon is a genuinely
+ * separate item with its own defindex — e.g. Festive Eyelander is
+ * defindex 1082, plain Eyelander is 132 — so backpack.tf has its own
+ * distinct stats page for it too, one this must not collapse into.
+ * Used for classic + next backpack.tf stats and Wiki.
  */
 function parseShallow(itemNameRaw) {
   let name = String(itemNameRaw || "").trim();
@@ -135,8 +140,6 @@ function parseShallow(itemNameRaw) {
       break;
     }
   }
-
-  if (name.startsWith("Festive ")) name = name.slice("Festive ".length);
 
   if (isNonCraftable) {
     name = name.replace(ITEMS_CRAFTABILITY[1] + " ", "").trim();
@@ -194,9 +197,17 @@ async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
   const nameWithoutSeries = crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw;
 
   const { name, quality, craftable } = parseShallow(nameWithoutSeries);
-  const quirk = ITEM_NAME_QUIRKS[name];
+
+  // ITEM_NAME_QUIRKS (e.g. Force-A-Nature's backpack.tf casing fix) is
+  // keyed by the bare weapon name — strip "Festive " just for that
+  // lookup, then reattach it, so the quirk still applies to a Festive
+  // weapon too instead of only ever matching the plain one.
+  const festivePrefix = name.startsWith("Festive ") ? "Festive " : "";
+  const baseForQuirk = festivePrefix ? name.slice(festivePrefix.length) : name;
+  const quirk = ITEM_NAME_QUIRKS[baseForQuirk];
+
   return backpackStatsUrl({
-    name: quirk?.backpackName ?? name,
+    name: festivePrefix + (quirk?.backpackName ?? baseForQuirk),
     quality,
     craftable,
     effectId: crateMatch ? crateMatch[1] : undefined,
@@ -206,12 +217,17 @@ async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
 
 /**
  * Parses an item's full name down to the bare schema name (no quality,
- * no "The ", no killstreak/Australium/Festive/Non-Craftable text — all
- * those become separate fields) plus the attributes the query-param
- * based links (classifieds, marketplace.tf) need.
+ * no "The ", no killstreak/Australium/Non-Craftable text — all those
+ * become separate fields) plus the attributes the query-param based
+ * links (classifieds, marketplace.tf) need. "Festive " is deliberately
+ * left in the name rather than pulled out as its own field — see
+ * parseShallow() above for why (it's a distinct item/defindex, not a
+ * modifier like killstreak tier or Australium): marketplace.tf's
+ * schema lookup needs "Festive Eyelander" as the literal name to
+ * resolve to its own defindex (1082), not "Eyelander" (132).
  *
  * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier?: number, australium?: boolean, festive?: boolean, effectId?: string, crateNumber?: string}|null>}
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier?: number, australium?: boolean, effectId?: string, crateNumber?: string}|null>}
  */
 async function parseItemAttributes(itemNameRaw) {
   // Crate series/case number always trails at the very end, after
@@ -263,14 +279,12 @@ async function parseItemAttributes(itemNameRaw) {
     name = name.slice("Killstreak ".length);
   }
 
-  // detect + strip Australium/Festive — also separate sku fields
+  // detect + strip Australium — a separate sku field. "Festive " is
+  // NOT stripped here (see this function's own doc comment above).
   const australium = name.startsWith("Australium ");
   if (australium) name = name.slice("Australium ".length);
 
-  const festive = name.startsWith("Festive ");
-  if (festive) name = name.slice("Festive ".length);
-
-  return { name, quality: matchedQuality, craftable: !isNonCraftable, ksTier, australium, festive, crateNumber };
+  return { name, quality: matchedQuality, craftable: !isNonCraftable, ksTier, australium, crateNumber };
 }
 
 /**
