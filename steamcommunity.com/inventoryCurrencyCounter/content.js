@@ -115,13 +115,20 @@ function injectStyles() {
 
 /** The inventory owner's steamid64 — from the canonical link tag first
  *  (works for both /profiles/<id>/ and /id/<vanity>/ URLs), falling
- *  back to the URL path itself. */
+ *  back to the URL path itself (only present for /profiles/ URLs, not
+ *  a vanity /id/ one), and finally to #filter_options' own per-app tag
+ *  containers, whose ids embed it regardless of URL shape — e.g.
+ *  id="tags_76561198265368729_440_2" on a /id/<vanity>/inventory/ page. */
 function getOwnerSteamId64() {
   const canonical = document.querySelector('link[rel="canonical"]')?.getAttribute("href");
   const fromCanonical = canonical?.match(/\/profiles\/(\d{17})/)?.[1];
   if (fromCanonical) return fromCanonical;
 
-  return location.pathname.match(/\/profiles\/(\d{17})/)?.[1] ?? null;
+  const fromPath = location.pathname.match(/\/profiles\/(\d{17})/)?.[1];
+  if (fromPath) return fromPath;
+
+  const tagsContainer = document.querySelector('#filter_options [id^="tags_"]');
+  return tagsContainer?.id.match(/^tags_(\d{17})_/)?.[1] ?? null;
 }
 
 // backpack.tf's classic grid renders 16 items per page — the page
