@@ -61,6 +61,14 @@ async function scriptRouter() {
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/groupTradeItems",
     ]);
   }
+
+  if (url.pathname.includes("tradeoffers") || url.pathname.includes("tradehistory")) {
+    loadTradeOfferCurrency();
+    EXT_SCRIPT_INFO.scripts.push([
+      "tradeOfferCurrency",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/tradeOfferCurrency",
+    ]);
+  }
 }
 
 //Start the script
@@ -106,6 +114,15 @@ function loadGroupTradeItems() {
       chrome.runtime.getURL("steamcommunity.com/groupTradeItems/content.js")
     );
     groupTradeItems();
+  })();
+}
+
+function loadTradeOfferCurrency() {
+  (async () => {
+    const { addTradeCurrencyTotals } = await import(
+      chrome.runtime.getURL("steamcommunity.com/tradeOfferCurrency/content.js")
+    );
+    addTradeCurrencyTotals();
   })();
 }
 
