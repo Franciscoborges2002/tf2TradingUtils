@@ -1,5 +1,6 @@
 # Version 1.1.1 (v1.3.0)
 
+- Added a skinport.com link
 - Renamed ItemLinks to itemLinks
 - Added mannco.store and marketplace.tf links
 - Removed Bp Classifieds and Next Bp Classifieds links, keeping only Bp Stats and Next Bp Stats

@@ -18,6 +18,7 @@
  * @property {string} [manncoStoreName] - mannco.store uses this short name instead of the item's real name (e.g. "Capper" instead of "C.A.P.P.E.R"). Apostrophes don't need a quirk entry for this anymore — mannCoStoreUrl() strips them outright now (see utils/itemLinks.js).
  * @property {boolean} [manncoStoreNeedsThePrefix] - same "The"-only-when-no-killstreak rule as steamMarketNeedsThePrefix, but tracked separately per site — confirmed independently, not assumed to match
  * @property {string} [backpackName] - backpack.tf needs this exact casing instead of the name as some site displays it (e.g. "Force-a-Nature" — lowercase "a" — not "Force-A-Nature", which is how stntrading.eu auto-capitalizes it)
+ * @property {boolean} [skinportNeedsThePrefix] - skinport.com needs "The " prepended — but ONLY when no quality word leads the name (confirmed for Quäckenbirdt: the unqualified version is "the-qu-ckenbirdt", but the Genuine version is "genuine-qu-ckenbirdt", with no "the" at all). Tracked separately from manncoStoreNeedsThePrefix — confirmed NOT to always match it.
  */
 
 /** @type {Record<string, ItemNameQuirk>} */
@@ -33,9 +34,31 @@ export const ITEM_NAME_QUIRKS = {
   },
   "Quäckenbirdt": {
     manncoStoreNeedsThePrefix: true,
+    skinportNeedsThePrefix: true,
   },
   "Festivizer": {
     manncoStoreNeedsThePrefix: true,
+  },
+  "Conscientious Objector": {
+    skinportNeedsThePrefix: true,
+  },
+  "AWPer Hand": {
+    skinportNeedsThePrefix: true,
+  },
+  "Sharp Dresser": {
+    skinportNeedsThePrefix: true,
+  },
+  "Nostromo Napalmer": {
+    skinportNeedsThePrefix: true,
+  },
+  "Maul": {
+    skinportNeedsThePrefix: true,
+  },
+  "Ham Shank": {
+    skinportNeedsThePrefix: true,
+  },
+  "Frying Pan": {
+    skinportNeedsThePrefix: true,
   },
   // Keyed by stntrading.eu's own (wrongly-capitalized) casing — see
   // backpackName above.

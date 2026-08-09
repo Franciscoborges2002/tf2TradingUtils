@@ -3,6 +3,7 @@ import {
   mannCoStoreUrl,
   marketplaceTfUrl,
   steamMarketUrl,
+  skinportUrl,
   wikiUrl,
 } from "../../utils/itemLinks.js";
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
@@ -33,6 +34,7 @@ const LINK_ACCENTS = {
   "bp.tf stats": SITE_BRAND_COLORS.backpackTf,
   "next.bp.tf stats": SITE_BRAND_COLORS.backpackTf,
   "mannco.store": SITE_BRAND_COLORS.manncoStore,
+  "skinport.com": SITE_BRAND_COLORS.skinport,
   "marketplace.tf": SITE_BRAND_COLORS.marketplaceTf,
   "Steam Market": SITE_BRAND_COLORS.steam,
   "Wiki": SITE_BRAND_COLORS.wiki,
@@ -62,6 +64,7 @@ export async function showItemLinks() {
     { label: "bp.tf stats", href: await createBpStatsLink(itemName, isUnusual, effect, false) },
     { label: "next.bp.tf stats", href: await createBpStatsLink(itemName, isUnusual, effect, true) },
     { label: "mannco.store", href: await createManncoLink(itemName, isUnusual, effect) },
+    { label: "skinport.com", href: createSkinportLink(itemName, isUnusual) },
     { label: "marketplace.tf", href: await createMarketplaceLink(itemName) },
     { label: "Steam Market", href: steamMarketUrl(itemName.trim()) },
     { label: "Wiki", href: wikiUrl(parseShallow(itemName).name) },
@@ -314,6 +317,29 @@ async function createManncoLink(itemNameRaw, isUnusual, effect) {
   // "Non-Craftable " (if present) is kept as-is — mannCoStoreUrl()
   // turns it into mannco.store's "uncraftable" slug word.
   return mannCoStoreUrl({ name: manncoName });
+}
+
+/**
+ * Build a skinport.com item URL. No Unusual effect name is known to
+ * belong anywhere in skinport.com's slug (unconfirmed, unlike
+ * mannco.store's prepend-effect-name convention), so Unusuals are
+ * skipped rather than guessed wrong — same reasoning as createManncoLink().
+ *
+ * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
+ * @param {boolean} isUnusual
+ * @returns {string|null}
+ */
+function createSkinportLink(itemNameRaw, isUnusual) {
+  if (isUnusual) return null;
+
+  const name = String(itemNameRaw || "").trim();
+
+  // skinport.com doesn't distinguish crates by series/case number —
+  // same reasoning as mannco.store, drop it if present.
+  const crateMatch = name.match(CRATE_NUMBER_RE);
+  const skinportName = crateMatch ? name.slice(0, crateMatch.index) : name;
+
+  return skinportUrl({ name: skinportName });
 }
 
 /**

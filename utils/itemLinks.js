@@ -13,6 +13,7 @@
  */
 
 import { TF2_APPID, TF2_QUALITY_IDS } from "./constants/tf2Economy.js";
+import { ITEM_NAME_QUIRKS } from "./constants/itemNameQuirks.js";
 
 /**
  * Steam Market and mannco.store both key off the item's full descriptive
@@ -279,6 +280,72 @@ export async function getKnownCrateNumber(name) {
   const table = await loadCrateSeriesNumbers();
   const numbers = table[name];
   return numbers?.length === 1 ? numbers[0] : null;
+}
+
+/**
+ * skinport.com item page.
+ *
+ * The slug is a generic slugify of the full display name (quality/
+ * killstreak/Non-Craftable prefixes included, same order Steam shows
+ * them) — lowercased, with every run of one-or-more non-alphanumeric
+ * characters (spaces, punctuation, "#", accented letters — unlike
+ * mannco.store, skinport.com does NOT fold accents to a plain ASCII
+ * base, e.g. "Quäckenbirdt" -> "qu-ckenbirdt", not "quackenbirdt";
+ * confirmed against real skinport.com URLs) collapsed to a single "-",
+ * and any leading/trailing "-" trimmed. Apostrophes aren't dropped
+ * either, unlike mannco.store — they become their own "-" like any
+ * other punctuation: "Collector's Jag" -> "collector-s-jag" (not
+ * "collectors-jag"), "Professional Killstreak C.A.P.P.E.R" ->
+ * "professional-killstreak-c-a-p-p-e-r" (each "." becomes its own "-",
+ * not stripped), "Strange Part: Damage Dealt" ->
+ * "strange-part-damage-dealt" (the ": " run collapses to one "-").
+ *
+ * Non-Craftable is its own special case, unlike every other prefix:
+ * rather than folding into the dash-slug like the rest of the name
+ * would, it's stripped out and appended as a literal "+uncraftable"
+ * suffix instead — confirmed against a real skinport.com URL:
+ * "Non-Craftable Unlocked Cosmetic Crate Multi-Class" ->
+ * "unlocked-cosmetic-crate-multi-class+uncraftable", not
+ * "non-craftable-unlocked-cosmetic-crate-multi-class".
+ *
+ * A handful of items also need a leading "The " that isn't part of
+ * their normal display name anywhere else — ITEM_NAME_QUIRKS'
+ * `skinportNeedsThePrefix` (tracked independently from mannco.store's
+ * own, similarly-named quirk: confirmed NOT to always match it — see
+ * Quäckenbirdt below). Only applied when no quality word ends up
+ * leading the name, i.e. quality is Unique/Unusual/omitted: confirmed
+ * against two real skinport.com URLs for the same item — the
+ * unqualified version is "the-qu-ckenbirdt", but the Genuine version is
+ * "genuine-qu-ckenbirdt", with no "the" at all.
+ *
+ * @param {object} opts
+ * @param {string} opts.name - full item name (quality/killstreak/Non-Craftable prefixes included, as Steam displays them)
+ * @param {string} [opts.quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
+ */
+export function skinportUrl({ name, quality }) {
+  // Non-Craftable is stripped before the quirk lookup below (not just
+  // before slugifying) — ITEM_NAME_QUIRKS is keyed by the bare name, so
+  // leaving "Non-Craftable " attached would make a Non-Craftable
+  // Quäckenbirdt silently miss its "The " (confirmed: the correct link
+  // is "the-qu-ckenbirdt+uncraftable", not "qu-ckenbirdt+uncraftable").
+  const trimmed = name.trim();
+  const isNonCraftable = /^non-craftable\s+/i.test(trimmed);
+  const withoutCraftability = trimmed.replace(/^non-craftable\s+/i, "");
+
+  let fullName = ensureQualityPrefix(withoutCraftability, quality);
+
+  if (!quality || quality === "Unique" || quality === "Unusual") {
+    const quirk = ITEM_NAME_QUIRKS[fullName];
+    if (quirk?.skinportNeedsThePrefix && !fullName.startsWith("The ")) {
+      fullName = `The ${fullName}`;
+    }
+  }
+
+  const slug = fullName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `https://skinport.com/tf2/item/${slug}${isNonCraftable ? "+uncraftable" : ""}`;
 }
 
 /**

@@ -19,7 +19,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/old
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
 import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
-import { mannCoStoreUrl, stnTradingUrl } from "../../../utils/itemLinks.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl } from "../../../utils/itemLinks.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])
@@ -29,6 +29,7 @@ const LINK_ACCENTS = {
   "mannco.store": SITE_BRAND_COLORS.manncoStore,
   "stntrading.eu": SITE_BRAND_COLORS.stnTrading,
   "scrap.tf": SITE_BRAND_COLORS.scrapTf,
+  "skinport.com": SITE_BRAND_COLORS.skinport,
 };
 
 const KEY_NAME_RE = /Mann Co\. Supply Crate Key/i;
@@ -129,6 +130,14 @@ function processPopover(popover) {
     ? null
     : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName });
 
+  // skinport.com wants the same full descriptive name mannco.store does
+  // (quality/killstreak/Festivized/Non-Craftable text baked in) — no
+  // Unusual effect name is reliably available from this popover either,
+  // so skip skinport.com for Unusual items for the same reason.
+  const skinportHref = qualityName === "Unusual"
+    ? null
+    : skinportUrl({ name: fullDisplayName, quality: qualityName });
+
   // stntrading.eu bakes craftability into its own name/prefix — strip
   // "Non-Craftable " back out of the title so it isn't duplicated. It
   // also has no separate item page per Festivized variant or killstreak
@@ -150,6 +159,7 @@ function processPopover(popover) {
   const links = [
     { label: "mannco.store", href: manncoHref },
     { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable }) },
+    { label: "skinport.com", href: skinportHref },
   ].filter((link) => link.href);
 
   // scrap.tf has no per-item page — its keys market page is the one
