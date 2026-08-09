@@ -1,6 +1,7 @@
-# Version 1.0.4
+# Version 1.0.4 (v1.3.0)
 
 - Added inventoryCurrencyCounter
+- Added tradeOfferCurrency
 
 # Version 1.0.3
 
