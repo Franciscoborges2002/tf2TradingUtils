@@ -6,10 +6,56 @@
  * https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/filterSpecialListings
  */
 
+// A killstreak weapon's sheen/killstreaker render in .item__icons as an
+// SVG classed "attribute__<name>" (confirmed: a Specialized Killstreak
+// C.A.P.P.E.R's only icon there is `<svg class="... attribute__deadly-
+// daffodil">` for its Deadly Daffodil sheen — no src/alt/title at all,
+// just that class). Unlike spells/strange parts (many different possible
+// attachments), sheens and killstreakers are a small, fixed, well-known
+// set of names in TF2 regardless of which weapon they're on, so those
+// specific classes can be matched precisely and excluded — a killstreak
+// item isn't a "special" listing the way a spell/strange-part one is,
+// and searching by killstreak tier was hiding every single result
+// because every one of them carries a sheen (Specialized+) and/or
+// killstreaker (Professional) icon.
+const KILLSTREAK_ATTRIBUTE_CLASSES = new Set([
+  // Generic fallback classes — confirmed on a Professional Killstreak
+  // C.A.P.P.E.R whose only icon was `<img src=".../ksProfessional.png"
+  // class="item__icons__icon attribute__killstreaker">`: the specific
+  // killstreaker particle apparently isn't always recognized, in which
+  // case it renders under this generic class (with the tier badge image)
+  // instead of a specific one. "attribute__sheen" isn't confirmed the
+  // same way yet, but included defensively in case the site falls back
+  // the same way for an unrecognized sheen.
+  "attribute__killstreaker",
+  "attribute__sheen",
+  // Sheens
+  "attribute__team-shine",
+  "attribute__deadly-daffodil",
+  "attribute__manndarin",
+  "attribute__mean-green",
+  "attribute__agonizing-emerald",
+  "attribute__villainous-violet",
+  "attribute__hot-rod",
+  // Killstreakers
+  "attribute__fire-horns",
+  "attribute__cerebral-discharge",
+  "attribute__tornado",
+  "attribute__flames",
+  "attribute__singularity",
+  "attribute__incinerator",
+  "attribute__hypno-beam",
+]);
+
+function isKillstreakIcon(el) {
+  return [...el.classList].some((c) => KILLSTREAK_ATTRIBUTE_CLASSES.has(c));
+}
+
 function isSpecialListing(listingEl) {
   const iconsDiv = listingEl.querySelector(".item__icons");
   if (!iconsDiv) return false;
-  return iconsDiv.querySelector("svg, img") !== null;
+  const icons = [...iconsDiv.querySelectorAll("svg, img")];
+  return icons.some((icon) => !isKillstreakIcon(icon));
 }
 
 function injectStyles() {
