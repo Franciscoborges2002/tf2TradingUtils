@@ -93,3 +93,9 @@ export const TF2_QUALITY_IDS = {
   "Collector's": 14,
   "Decorated Weapon": 15,
 };
+
+/** Same names as TF2_QUALITY_IDS, as a plain array */
+export const TF2_QUALITY_NAMES = Object.keys(TF2_QUALITY_IDS);
+
+/** TF2's two craftability states, as shown in item names/URLs across every site here. */
+export const TF2_CRAFTABILITY = ["Craftable", "Non-Craftable"];

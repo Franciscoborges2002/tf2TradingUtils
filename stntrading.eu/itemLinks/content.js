@@ -12,11 +12,8 @@ import {
 } from "../../utils/itemLinks.js";
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
+import { TF2_QUALITY_NAMES, TF2_CRAFTABILITY } from "../../utils/constants/tf2Economy.js";
 
-// Index 4 ("Unusual") is referenced directly below (ITEMS_QUALITY[4]) —
-// new entries go at the end so that index stays put.
-const ITEMS_QUALITY = ["Unique", "Strange", "Vintage", "Haunted", "Unusual", "Genuine", "Collector's"];
-const ITEMS_CRAFTABILITY = ["Craftable", "Non-Craftable"];
 let effectsDataPromise = null; //to get the utils effects ids
 
 // A distinct accent color per destination site, so the row reads as a
@@ -47,7 +44,7 @@ export async function showItemLinks() {
   const placeAddLink = document.getElementsByClassName("card-body")[1]; //place for were i want to add the links in the actual page
   if (!placeAddLink) return;
 
-  const isUnusual = itemName.includes(ITEMS_QUALITY[4]);
+  const isUnusual = itemName.includes("Unusual");
   // Fetched once and reused — Bp Stats, Next Bp Stats and mannco.store
   // all need the same Unusual effect for this item.
   const effect = isUnusual ? await findUnusualEffect(itemName) : null;
@@ -125,11 +122,11 @@ function injectLinkStyles() {
 function parseShallow(itemNameRaw) {
   let name = String(itemNameRaw || "").trim();
 
-  const isNonCraftable = name.includes(ITEMS_CRAFTABILITY[1]);
+  const isNonCraftable = name.includes(TF2_CRAFTABILITY[1]);
   if (name.startsWith("The ")) name = name.slice(4);
 
   let matchedQuality = "Unique";
-  for (const q of ITEMS_QUALITY) {
+  for (const q of TF2_QUALITY_NAMES) {
     if (name.startsWith(q + " ")) {
       matchedQuality = q;
       name = name.slice((q + " ").length);
@@ -138,7 +135,7 @@ function parseShallow(itemNameRaw) {
   }
 
   if (isNonCraftable) {
-    name = name.replace(ITEMS_CRAFTABILITY[1] + " ", "").trim();
+    name = name.replace(TF2_CRAFTABILITY[1] + " ", "").trim();
   }
 
   return { name, quality: matchedQuality, craftable: !isNonCraftable };
@@ -239,9 +236,9 @@ async function parseItemAttributes(itemNameRaw) {
   let name = String(crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw || "").trim();
 
   // detect + strip craftability
-  const isNonCraftable = name.includes(ITEMS_CRAFTABILITY[1]);
+  const isNonCraftable = name.includes(TF2_CRAFTABILITY[1]);
   if (isNonCraftable) {
-    name = name.replace(ITEMS_CRAFTABILITY[1] + " ", "").trim();
+    name = name.replace(TF2_CRAFTABILITY[1] + " ", "").trim();
   }
 
   // remove "The " at start — the schema's own item_name never has it
@@ -249,7 +246,7 @@ async function parseItemAttributes(itemNameRaw) {
 
   // detect + strip quality, default Unique
   let matchedQuality = "Unique";
-  for (const q of ITEMS_QUALITY) {
+  for (const q of TF2_QUALITY_NAMES) {
     if (name.startsWith(q + " ")) {
       matchedQuality = q;
       name = name.slice((q + " ").length);
