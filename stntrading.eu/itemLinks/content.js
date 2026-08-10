@@ -6,6 +6,8 @@ import {
   skinportUrl,
   crateTfUrl,
   getKnownCrateNumber,
+  resolveCrateSeries,
+  CRATE_NUMBER_RE,
   wikiUrl,
 } from "../../utils/itemLinks.js";
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
@@ -16,19 +18,6 @@ import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 const ITEMS_QUALITY = ["Unique", "Strange", "Vintage", "Haunted", "Unusual", "Genuine", "Collector's"];
 const ITEMS_CRAFTABILITY = ["Craftable", "Non-Craftable"];
 let effectsDataPromise = null; //to get the utils effects ids
-
-// Crates carry their series/case number as a trailing "#N" — sometimes
-// with a "Series " word first (base supply crates, e.g. "Mann Co.
-// Supply Crate Series #34" — "Series" isn't part of the schema name
-// either, unlike themed cosmetic cases, e.g. "Bone-Chilling Bonanza
-// Case #142", whose "Case" IS part of the name and stays). Matches
-// either shape; whichever's present is stripped along with the number
-// before the usual parse, then the number's re-attached wherever each
-// destination site wants it: backpack.tf's stats page takes it as a
-// trailing path segment (same slot Unusual effect ids use), marketplace.tf
-// as a "c<N>" sku modifier — mannco.store doesn't distinguish by it at
-// all, so it's just dropped for that one.
-const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
 
 // A distinct accent color per destination site, so the row reads as a
 // set of different places rather than one undifferentiated button mass.
@@ -67,7 +56,7 @@ export async function showItemLinks() {
     { label: "bp.tf stats", href: await createBpStatsLink(itemName, isUnusual, effect, false) },
     { label: "next.bp.tf stats", href: await createBpStatsLink(itemName, isUnusual, effect, true) },
     { label: "mannco.store", href: await createManncoLink(itemName, isUnusual, effect) },
-    { label: "skinport.com", href: createSkinportLink(itemName, isUnusual) },
+    { label: "skinport.com", href: await createSkinportLink(itemName, isUnusual) },
     { label: "marketplace.tf", href: await createMarketplaceLink(itemName) },
     { label: "crate.tf", href: await createCrateTfLink(itemName) },
     { label: "Steam Market", href: steamMarketUrl(itemName.trim()) },
@@ -322,14 +311,14 @@ async function createManncoLink(itemNameRaw, isUnusual, effect) {
     return mannCoStoreUrl({ name: `Unusual ${baseName}`, effectName: effect.name });
   }
 
-  // mannco.store doesn't distinguish crates by series/case number the
-  // way marketplace.tf and backpack.tf do — drop it if present.
-  const crateMatch = name.match(CRATE_NUMBER_RE);
-  const manncoName = crateMatch ? name.slice(0, crateMatch.index) : name;
+  // mannco.store only wants the crate number for ambiguous multi-series
+  // names (see resolveCrateSeries()) — dropped for every other crate.
+  const manncoName = name.replace(CRATE_NUMBER_RE, "");
+  const { crateNumber, isAmbiguous } = await resolveCrateSeries(name, manncoName);
 
   // "Non-Craftable " (if present) is kept as-is — mannCoStoreUrl()
   // turns it into mannco.store's "uncraftable" slug word.
-  return mannCoStoreUrl({ name: manncoName });
+  return mannCoStoreUrl({ name: manncoName, crateNumber: isAmbiguous ? crateNumber : undefined });
 }
 
 /**
@@ -340,19 +329,18 @@ async function createManncoLink(itemNameRaw, isUnusual, effect) {
  *
  * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
  * @param {boolean} isUnusual
- * @returns {string|null}
+ * @returns {Promise<string|null>}
  */
-function createSkinportLink(itemNameRaw, isUnusual) {
+async function createSkinportLink(itemNameRaw, isUnusual) {
   if (isUnusual) return null;
 
   const name = String(itemNameRaw || "").trim();
 
-  // skinport.com doesn't distinguish crates by series/case number —
-  // same reasoning as mannco.store, drop it if present.
-  const crateMatch = name.match(CRATE_NUMBER_RE);
-  const skinportName = crateMatch ? name.slice(0, crateMatch.index) : name;
+  // Same multi-series exception as createManncoLink() above.
+  const skinportName = name.replace(CRATE_NUMBER_RE, "");
+  const { crateNumber, isAmbiguous } = await resolveCrateSeries(name, skinportName);
 
-  return skinportUrl({ name: skinportName });
+  return skinportUrl({ name: skinportName, crateNumber: isAmbiguous ? crateNumber : undefined });
 }
 
 /**
