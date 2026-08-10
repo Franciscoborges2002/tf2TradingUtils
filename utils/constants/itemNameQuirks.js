@@ -38,6 +38,7 @@ export const ITEM_NAME_QUIRKS = {
   },
   "Festivizer": {
     manncoStoreNeedsThePrefix: true,
+    skinportNeedsThePrefix: true,
   },
   "Conscientious Objector": {
     skinportNeedsThePrefix: true,
