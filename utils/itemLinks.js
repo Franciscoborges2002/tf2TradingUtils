@@ -448,6 +448,16 @@ export async function crateTfUrl({ name, crateNumber, craftable = true }) {
   return null;
 }
 
+/**
+ * backpack.tf Classifieds "sell" listing draft for one specific item —
+ * unlike every other link here, this isn't derivable from the item's
+ * name/quality/etc. at all, just its Steam asset id.
+ * @param {string|number} assetId
+ */
+export function backpackSellUrl(assetId) {
+  return `https://backpack.tf/classifieds/sell/${assetId}`;
+}
+
 /** posts.tf's plain search results page — no query params, since it doesn't read search state from the URL. */
 export const POSTS_TF_SEARCH_RESULTS_URL = "https://posts.tf/posts/search/results";
 

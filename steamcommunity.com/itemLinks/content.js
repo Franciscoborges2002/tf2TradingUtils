@@ -1,5 +1,6 @@
 // itemLinks.js
 import { COLOR_PANEL_BG, SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
+import { TF2_APPID, TF2_CONTEXTID } from "../../utils/constants/tf2Economy.js";
 import {
   steamMarketUrl,
   backpackStatsUrl,
@@ -8,6 +9,7 @@ import {
   marketplaceTfUrl,
   skinportUrl,
   crateTfUrl,
+  backpackSellUrl,
   getKnownCrateNumber,
 } from "../../utils/itemLinks.js";
 
@@ -43,28 +45,60 @@ function pickContainer() {
 }
 
 /**
- * Reads the quality word off the item's "Tags:" line (e.g. "Tags:
+ * The item's "Tags:" line, split into individual words (e.g. "Tags:
  * Unique, Crate, Bone-Chilling Bonanza Collection, Tradable,
- * Marketable") — the one reliable structured signal for it on this
- * page, used instead of assuming every item is Unique quality.
+ * Marketable" -> ["Unique", "Crate", ..., "Tradable", "Marketable"]) —
+ * the one reliable structured signal this page gives for both quality
+ * and tradability, shared by getQualityFromTags() and isTradable() below.
  */
-function getQualityFromTags(container) {
+function getTags(container) {
   const tagsEl = [...container.querySelectorAll("span")]
     .find((el) => el.textContent.trim().startsWith("Tags:"));
   if (!tagsEl) return null;
 
-  const tags = tagsEl.textContent.replace(/^Tags:\s*/, "").split(",").map((t) => t.trim());
-  return QUALITY_WORDS.find((q) => tags.includes(q)) || null;
+  return tagsEl.textContent.replace(/^Tags:\s*/, "").split(",").map((t) => t.trim());
+}
+
+/** Reads the quality word off the item's "Tags:" line, used instead of assuming every item is Unique quality. */
+function getQualityFromTags(tags) {
+  return tags ? QUALITY_WORDS.find((q) => tags.includes(q)) || null : null;
+}
+
+/**
+ * Non-Tradable items (gifted/trade-locked, etc.) can't be listed for
+ * sale on backpack.tf at all — a missing "Tags:" line (e.g. currency,
+ * which doesn't show one) is assumed tradable rather than blocking the
+ * button on a signal that just isn't there for that item type.
+ */
+function isTradable(tags) {
+  return tags ? tags.includes("Tradable") : true;
 }
 
 /**
  * The item's asset id — needed for the backpack.tf/next.backpack.tf
- * History links (backpack.tf/item/<assetId>), which aren't name-based
- * like everything else here. Pulled out of the "Inspect in Game" link's
- * steam://...+tf_econ_item_preview%20S<steamid>A<assetId>D<d> URI —
- * the only place this page exposes it.
+ * History links and the "List on backpack.tf" button, none of which are
+ * name-based like everything else here.
+ *
+ * Primary source: the left-hand inventory grid's own tile for this
+ * item, whose id is the classic Steam shape "<appid>_<contextid>_<assetId>"
+ * (e.g. "440_2_17378907398", confirmed against a real tile) — Steam
+ * marks whichever tile is currently shown in this info panel with its
+ * own "activeInfo" class, so that's how the right one's found among
+ * every other item in the inventory.
+ *
+ * Falls back to the "Inspect in Game" link's steam://...+tf_econ_item_preview
+ * %20S<steamid>A<assetId>D<d> URI, in case the grid tile isn't found for
+ * some reason — but that link is the weaker signal of the two: several
+ * confirmed items (Keys, Vintage Tribalman's Shiv) don't have one at
+ * all, which used to mean no asset id — and so no History/List
+ * button — for them.
  */
 function getAssetId(container) {
+  const activeTile = document.querySelector(`.item.app${TF2_APPID}.context${TF2_CONTEXTID}.activeInfo`);
+  const fromTile = activeTile?.id.match(/^\d+_\d+_(\d+)$/)?.[1];
+  if (fromTile) return fromTile;
+
+  //fallback
   const inspectLink = container.querySelector('a[href*="tf_econ_item_preview"]');
   if (!inspectLink) return null;
   const match = (inspectLink.getAttribute("href") || "").match(/A(\d+)D/);
@@ -134,7 +168,7 @@ export function showItemLinks() {
   // remove old injected links if item changed
   const prev = container.dataset.injectedFor || "";
   if (prev !== itemName) {
-    container.querySelectorAll(".custom-market-links").forEach((n) => n.remove());
+    container.querySelectorAll(".custom-market-links, .custom-sell-btn").forEach((n) => n.remove());
   }
 
   // Prevent duplicate for the same item — but the item info panel is
@@ -147,8 +181,19 @@ export function showItemLinks() {
     return true;
   }
 
-  const attrs = parseItemName(itemName, getQualityFromTags(container));
+  const tags = getTags(container);
+  const attrs = parseItemName(itemName, getQualityFromTags(tags));
   const assetId = getAssetId(container);
+
+  // Given its own standalone CTA button (not just another row entry
+  // like everything else here) — this is the one action a user's
+  // actually likely to take right from their own inventory, unlike the
+  // rest of these links, which are just reference/price-check lookups.
+  // Skipped for Non-Tradable items (gifted/trade-locked, etc.) — they
+  // can't be listed for sale at all.
+  const sellUrl = assetId && isTradable(tags) ? backpackSellUrl(assetId) : null;
+  const anchorEl = sellUrl ? makeSellButton(sellUrl) : title;
+  if (sellUrl) title.insertAdjacentElement("afterend", anchorEl);
 
   const marketUrl = steamMarketUrl(itemName);
   const manncoUrl = attrs.quality === "Unusual" ? null : mannCoStoreUrl({ name: itemName });
@@ -186,7 +231,7 @@ export function showItemLinks() {
 
   linkList.forEach((link) => links.appendChild(makeLinkBtn(link)));
 
-  title.insertAdjacentElement("afterend", links);
+  anchorEl.insertAdjacentElement("afterend", links);
   container.dataset.injectedFor = itemName;
 
   // marketplace.tf needs a network fetch (defindex lookup, plus — for
@@ -230,6 +275,31 @@ function makeLinkBtn({ label, href }) {
 
   a.addEventListener("mouseenter", () => { a.style.filter = "brightness(1.15)"; });
   a.addEventListener("mouseleave", () => { a.style.filter = "none"; });
+
+  return a;
+}
+
+/**
+ * "List on backpack.tf" — a filled, full-width CTA button rather than
+ * just another entry in the .custom-market-links row, so it actually
+ * stands out as the one action worth taking (list this item for sale)
+ * instead of blending into the pile of reference/price-check links.
+ */
+function makeSellButton(href) {
+  const a = document.createElement("a");
+  a.className = "custom-sell-btn";
+  a.textContent = "List on backpack.tf";
+  a.href = href;
+  a.target = "_blank";
+  a.rel = "noreferrer";
+  a.style.cssText =
+    "display:flex;align-items:center;justify-content:center;" +
+    "margin-top:10px;padding:10px 16px;border-radius:8px;text-decoration:none;" +
+    `background:${SITE_BRAND_COLORS.backpackTf};color:#ffffff;font-weight:700;font-size:13px;` +
+    "letter-spacing:0.02em;border:none;transition:0.15s ease;box-shadow:0 2px 8px rgba(0,0,0,0.3);";
+
+  a.addEventListener("mouseenter", () => { a.style.filter = "brightness(1.15)"; a.style.transform = "translateY(-1px)"; });
+  a.addEventListener("mouseleave", () => { a.style.filter = "none"; a.style.transform = "none"; });
 
   return a;
 }
