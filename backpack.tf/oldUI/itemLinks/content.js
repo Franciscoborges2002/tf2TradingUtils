@@ -19,7 +19,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/old
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
 import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
-import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl, resolveCrateSeries, CRATE_NUMBER_RE } from "../../../utils/itemLinks.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])
@@ -34,11 +34,6 @@ const LINK_ACCENTS = {
 };
 
 const KEY_NAME_RE = /Mann Co\. Supply Crate Key/i;
-
-// Same crate/case number shape used across every other itemLinks
-// script (backpack.tf itself suffixes crates with it, "Series" only
-// present for base supply crates, not themed cosmetic cases).
-const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
 
 // backpack.tf's own stats page for one specific crate series (e.g.
 // /stats/Unique/Salvaged%20Mann%20Co.%20Supply%20Crate/Tradable/Craftable/30)
@@ -103,9 +98,23 @@ export function addItemLinks() {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
-function processPopover(popover) {
-  if (popover.querySelector(`#${EXTRA_LINKS_ID}`)) return;
+async function processPopover(popover) {
+  // The reserved-flag check guards a real race: the ambiguity check
+  // below is async, and without it, a second processPopover() call for
+  // this same popover (unlikely here — see addItemLinks()'s own doc —
+  // but possible) could pass the "not yet injected" check above before
+  // the first call's await resolves, injecting the row twice.
+  if (popover.querySelector(`#${EXTRA_LINKS_ID}`) || popover.dataset.tf2utilsProcessing) return;
+  popover.dataset.tf2utilsProcessing = "1";
 
+  try {
+    await processPopoverInner(popover);
+  } finally {
+    delete popover.dataset.tf2utilsProcessing;
+  }
+}
+
+async function processPopoverInner(popover) {
   const content = popover.querySelector(".popover-content");
   const titleEl = popover.querySelector(".popover-title");
   if (!content || !titleEl) return;
@@ -114,18 +123,21 @@ function processPopover(popover) {
   // unrelated tooltip that happens to share the id shape).
   if (!content.querySelector("dl.item-popover")) return;
 
-  // backpack.tf suffixes crates with their case/series number — with a
-  // "Series" word for base supply crates (e.g. "Mann Co. Supply Crate
-  // Series #34") but not for themed cosmetic cases (e.g. "Bone-Chilling
-  // Bonanza Case #142", where "Case" stays as part of the name).
-  // mannco.store doesn't distinguish crates by this number in its own
-  // slugs, so it's stripped for that one — but stntrading.eu is the
-  // opposite: it has a separate page per series/case number, so it
-  // needs the number kept (see rawTitle/stnName below).
+  // stntrading.eu keeps a crate's case/series number as part of the
+  // name (see rawTitle/stnName below); mannco.store/skinport.com only
+  // want it for ambiguous multi-series names (see resolveCrateSeries()).
   const rawTitle = titleEl.textContent.trim();
-  const crateMatch = rawTitle.match(CRATE_NUMBER_RE);
   const fullDisplayName = rawTitle.replace(CRATE_NUMBER_RE, "");
-  const crateNumber = crateMatch ? crateMatch[1] : getCrateNumberFromStatsUrl(fullDisplayName);
+  const bareName = fullDisplayName.replace(/^Non-Craftable\s+/i, "");
+
+  let { crateNumber, isAmbiguous } = await resolveCrateSeries(rawTitle, bareName);
+  if (crateNumber == null) {
+    // Stats-page fallback (see getCrateNumberFromStatsUrl's own doc) —
+    // only ever fires for ambiguous multi-series families.
+    const fromUrl = getCrateNumberFromStatsUrl(fullDisplayName);
+    if (fromUrl != null) { crateNumber = fromUrl; isAmbiguous = true; }
+  }
+  const manncoSkinportCrateNumber = isAmbiguous ? crateNumber : undefined;
 
   // Non-Tradable items (gifted/trade-locked, etc.) can't be sold on any
   // of these sites — skip the row entirely rather than link to a
@@ -155,7 +167,7 @@ function processPopover(popover) {
   // link somewhere wrong.
   const manncoHref = qualityName === "Unusual"
     ? null
-    : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName });
+    : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName, crateNumber: manncoSkinportCrateNumber });
 
   // skinport.com wants the same full descriptive name mannco.store does
   // (quality/killstreak/Festivized/Non-Craftable text baked in) — no
@@ -163,7 +175,7 @@ function processPopover(popover) {
   // so skip skinport.com for Unusual items for the same reason.
   const skinportHref = qualityName === "Unusual"
     ? null
-    : skinportUrl({ name: fullDisplayName, quality: qualityName });
+    : skinportUrl({ name: fullDisplayName, quality: qualityName, crateNumber: manncoSkinportCrateNumber });
 
   // stntrading.eu bakes craftability into its own name/prefix — strip
   // "Non-Craftable " back out of the title so it isn't duplicated. It
@@ -185,7 +197,7 @@ function processPopover(popover) {
 
   const links = [
     { label: "mannco.store", href: manncoHref },
-    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable }) },
+    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable, isAmbiguousSeries: isAmbiguous }) },
     { label: "skinport.com", href: skinportHref },
   ].filter((link) => link.href);
 

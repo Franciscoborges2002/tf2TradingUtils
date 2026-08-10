@@ -118,12 +118,30 @@ export function backpackClassifiedsUrl({ name, qualityId, craftable = true, aust
  * shape stntrading.eu actually expects, reverse-engineered from the
  * site itself rather than documented anywhere.
  *
+ * Crate/case names known to span multiple series under one shared
+ * display name (base "Mann Co. Supply Crate"/"Mann Co. Supply
+ * Munition", ...) need the word "Series" in front of the number on
+ * stntrading.eu regardless of whether the source site's own text
+ * included it — confirmed: "Mann Co. Supply Munition #91" (no "Series"
+ * word on backpack.tf) still needs
+ * ".../Mann+Co.+Supply+Munition+Series+%2391" here, not
+ * ".../Mann+Co.+Supply+Munition+%2391". Pass `isAmbiguousSeries: true`
+ * (from isAmbiguousCrateName()) and a trailing "#N" with no "Series"
+ * word gets one inserted; everything else (most crates, which are
+ * already unambiguous by name alone) is left exactly as given.
+ *
  * @param {object} opts
  * @param {string} opts.name - full item name (quality prefix included, as stntrading.eu shows it — keep any "Series #N"/"#N" crate suffix too, unlike mannco.store/marketplace.tf's separate crate handling)
  * @param {boolean} [opts.craftable=true]
+ * @param {boolean} [opts.isAmbiguousSeries=false] - see doc above
  */
-export function stnTradingUrl({ name, craftable = true }) {
-  const encoded = name
+export function stnTradingUrl({ name, craftable = true, isAmbiguousSeries = false }) {
+  let workingName = name;
+  if (isAmbiguousSeries && !/Series\s+#\d+\s*$/i.test(workingName)) {
+    workingName = workingName.replace(/#(\d+)\s*$/i, "Series #$1");
+  }
+
+  const encoded = workingName
     .replace(/:/g, "%3A")
     .replace(/'/g, "%27")
     .replace(/#/g, "%23")
@@ -159,13 +177,26 @@ export function stnTradingUrl({ name, craftable = true }) {
  * "non-craftable" straight lowercasing would produce, e.g.
  * "Non-Craftable Tour of Duty Ticket" -> "uncraftable-tour-of-duty-ticket".
  *
+ * Crate/case series number: dropped for almost every crate, since a
+ * unique display name (most themed cases) is already enough on its own
+ * (confirmed: "Bone-Chilling Bonanza Case" -> ".../440-bone-chilling-
+ * bonanza-case", no number at all) — but a handful of names span many
+ * different series (base "Mann Co. Supply Crate"/"Mann Co. Supply
+ * Munition", "Salvaged Mann Co. Supply Crate", ...), and for those,
+ * mannco.store has the exact same name-collision problem our own
+ * defindex schema does, so it needs the number too: pass it via
+ * `crateNumber` and it's appended as "-series-<N>" — confirmed:
+ * "Salvaged Mann Co. Supply Crate" #30 -> ".../440-salvaged-mann-co-
+ * supply-crate-series-30".
+ *
  * @param {object} opts
- * @param {string} opts.name - full item name, as Steam displays it (no effect name) — include "Non-Craftable " if applicable
+ * @param {string} opts.name - full item name, as Steam displays it (no effect name, no "Series #N"/"#N" suffix) — include "Non-Craftable " if applicable
  * @param {string} [opts.quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
  * @param {string} [opts.effectName] - Unusual effect name, e.g. "Frostbite"
  * @param {number} [opts.appId] - defaults to TF2
+ * @param {string|number} [opts.crateNumber] - only for crate/case names known to span multiple series under one display name — see doc above
  */
-export function mannCoStoreUrl({ name, quality, effectName, appId = TF2_APPID }) {
+export function mannCoStoreUrl({ name, quality, effectName, appId = TF2_APPID, crateNumber }) {
   const qualifiedName = ensureQualityPrefix(name, quality);
   const fullName = effectName ? `${effectName} ${qualifiedName}` : qualifiedName;
   const slug = fullName
@@ -178,7 +209,8 @@ export function mannCoStoreUrl({ name, quality, effectName, appId = TF2_APPID })
     .replace(/\:/g, "")
     .trim()
     .replace(/[\s-]+/g, "-");
-  return `https://mannco.store/item/${appId}-${slug}`;
+  const seriesSuffix = crateNumber != null ? `-series-${crateNumber}` : "";
+  return `https://mannco.store/item/${appId}-${slug}${seriesSuffix}`;
 }
 
 // name (schema's item_name, no quality/killstreak/etc. prefix) -> defindex.
@@ -313,6 +345,47 @@ export async function getKnownCrateNumber(name) {
 }
 
 /**
+ * Whether a crate/case name is known to span multiple series under one
+ * shared display name (per the same bundled table above) — mannco.store
+ * and skinport.com need the series number kept in their slug for these
+ * specifically (the same name-collision problem our own defindex schema
+ * has), but drop it for every other crate, whose name alone is already
+ * unambiguous.
+ *
+ * NOT reliably signaled by whether the page's own text says "Series #N"
+ * vs. plain "#N" — confirmed wrong: "Mann Co. Supply Munition" spans 8
+ * different series same as "Mann Co. Supply Crate" does, but backpack.tf
+ * doesn't actually show a "Series" word for either of them in practice.
+ * This checks the real, confirmed multi-series data instead.
+ *
+ * @param {string} name - bare crate/case name (no quality/Non-Craftable prefix, no "#N"/"Series #N" suffix)
+ * @returns {Promise<boolean>}
+ */
+export async function isAmbiguousCrateName(name) {
+  const table = await loadCrateSeriesNumbers();
+  return (table[name]?.length ?? 0) > 1;
+}
+
+/** Crate/case "#N"/"Series #N" suffix shape, shared by every itemLinks script. */
+export const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
+
+/**
+ * Resolves the crate number + ambiguity flag mannco.store/skinport.com/
+ * stntrading.eu need, for callers that would otherwise each match
+ * CRATE_NUMBER_RE and await isAmbiguousCrateName() themselves.
+ *
+ * @param {string} rawText - full name as shown, suffix included
+ * @param {string} bareName - bare schema name, matching tf2ItemDefindexes.json's keys
+ * @returns {Promise<{crateNumber: string|null, isAmbiguous: boolean}>}
+ */
+export async function resolveCrateSeries(rawText, bareName) {
+  const match = String(rawText || "").match(CRATE_NUMBER_RE);
+  if (!match) return { crateNumber: null, isAmbiguous: false };
+
+  return { crateNumber: match[1], isAmbiguous: await isAmbiguousCrateName(bareName) };
+}
+
+/**
  * skinport.com item page.
  *
  * The slug is a generic slugify of the full display name (quality/
@@ -348,11 +421,20 @@ export async function getKnownCrateNumber(name) {
  * unqualified version is "the-qu-ckenbirdt", but the Genuine version is
  * "genuine-qu-ckenbirdt", with no "the" at all.
  *
+ * Crate/case series number: dropped for almost every crate (a unique
+ * display name is already enough on its own), but a handful of names
+ * span many different series under one shared display name (base
+ * "Mann Co. Supply Crate"/"Mann Co. Supply Munition", "Salvaged Mann
+ * Co. Supply Crate", ...) — those need it too, appended as "-series-<N>"
+ * before the "+uncraftable" suffix if both apply: confirmed "Salvaged
+ * Mann Co. Supply Crate" #30 -> ".../salvaged-mann-co-supply-crate-series-30".
+ *
  * @param {object} opts
- * @param {string} opts.name - full item name (quality/killstreak/Non-Craftable prefixes included, as Steam displays them)
+ * @param {string} opts.name - full item name (quality/killstreak/Non-Craftable prefixes included, as Steam displays them; no "Series #N"/"#N" suffix)
  * @param {string} [opts.quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
+ * @param {string|number} [opts.crateNumber] - only for crate/case names known to span multiple series under one display name — see doc above
  */
-export function skinportUrl({ name, quality }) {
+export function skinportUrl({ name, quality, crateNumber }) {
   // Non-Craftable is stripped before the quirk lookup below (not just
   // before slugifying) — ITEM_NAME_QUIRKS is keyed by the bare name, so
   // leaving "Non-Craftable " attached would make a Non-Craftable
@@ -375,7 +457,8 @@ export function skinportUrl({ name, quality }) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return `https://skinport.com/tf2/item/${slug}${isNonCraftable ? "+uncraftable" : ""}`;
+  const seriesSuffix = crateNumber != null ? `-series-${crateNumber}` : "";
+  return `https://skinport.com/tf2/item/${slug}${seriesSuffix}${isNonCraftable ? "+uncraftable" : ""}`;
 }
 
 /**
