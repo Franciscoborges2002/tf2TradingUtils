@@ -1,9 +1,10 @@
 /**
- * Shared helpers for detecting which game's tab is active on
- * steamcommunity.com's multi-game inventory page (each Steam account
- * has one inventory page listing every game they own items for — TF2,
- * CS2, etc. — switchable via tabs), so TF2-specific scripts don't
- * misfire while some other game's tab is the one actually showing.
+ * Shared helpers for steamcommunity.com's inventory page: which game's
+ * tab is active (each Steam account has one inventory page listing
+ * every game they own items for — TF2, CS2, etc. — switchable via
+ * tabs), and whether it's the logged-in user's own inventory or someone
+ * else's — so scripts that only make sense in one of those contexts
+ * don't misfire in the other.
  *
  * Only usable from files loaded as ES modules (anything dynamically
  * imported via a router's content.js) — see utils/constants/README.md.
@@ -28,4 +29,19 @@ export function isTf2InventoryActive() {
   if (location.hash) return location.hash === `#${TF2_APPID}`;
   const container = findTf2InventoryContainer();
   return !!container && container.style.display !== "none";
+}
+
+/**
+ * Whether this is the logged-in user's own inventory, not someone
+ * else's — relevant for anything that only makes sense on your own
+ * items (e.g. a "list for sale" link). Signaled by
+ * .inventory_links .inventory_rightnav actually having content: a
+ * "Trade Offers" shortcut button (to the viewer's own trade offers
+ * inbox) plus a "More..." dropdown (trade/inventory/gift history,
+ * privacy settings — all account-management links that only make sense
+ * for your own inventory). On someone else's inventory page, that same
+ * container renders empty instead.
+ */
+export function isOwnInventory() {
+  return !!document.querySelector(".inventory_links .inventory_rightnav .new_trade_offer_btn");
 }
