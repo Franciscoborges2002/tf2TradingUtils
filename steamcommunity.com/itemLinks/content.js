@@ -1,7 +1,7 @@
 // itemLinks.js
 import { COLOR_PANEL_BG, SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { TF2_APPID, TF2_CONTEXTID } from "../../utils/constants/tf2Economy.js";
-import { isTf2InventoryActive } from "../../utils/steamInventory.js";
+import { isTf2InventoryActive, isOwnInventory } from "../../utils/steamInventory.js";
 import {
   steamMarketUrl,
   backpackStatsUrl,
@@ -198,8 +198,9 @@ export function showItemLinks() {
   // actually likely to take right from their own inventory, unlike the
   // rest of these links, which are just reference/price-check lookups.
   // Skipped for Non-Tradable items (gifted/trade-locked, etc.) — they
-  // can't be listed for sale at all.
-  const sellUrl = assetId && isTradable(tags) ? backpackSellUrl(assetId) : null;
+  // can't be listed for sale at all — and for someone else's inventory,
+  // where there's nothing of yours to list.
+  const sellUrl = assetId && isTradable(tags) && isOwnInventory() ? backpackSellUrl(assetId) : null;
   const anchorEl = sellUrl ? makeSellButton(sellUrl) : title;
   if (sellUrl) title.insertAdjacentElement("afterend", anchorEl);
 
