@@ -2,6 +2,7 @@
 
 - Added inventoryCurrencyCounter
 - Added tradeOfferCurrency
+- Added itemDescriptionToggle
 
 # Version 1.0.3
 

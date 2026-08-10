@@ -544,6 +544,22 @@ footer a:hover img,
   border-color: #b35112;
 }
 
+.settings-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #f0e8de;
+  cursor: pointer;
+}
+
+.settings-checkbox-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #b35112;
+  cursor: pointer;
+}
+
 .settings-actions {
   display: flex;
   align-items: center;
