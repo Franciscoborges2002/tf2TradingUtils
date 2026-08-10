@@ -148,7 +148,7 @@ function loadItemLinks() {
       chrome.runtime.getURL("steamcommunity.com/itemLinks/content.js")
     );
 
-    showItemLinks();
+    runWithRetries(showItemLinks);
 
     const target = document.querySelector("#iteminfo0") ||
                    document.querySelector("#iteminfo1") ||
@@ -165,7 +165,7 @@ function loadItemDescriptionToggle() {
       chrome.runtime.getURL("steamcommunity.com/itemDescriptionToggle/content.js")
     );
 
-    addItemDescriptionToggle();
+    runWithRetries(addItemDescriptionToggle);
 
     const target = document.querySelector("#iteminfo0") ||
                    document.querySelector("#iteminfo1") ||
@@ -174,6 +174,28 @@ function loadItemDescriptionToggle() {
     new MutationObserver(() => addItemDescriptionToggle())
       .observe(target, { childList: true, subtree: true });
   })();
+}
+
+/**
+ * Runs `fn` immediately, then again on a short interval for a bounded
+ * window. The very first item Steam shows on inventory page load can
+ * finish rendering into #iteminfo0/#iteminfo1 (and, for TF2-gated
+ * scripts, the TF2 grid container getting its own final id) slightly
+ * after this router's dynamic import resolves — a MutationObserver set
+ * up right after that render already happened never fires for it,
+ * since nothing changes there again until the user clicks a different
+ * item, so relying on the observer alone silently misses the first
+ * item specifically. Safe to call repeatedly: every function passed
+ * here already guards its own "already processed" state internally.
+ */
+function runWithRetries(fn, { retries = 10, intervalMs = 300 } = {}) {
+  fn();
+  let attempt = 0;
+  const timer = setInterval(() => {
+    attempt++;
+    fn();
+    if (attempt >= retries) clearInterval(timer);
+  }, intervalMs);
 }
 
 // Small helper so it works in Chrome + Firefox

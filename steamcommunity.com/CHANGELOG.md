@@ -3,6 +3,7 @@
 - Added inventoryCurrencyCounter
 - Added tradeOfferCurrency
 - Added itemDescriptionToggle
+- Fixed itemLinks/itemDescriptionToggle not applying to the first item shown when the inventory page loads — the render can finish slightly after their MutationObserver attaches, which then never fires again for that same item
 
 # Version 1.0.3
 
