@@ -50,6 +50,8 @@ import {
   mannCoStoreUrl,
   marketplaceTfUrl,
   steamMarketUrl,
+  skinportUrl,
+  crateTfUrl,
   getKnownCrateNumber,
   getItemNameByDefindex,
 } from "../../utils/itemLinks.js";
@@ -59,7 +61,9 @@ const LINK_ACCENTS = {
   "bp.tf history": SITE_BRAND_COLORS.backpackTf,
   "stntrading.eu": SITE_BRAND_COLORS.stnTrading,
   "mannco.store": SITE_BRAND_COLORS.manncoStore,
+  "skinport.com": SITE_BRAND_COLORS.skinport,
   "marketplace.tf": SITE_BRAND_COLORS.marketplaceTf,
+  "crate.tf": SITE_BRAND_COLORS.crateTf,
   "Steam Market": SITE_BRAND_COLORS.steam,
 };
 
@@ -261,6 +265,10 @@ async function buildLinks(rawName, assetId) {
     ? null // no reliable Unusual effect name available from this menu
     : mannCoStoreUrl({ name: nameWithoutCrate, quality: attrs.quality });
 
+  const skinportHref = attrs.quality === "Unusual"
+    ? null // same reasoning as mannco.store above
+    : skinportUrl({ name: nameWithoutCrate, quality: attrs.quality });
+
   const stnName = rawName
     .replace(/^Non-Craftable\s+/i, "")
     .replace(/Festivized\s+/i, "")
@@ -278,6 +286,7 @@ async function buildLinks(rawName, assetId) {
     { label: "bp.tf history", href: assetId ? `https://backpack.tf/item/${assetId}` : null },
     { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable: attrs.craftable }) },
     { label: "mannco.store", href: manncoHref },
+    { label: "skinport.com", href: skinportHref },
     // Only for names Steam's own (unescaped) Market link would mangle
     // — see the file header for why. Everything else already has a
     // working native link, so this would just be a redundant duplicate.
@@ -295,8 +304,14 @@ async function buildLinks(rawName, assetId) {
       crateNumber: resolvedCrateNumber ?? undefined,
     });
     if (marketplaceHref) links.push({ label: "marketplace.tf", href: marketplaceHref });
+
+    // crate.tf only has pages for crates/cases — crateTfUrl() itself
+    // returns null with no crate number, so this naturally stays absent
+    // for every other item rather than needing its own type check here.
+    const crateTfHref = await crateTfUrl({ name: attrs.name, crateNumber: resolvedCrateNumber, craftable: attrs.craftable });
+    if (crateTfHref) links.push({ label: "crate.tf", href: crateTfHref });
   } catch (err) {
-    console.warn("[TF2Utils] marketplace.tf link failed:", err);
+    console.warn("[TF2Utils] marketplace.tf/crate.tf link failed:", err);
   }
 
   return links;

@@ -16,7 +16,18 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
-import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, wikiUrl } from "../../utils/itemLinks.js";
+import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, skinportUrl, crateTfUrl, getKnownCrateNumber, wikiUrl } from "../../utils/itemLinks.js";
+
+// scrap.tf's own hover tooltip text drops diacritics for at least this
+// one item — it literally renders "Quackenbirdt" with no accent at all
+// (confirmed against backpack.tf/stntrading.eu, which do show it
+// correctly), so every link built from the tooltip text would inherit
+// the missing accent. Corrected right where the name is first read out
+// of the DOM, before anything downstream (URL builders, the modal's own
+// display name) ever sees it.
+const SCRAP_TF_NAME_CORRECTIONS = {
+  "Quackenbirdt": "Quäckenbirdt",
+};
 
 export function ItemLinks() {
   // store pending hover info
@@ -139,11 +150,12 @@ export function ItemLinks() {
       const titleDiv = hoverEl.querySelector(".hover-over-title");
       const contentDiv = hoverEl.querySelector(".hover-over-content");
 
-      const name = (
+      const rawName = (
         titleSpan?.textContent ||
         titleDiv?.textContent ||
         ""
       ).trim();
+      const name = SCRAP_TF_NAME_CORRECTIONS[rawName] || rawName;
       const contentHtml = contentDiv?.innerHTML || "";
 
       if (!name) return;
@@ -317,6 +329,19 @@ async function makeLinks(name, itemEl) {
     ? (unusualEffectName ? mannCoStoreUrl({ name: baseName, effectName: unusualEffectName }) : null)
     : mannCoStoreUrl({ name: manncoDisplayName, quality: qualityName });
 
+  // skinport.com wants the plain descriptive name (Non-Craftable/
+  // Festivized/killstreak-tier prefixes included, but NOT mannco.store's
+  // own "The "/short-name quirk substitutions — confirmed those don't
+  // transfer: skinport.com's own "The " quirk, when it applies at all,
+  // only does so for the unqualified name, unlike mannco.store's
+  // (see skinportUrl's own doc comment and ITEM_NAME_QUIRKS'
+  // skinportNeedsThePrefix). No Unusual effect name is known to belong
+  // anywhere in its slug either, so Unusual items are skipped rather
+  // than guessed wrong.
+  const skinportHref = qualityName === "Unusual"
+    ? null
+    : skinportUrl({ name: craftabilityPrefix + festivizedPrefix + ksPrefix + baseName, quality: qualityName });
+
   // marketplace.tf needs a network fetch (defindex lookup) — don't let a
   // failure there (offline, blocked request, etc.) take down every other
   // link in the modal.
@@ -327,6 +352,21 @@ async function makeLinks(name, itemEl) {
     });
   } catch (err) {
     console.warn("[TF2Utils] marketplace.tf link failed:", err);
+  }
+
+  // crate.tf only has pages for crates/cases. scrap.tf's tooltip title
+  // never shows the series/case number as literal text the way
+  // backpack.tf's does (unlike those, so there's nothing to parse here),
+  // so this always goes through the bundled series-number table — same
+  // fallback steamcommunity.com/itemLinks uses for the same reason —
+  // which only resolves names with exactly one known series (see
+  // getKnownCrateNumber()'s own docs).
+  let crateTfHref = null;
+  try {
+    const crateNumber = await getKnownCrateNumber(classifiedsName);
+    crateTfHref = await crateTfUrl({ name: classifiedsName, crateNumber, craftable: !isUncraft });
+  } catch (err) {
+    console.warn("[TF2Utils] crate.tf link failed:", err);
   }
 
   const links = [
@@ -345,8 +385,16 @@ async function makeLinks(name, itemEl) {
       href: manncoHref,
     },
     {
+      label: "skinport.com",
+      href: skinportHref,
+    },
+    {
       label: "marketplace.tf",
       href: marketplaceHref,
+    },
+    {
+      label: "crate.tf",
+      href: crateTfHref,
     },
     {
       label: "Steam Market",

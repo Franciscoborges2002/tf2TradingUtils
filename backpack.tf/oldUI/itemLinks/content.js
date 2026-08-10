@@ -19,7 +19,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/old
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
 import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
-import { mannCoStoreUrl, stnTradingUrl } from "../../../utils/itemLinks.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])
@@ -29,9 +29,35 @@ const LINK_ACCENTS = {
   "mannco.store": SITE_BRAND_COLORS.manncoStore,
   "stntrading.eu": SITE_BRAND_COLORS.stnTrading,
   "scrap.tf": SITE_BRAND_COLORS.scrapTf,
+  "skinport.com": SITE_BRAND_COLORS.skinport,
+  "crate.tf": SITE_BRAND_COLORS.crateTf,
 };
 
 const KEY_NAME_RE = /Mann Co\. Supply Crate Key/i;
+
+// Same crate/case number shape used across every other itemLinks
+// script (backpack.tf itself suffixes crates with it, "Series" only
+// present for base supply crates, not themed cosmetic cases).
+const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
+
+// backpack.tf's own stats page for one specific crate series (e.g.
+// /stats/Unique/Salvaged%20Mann%20Co.%20Supply%20Crate/Tradable/Craftable/30)
+// doesn't repeat that series number as literal text in the item's own
+// popover title there — unlike everywhere else (classifieds, search,
+// listings), where it does — since the number's already implicit from
+// viewing that specific page. For a multi-series name (e.g. "Salvaged
+// Mann Co. Supply Crate" spans series 30/40/50, all sharing one bundled
+// schema defindex), that leaves no way to tell which series is being
+// viewed from the popover text alone — the page's own URL is the only
+// place left carrying it, so this reads it from there, but only when
+// the popover being processed is actually for this exact item (not
+// some other item's popover elsewhere on the same stats page).
+function getCrateNumberFromStatsUrl(fullDisplayName) {
+  const match = location.pathname.match(/^\/stats\/[^/]+\/([^/]+)\/[^/]+\/[^/]+\/(\d+)\/?$/);
+  if (!match) return null;
+  const [, nameSegment, numberSegment] = match;
+  return decodeURIComponent(nameSegment) === fullDisplayName ? numberSegment : null;
+}
 
 const EXTRA_LINKS_ID = "popover-extra-links";
 
@@ -97,7 +123,9 @@ function processPopover(popover) {
   // opposite: it has a separate page per series/case number, so it
   // needs the number kept (see rawTitle/stnName below).
   const rawTitle = titleEl.textContent.trim();
-  const fullDisplayName = rawTitle.replace(/\s+(?:Series\s+)?#\d+\s*$/i, "");
+  const crateMatch = rawTitle.match(CRATE_NUMBER_RE);
+  const fullDisplayName = rawTitle.replace(CRATE_NUMBER_RE, "");
+  const crateNumber = crateMatch ? crateMatch[1] : getCrateNumberFromStatsUrl(fullDisplayName);
 
   // Non-Tradable items (gifted/trade-locked, etc.) can't be sold on any
   // of these sites — skip the row entirely rather than link to a
@@ -129,6 +157,14 @@ function processPopover(popover) {
     ? null
     : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName });
 
+  // skinport.com wants the same full descriptive name mannco.store does
+  // (quality/killstreak/Festivized/Non-Craftable text baked in) — no
+  // Unusual effect name is reliably available from this popover either,
+  // so skip skinport.com for Unusual items for the same reason.
+  const skinportHref = qualityName === "Unusual"
+    ? null
+    : skinportUrl({ name: fullDisplayName, quality: qualityName });
+
   // stntrading.eu bakes craftability into its own name/prefix — strip
   // "Non-Craftable " back out of the title so it isn't duplicated. It
   // also has no separate item page per Festivized variant or killstreak
@@ -150,6 +186,7 @@ function processPopover(popover) {
   const links = [
     { label: "mannco.store", href: manncoHref },
     { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable }) },
+    { label: "skinport.com", href: skinportHref },
   ].filter((link) => link.href);
 
   // scrap.tf has no per-item page — its keys market page is the one
@@ -165,6 +202,21 @@ function processPopover(popover) {
   dd.id = EXTRA_LINKS_ID;
   links.forEach((link) => appendLink(dd, link));
   content.appendChild(dd);
+
+  // crate.tf needs a network fetch (defindex lookup) and only has pages
+  // for crates/cases — appended separately afterward so it never blocks
+  // the synchronous links above, and skipped if this popover's gone by
+  // the time it resolves. crateTfUrl() wants the bare schema name (no
+  // "Non-Craftable " prefix — unlike mannco.store/skinport.com, it
+  // takes craftability as its own separate field instead), so that's
+  // stripped back out here even though fullDisplayName keeps it.
+  if (crateNumber != null || !craftable) {
+    crateTfUrl({ name: fullDisplayName.replace(/^Non-Craftable\s+/i, ""), crateNumber, craftable })
+      .then((href) => {
+        if (href && dd.isConnected) appendLink(dd, { label: "crate.tf", href });
+      })
+      .catch((err) => console.warn("[TF2Utils] crate.tf link failed:", err));
+  }
 }
 
 function appendLink(dd, { label, href }) {

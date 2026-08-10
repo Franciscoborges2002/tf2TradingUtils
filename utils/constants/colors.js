@@ -40,6 +40,8 @@ export const SITE_BRAND_COLORS = {
   postsTf:       "#E67E22", // orange from their logo — not wired up to any link currently
   stnTrading:    "#8E2A2A", // no logo given yet — placeholder dark red accent
   scrapTf:       "#C0392B", // no logo given yet — placeholder red accent
+  skinport:      "#F2A93B", // no logo given yet — placeholder orange accent
+  crateTf:       "#5C8A3A", // no logo given yet — placeholder green accent
 };
 
 // backpack.tf's own colors for each killstreak tier (see addKSButtons)
