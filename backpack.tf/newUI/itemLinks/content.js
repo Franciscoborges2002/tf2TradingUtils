@@ -17,7 +17,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/new
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
 import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
-import { mannCoStoreUrl, stnTradingUrl, skinportUrl } from "../../../utils/itemLinks.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])
@@ -28,9 +28,15 @@ const LINK_ACCENTS = {
   "stntrading.eu": SITE_BRAND_COLORS.stnTrading,
   "scrap.tf": SITE_BRAND_COLORS.scrapTf,
   "skinport.com": SITE_BRAND_COLORS.skinport,
+  "crate.tf": SITE_BRAND_COLORS.crateTf,
 };
 
 const KEY_NAME_RE = /Mann Co\. Supply Crate Key/i;
+
+// Same crate/case number shape used across every other itemLinks
+// script (backpack.tf itself suffixes crates with it, "Series" only
+// present for base supply crates, not themed cosmetic cases).
+const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
 
 const EXTRA_LINKS_CLASS = "tf2utils-newui-extra-links";
 
@@ -88,7 +94,9 @@ function processTooltip(popper) {
   // page per series/case number), so stnName below is built from
   // rawTitle instead, keeping it.
   const rawTitle = titleEl.textContent.trim();
-  const fullDisplayName = rawTitle.replace(/\s+(?:Series\s+)?#\d+\s*$/i, "");
+  const crateMatch = rawTitle.match(CRATE_NUMBER_RE);
+  const crateNumber = crateMatch ? crateMatch[1] : null;
+  const fullDisplayName = rawTitle.replace(CRATE_NUMBER_RE, "");
 
   if (/Non-Tradable/i.test(fullDisplayName)) return;
 
@@ -160,6 +168,21 @@ function processTooltip(popper) {
   row.className = `item-tooltip__content__links ${EXTRA_LINKS_CLASS}`;
   links.forEach((link) => appendLink(row, link));
   linksContainers[linksContainers.length - 1].insertAdjacentElement("afterend", row);
+
+  // crate.tf needs a network fetch (defindex lookup) and only has pages
+  // for crates/cases — appended separately afterward so it never blocks
+  // the synchronous links above, and skipped if this tooltip's gone by
+  // the time it resolves. crateTfUrl() wants the bare schema name (no
+  // "Non-Craftable " prefix — unlike mannco.store/skinport.com, it
+  // takes craftability as its own separate field instead), so that's
+  // stripped back out here even though fullDisplayName keeps it.
+  if (crateNumber != null || !craftable) {
+    crateTfUrl({ name: fullDisplayName.replace(/^Non-Craftable\s+/i, ""), crateNumber, craftable })
+      .then((href) => {
+        if (href && row.isConnected) appendLink(row, { label: "crate.tf", href });
+      })
+      .catch((err) => console.warn("[TF2Utils] crate.tf link failed:", err));
+  }
 }
 
 function appendLink(row, { label, href }) {

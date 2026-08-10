@@ -7,6 +7,7 @@ import {
   mannCoStoreUrl,
   marketplaceTfUrl,
   skinportUrl,
+  crateTfUrl,
   getKnownCrateNumber,
 } from "../../utils/itemLinks.js";
 
@@ -20,6 +21,7 @@ const LINK_ACCENTS = {
   "mannco.store": SITE_BRAND_COLORS.manncoStore,
   "skinport.com": SITE_BRAND_COLORS.skinport,
   "marketplace.tf": SITE_BRAND_COLORS.marketplaceTf,
+  "crate.tf": SITE_BRAND_COLORS.crateTf,
   "bp.tf stats": SITE_BRAND_COLORS.backpackTf,
   "next.bp.tf stats": SITE_BRAND_COLORS.backpackTf,
   "bp.tf history": SITE_BRAND_COLORS.backpackTf,
@@ -200,9 +202,14 @@ export function showItemLinks() {
       ksTier: attrs.ksTier, australium: attrs.australium, festive: attrs.festive,
       crateNumber: crateNumber ?? undefined,
     });
-    if (!href || !links.isConnected) return;
-    links.appendChild(makeLinkBtn({ label: "marketplace.tf", href }));
-  })().catch((err) => console.warn("[TF2Utils] marketplace.tf link failed:", err));
+    if (href && links.isConnected) links.appendChild(makeLinkBtn({ label: "marketplace.tf", href }));
+
+    // crate.tf only has pages for crates/cases — crateTfUrl() returns
+    // null with no crate number, so this naturally stays absent for
+    // every other item rather than needing its own type check here.
+    const crateTfHref = await crateTfUrl({ name: attrs.name, crateNumber, craftable: attrs.craftable });
+    if (crateTfHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "crate.tf", href: crateTfHref }));
+  })().catch((err) => console.warn("[TF2Utils] marketplace.tf/crate.tf link failed:", err));
 
   return true;
 }

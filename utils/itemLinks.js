@@ -209,6 +209,36 @@ export async function getItemDefindex(name) {
   return schema[name] ?? null;
 }
 
+/**
+ * Resolves a defindex, crate/case-series-aware: some crate/case names
+ * span multiple series under one display name, each with its own real
+ * defindex (e.g. "Mann Co. Supply Munition" #91 is defindex 5802, but
+ * #90 is 5781) — the bundled schema can only store one defindex per
+ * plain name key, which would be wrong for every series except
+ * whichever one happened to get scraped into it. Confirmed per-series
+ * entries are added to the same schema file keyed as "<name> #<N>"
+ * (e.g. "Mann Co. Supply Munition #91": 5802) and checked here first.
+ *
+ * For a name known to span multiple series at all (per the bundled
+ * tf2CrateSeriesNumbers.json — see loadCrateSeriesNumbers below), a
+ * series with no confirmed "<name> #<N>" entry yet returns null rather
+ * than falling back to the plain name's defindex, which would just be
+ * some OTHER series' value guessed wrong. The plain-name fallback is
+ * only trusted for names that aren't ambiguous in the first place
+ * (single/no known series — the vast majority of items).
+ */
+async function resolveDefindex(name, crateNumber) {
+  const schema = await loadDefindexSchema();
+  if (crateNumber != null) {
+    const seriesDefindex = schema[`${name} #${crateNumber}`];
+    if (seriesDefindex != null) return seriesDefindex;
+
+    const seriesNumbers = await loadCrateSeriesNumbers();
+    if ((seriesNumbers[name]?.length ?? 0) > 1) return null;
+  }
+  return schema[name] ?? null;
+}
+
 // defindex -> name, built once by inverting the bundled name -> defindex
 // schema above. Where more than one name shares a defindex (the same
 // "stock vs. tradable" ambiguity noted on loadDefindexSchema), whichever
@@ -367,8 +397,7 @@ export function skinportUrl({ name, quality }) {
 export async function marketplaceTfUrl({
   name, quality = "Unique", craftable = true, ksTier, australium = false, festive = false, effectId, crateNumber,
 }) {
-  const schema = await loadDefindexSchema();
-  const defindex = schema[name];
+  const defindex = await resolveDefindex(name, crateNumber);
   if (defindex == null) return null;
 
   const qualityId = TF2_QUALITY_IDS[quality] ?? TF2_QUALITY_IDS.Unique;
@@ -382,6 +411,41 @@ export async function marketplaceTfUrl({
   if (crateNumber != null) sku.push(`c${crateNumber}`);
 
   return `https://marketplace.tf/items/tf2/${sku.join(";")}`;
+}
+
+/**
+ * crate.tf item page — crates/cases only. Keyed by the same
+ * defindex/quality/crate-number sku marketplace.tf uses, but "-"
+ * separated instead of ";" — confirmed against three real crate.tf
+ * URLs: "End of the Line Community Crate #87" ->
+ * https://crate.tf/item/5774-6-c87, "Crimson Cache Case #133" ->
+ * https://crate.tf/item/5928-6-c133.
+ *
+ * One-off reward/unlock crates with no series/case number at all (e.g.
+ * "Unlocked Cosmetic Crate Multi-Class" — same one flagged by
+ * ITEM_NAME_QUIRKS' steamMarketOmitsNonCraftablePrefix for a related
+ * reason: it has no craftable variant to disambiguate from either) use
+ * "uncraftable" as the third sku segment instead of "c<N>" — confirmed:
+ * "Non-Craftable Unlocked Cosmetic Crate Multi-Class" ->
+ * https://crate.tf/item/5860-6-uncraftable, no crate number anywhere.
+ *
+ * @param {object} opts
+ * @param {string} opts.name - bare crate/case name, no "#N"/"Series #N" suffix (matches the TF2 schema's own item_name)
+ * @param {string|number} [opts.crateNumber] - crate/case series number (the "#142" backpack.tf shows, "Series #34" on stntrading.eu) — omit only for a one-off reward crate with no series number at all
+ * @param {boolean} [opts.craftable=true] - only consulted when crateNumber is omitted, to build the "uncraftable" sku variant above
+ * @returns {Promise<string|null>} null if the item name isn't in the schema, or if there's neither a crate number nor a Non-Craftable variant to key off
+ */
+export async function crateTfUrl({ name, crateNumber, craftable = true }) {
+  const defindex = await resolveDefindex(name, crateNumber);
+  if (defindex == null) return null;
+
+  if (crateNumber != null) {
+    return `https://crate.tf/item/${defindex}-${TF2_QUALITY_IDS.Unique}-c${crateNumber}`;
+  }
+  if (!craftable) {
+    return `https://crate.tf/item/${defindex}-${TF2_QUALITY_IDS.Unique}-uncraftable`;
+  }
+  return null;
 }
 
 /** posts.tf's plain search results page — no query params, since it doesn't read search state from the URL. */

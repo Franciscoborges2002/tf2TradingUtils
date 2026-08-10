@@ -16,7 +16,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
-import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, skinportUrl, wikiUrl } from "../../utils/itemLinks.js";
+import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, skinportUrl, crateTfUrl, getKnownCrateNumber, wikiUrl } from "../../utils/itemLinks.js";
 
 // scrap.tf's own hover tooltip text drops diacritics for at least this
 // one item — it literally renders "Quackenbirdt" with no accent at all
@@ -354,6 +354,21 @@ async function makeLinks(name, itemEl) {
     console.warn("[TF2Utils] marketplace.tf link failed:", err);
   }
 
+  // crate.tf only has pages for crates/cases. scrap.tf's tooltip title
+  // never shows the series/case number as literal text the way
+  // backpack.tf's does (unlike those, so there's nothing to parse here),
+  // so this always goes through the bundled series-number table — same
+  // fallback steamcommunity.com/itemLinks uses for the same reason —
+  // which only resolves names with exactly one known series (see
+  // getKnownCrateNumber()'s own docs).
+  let crateTfHref = null;
+  try {
+    const crateNumber = await getKnownCrateNumber(classifiedsName);
+    crateTfHref = await crateTfUrl({ name: classifiedsName, crateNumber, craftable: !isUncraft });
+  } catch (err) {
+    console.warn("[TF2Utils] crate.tf link failed:", err);
+  }
+
   const links = [
     {
       label: "Bp Stats",
@@ -376,6 +391,10 @@ async function makeLinks(name, itemEl) {
     {
       label: "marketplace.tf",
       href: marketplaceHref,
+    },
+    {
+      label: "crate.tf",
+      href: crateTfHref,
     },
     {
       label: "Steam Market",

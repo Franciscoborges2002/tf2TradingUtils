@@ -4,6 +4,8 @@ import {
   marketplaceTfUrl,
   steamMarketUrl,
   skinportUrl,
+  crateTfUrl,
+  getKnownCrateNumber,
   wikiUrl,
 } from "../../utils/itemLinks.js";
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
@@ -36,6 +38,7 @@ const LINK_ACCENTS = {
   "mannco.store": SITE_BRAND_COLORS.manncoStore,
   "skinport.com": SITE_BRAND_COLORS.skinport,
   "marketplace.tf": SITE_BRAND_COLORS.marketplaceTf,
+  "crate.tf": SITE_BRAND_COLORS.crateTf,
   "Steam Market": SITE_BRAND_COLORS.steam,
   "Wiki": SITE_BRAND_COLORS.wiki,
 };
@@ -66,6 +69,7 @@ export async function showItemLinks() {
     { label: "mannco.store", href: await createManncoLink(itemName, isUnusual, effect) },
     { label: "skinport.com", href: createSkinportLink(itemName, isUnusual) },
     { label: "marketplace.tf", href: await createMarketplaceLink(itemName) },
+    { label: "crate.tf", href: await createCrateTfLink(itemName) },
     { label: "Steam Market", href: steamMarketUrl(itemName.trim()) },
     { label: "Wiki", href: wikiUrl(parseShallow(itemName).name) },
   ];
@@ -235,9 +239,14 @@ async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
 async function parseItemAttributes(itemNameRaw) {
   // Crate series/case number always trails at the very end, after
   // everything else — strip it first so it can't interfere with the
-  // rest of the parse below.
+  // rest of the parse below. Not every crate/case page shows it as
+  // literal text though (confirmed: "Winter 2021 Cosmetic Case" has no
+  // "#N" anywhere in its own h1, unlike backpack.tf's title, which
+  // always includes it) — the bundled series-number table is the
+  // fallback for those, resolved once the bare name's known below (same
+  // fallback steamcommunity.com/itemLinks uses for the same reason).
   const crateMatch = String(itemNameRaw || "").match(CRATE_NUMBER_RE);
-  const crateNumber = crateMatch ? crateMatch[1] : undefined;
+  let crateNumber = crateMatch ? crateMatch[1] : undefined;
   let name = String(crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw || "").trim();
 
   // detect + strip craftability
@@ -286,6 +295,10 @@ async function parseItemAttributes(itemNameRaw) {
   // NOT stripped here (see this function's own doc comment above).
   const australium = name.startsWith("Australium ");
   if (australium) name = name.slice("Australium ".length);
+
+  if (crateNumber === undefined) {
+    crateNumber = (await getKnownCrateNumber(name)) ?? undefined;
+  }
 
   return { name, quality: matchedQuality, craftable: !isNonCraftable, ksTier, australium, crateNumber };
 }
@@ -352,6 +365,21 @@ async function createMarketplaceLink(itemNameRaw) {
   const attrs = await parseItemAttributes(itemNameRaw);
   if (!attrs) return null;
   return marketplaceTfUrl(attrs);
+}
+
+/**
+ * Build a crate.tf item URL — crates/cases only. crateTfUrl() itself
+ * returns null with no crate number, so this naturally resolves to
+ * null for every non-crate item too, without needing its own item-type
+ * check here.
+ *
+ * @param {string} itemNameRaw - e.g., "Mann Co. Supply Crate Series #34"
+ * @returns {Promise<string|null>}
+ */
+async function createCrateTfLink(itemNameRaw) {
+  const attrs = await parseItemAttributes(itemNameRaw);
+  if (!attrs) return null;
+  return crateTfUrl(attrs);
 }
 
 // Load and cache the JSON dynamically

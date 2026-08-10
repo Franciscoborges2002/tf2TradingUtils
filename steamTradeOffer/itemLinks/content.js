@@ -51,6 +51,7 @@ import {
   marketplaceTfUrl,
   steamMarketUrl,
   skinportUrl,
+  crateTfUrl,
   getKnownCrateNumber,
   getItemNameByDefindex,
 } from "../../utils/itemLinks.js";
@@ -62,6 +63,7 @@ const LINK_ACCENTS = {
   "mannco.store": SITE_BRAND_COLORS.manncoStore,
   "skinport.com": SITE_BRAND_COLORS.skinport,
   "marketplace.tf": SITE_BRAND_COLORS.marketplaceTf,
+  "crate.tf": SITE_BRAND_COLORS.crateTf,
   "Steam Market": SITE_BRAND_COLORS.steam,
 };
 
@@ -302,8 +304,14 @@ async function buildLinks(rawName, assetId) {
       crateNumber: resolvedCrateNumber ?? undefined,
     });
     if (marketplaceHref) links.push({ label: "marketplace.tf", href: marketplaceHref });
+
+    // crate.tf only has pages for crates/cases — crateTfUrl() itself
+    // returns null with no crate number, so this naturally stays absent
+    // for every other item rather than needing its own type check here.
+    const crateTfHref = await crateTfUrl({ name: attrs.name, crateNumber: resolvedCrateNumber, craftable: attrs.craftable });
+    if (crateTfHref) links.push({ label: "crate.tf", href: crateTfHref });
   } catch (err) {
-    console.warn("[TF2Utils] marketplace.tf link failed:", err);
+    console.warn("[TF2Utils] marketplace.tf/crate.tf link failed:", err);
   }
 
   return links;

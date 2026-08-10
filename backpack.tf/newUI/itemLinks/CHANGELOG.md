@@ -5,3 +5,4 @@
 * Skips Non-Tradable items and Unusual items without a resolvable effect name, rather than link somewhere wrong
 * Strips killstreak-tier text from the name before building the mannco.store/stntrading.eu links, since neither site distinguishes killstreak tier the way backpack.tf does. Crate/case-number ("Series #N" or "#N") text is stripped for mannco.store the same way, but kept for stntrading.eu — it has a separate page per series/case number
 * Added a skinport.com link, using the same full display name mannco.store does
+* Added a crate.tf link, crates/cases only
