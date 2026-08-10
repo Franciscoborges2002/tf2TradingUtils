@@ -1,6 +1,7 @@
 // itemLinks.js
 import { COLOR_PANEL_BG, SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { TF2_APPID, TF2_CONTEXTID } from "../../utils/constants/tf2Economy.js";
+import { isTf2InventoryActive } from "../../utils/steamInventory.js";
 import {
   steamMarketUrl,
   backpackStatsUrl,
@@ -158,6 +159,13 @@ function ksPrefixFor(ksTier) {
 }
 
 export function showItemLinks() {
+  // A Steam account's inventory page lists every game it owns items
+  // for, switchable via tabs — #iteminfo0/#iteminfo1 are shared across
+  // all of them, so without this check, clicking an item on some other
+  // game's tab (CS2, etc.) would build TF2 links for whatever text
+  // happens to be in its name/title, which is meaningless there.
+  if (!isTf2InventoryActive()) return false;
+
   const picked = pickContainer();
   if (!picked) return false;
 
