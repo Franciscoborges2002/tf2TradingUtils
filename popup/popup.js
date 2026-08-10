@@ -149,6 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const keyPriceInput     = document.getElementById("settings-key-price");
   const earbudsKeysInput  = document.getElementById("settings-earbuds-keys");
   const earbudsRefInput   = document.getElementById("settings-earbuds-ref");
+  const showDescInput     = document.getElementById("settings-show-item-descriptions");
   const saveBtn           = document.getElementById("settings-save");
   const savedMsg          = document.getElementById("settings-saved-msg");
 
@@ -157,14 +158,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (settings.keyPriceRef != null)      keyPriceInput.value    = settings.keyPriceRef;
     if (settings.earbudsPriceKeys != null) earbudsKeysInput.value = settings.earbudsPriceKeys;
     if (settings.earbudsPriceRef != null)  earbudsRefInput.value  = settings.earbudsPriceRef;
+    // Shown by default unless the user's explicitly turned it off.
+    showDescInput.checked = settings.showItemDescriptionsByDefault !== false;
   });
 
   function saveSettings() {
     const keyPriceRef      = parseFloat(keyPriceInput.value) || 0;
     const earbudsPriceKeys = parseFloat(earbudsKeysInput.value) || 0;
     const earbudsPriceRef  = parseFloat(earbudsRefInput.value) || 0;
+    const showItemDescriptionsByDefault = showDescInput.checked;
 
-    chrome.storage.local.set({ settings: { keyPriceRef, earbudsPriceKeys, earbudsPriceRef } }, () => {
+    chrome.storage.local.set({ settings: { keyPriceRef, earbudsPriceKeys, earbudsPriceRef, showItemDescriptionsByDefault } }, () => {
       currentKeyPriceRef = keyPriceRef || null;
       onKeyPriceChanged();
       savedMsg.textContent = "Saved";

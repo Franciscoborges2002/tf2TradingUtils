@@ -28,6 +28,12 @@ async function scriptRouter() {
       "inventoryCurrencyCounter",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/inventoryCurrencyCounter",
     ]);
+
+    loadItemDescriptionToggle();
+    EXT_SCRIPT_INFO.scripts.push([
+      "itemDescriptionToggle",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/itemDescriptionToggle",
+    ]);
   }
 
   if(url.pathname.includes("profile") || url.pathname.includes("id")){
@@ -149,6 +155,23 @@ function loadItemLinks() {
                    document.body;
 
     new MutationObserver(() => showItemLinks())
+      .observe(target, { childList: true, subtree: true });
+  })();
+}
+
+function loadItemDescriptionToggle() {
+  (async () => {
+    const { addItemDescriptionToggle } = await import(
+      chrome.runtime.getURL("steamcommunity.com/itemDescriptionToggle/content.js")
+    );
+
+    addItemDescriptionToggle();
+
+    const target = document.querySelector("#iteminfo0") ||
+                   document.querySelector("#iteminfo1") ||
+                   document.body;
+
+    new MutationObserver(() => addItemDescriptionToggle())
       .observe(target, { childList: true, subtree: true });
   })();
 }
