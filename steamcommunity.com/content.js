@@ -40,10 +40,10 @@ async function scriptRouter() {
   bots = await loadBotDb();
   console.log(bots);
   /* If there is the next in hostname, redirect to newUI scripts */
-  loadSteamLinks();
+  loadProfileLinks();
     EXT_SCRIPT_INFO.scripts.push([
-      "steamLinks",
-      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks",
+      "profileLinks",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/profileLinks",
     ]);
     loadBotRep(bots);
     EXT_SCRIPT_INFO.scripts.push([
@@ -83,14 +83,14 @@ scriptRouter();
 /* 
 Utility funtions to load scripts
 */
-function loadSteamLinks() {
+function loadProfileLinks() {
   (async () => {
     // Load module dynamically
-    const { steamLinks } = await import(
-      chrome.runtime.getURL("steamcommunity.com/steamLinks/content.js")
+    const { profileLinks } = await import(
+      chrome.runtime.getURL("steamcommunity.com/profileLinks/content.js")
     );
 
-    steamLinks();
+    profileLinks();
   })();
 }
 
