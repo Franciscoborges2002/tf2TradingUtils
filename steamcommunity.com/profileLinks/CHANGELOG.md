@@ -2,6 +2,8 @@
 
 - Renamed from steamLinks to profileLinks
 - Added a liquid.tf store link (`https://liquid.tf/store/<steamid64>`)
+- Added brand colors for all links
+- Added links for the trade offers inbox (`/tradeoffers/`), sent offers (`/tradeoffers/sent/`) and trade history (`/tradehistory/`) pages
 
 # Version 1.0.0
 
