@@ -1,9 +1,7 @@
 # Version 1.0.0
 
-- Added the panel to add keys and metal to a trade — detailed (per-denomination) and compact ("5 keys 5.44 ref") modes
-- Added support for adding currency from either your own inventory or the trade partner's inventory, following the currently selected Steam inventory tab
-- Fixed items not actually being added to the trade — items are now added by writing directly to Steam's own `g_rgCurrentTradeStatus` trade state and calling `RefreshTradeStatus`, instead of simulating clicks on inventory items (which only selects them)
-- Renamed from `addCurrency` to `tradeOfferPanel` to make room for future trade offer utilities beyond currency
-- Added a 🗑 button to clear every item from the currently active side of the trade (yours/theirs), with a confirmation prompt before removing anything
-- Moved the panel to sit directly above the trade summary panel (showTradeDetails), instead of above the inventory controls
-- Fixed the panel header only spanning half the panel width — it was wrapping next to a floated Steam element; added `clear: both` and `width: 100%` to the panel
+- Added the "🔧 Trade Panel" panel, positioned directly above the trade summary panel: add keys/metal (detailed or compact "5 keys 5.44 ref" input), add any named item (live autocomplete search + quantity), or add every item currently visible in the inventory grid — all from either your own or the trade partner's inventory, following the currently selected Steam inventory tab
+- Items are added by writing directly to Steam's own `g_rgCurrentTradeStatus` trade state and calling `RefreshTradeStatus`
+- 🗑 button clears every item from the active side of the trade, with a confirmation prompt
+- The "Add Visible Page" button is **not verified against a live trade offer page** — it uses `offsetParent === null` as a generic "not currently rendered" test rather than a confirmed pagination selector
+- Fixed 🗑 clear-side leaving some inventory tiles empty instead of showing the item as available again — clearing wiped the whole trade side in one bulk mutation plus a single `RefreshTradeStatus()` call, which didn't give Steam's own per-item "return this tile to the inventory grid" logic enough refresh cycles to run for every item; now removes and refreshes one item at a time

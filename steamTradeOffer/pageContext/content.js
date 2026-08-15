@@ -403,6 +403,51 @@ function respondWithAvailable(e, itemMap, tradeAssets) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// tf2utils_add_assets
+// Adds a specific, already-known list of assetids straight to one
+// side's trade — used by addItemPanel's "add everything currently
+// visible" button, which reads the visible inventory tile ids directly
+// off the DOM itself (an isolated-world content script can do that
+// fine; only writing to Steam's own trade state needs this MAIN-world
+// bridge). Skips any assetid already in the trade. Doesn't cross-check
+// against g_myItemMap/g_partnerItemMap — the caller already read these
+// ids from real rendered tiles, so they're known-good.
+// Payload: { eventId, side: "me" | "them", assetids: string[] }
+// Response: { addedCount }
+// ─────────────────────────────────────────────────────────────
+window.addEventListener("tf2utils_add_assets", (e) => {
+  const { eventId, side, assetids } = e.detail ?? {};
+  if (!eventId) return;
+
+  const tradeStatus = window.g_rgCurrentTradeStatus;
+  const tradeAssets = side === "them" ? tradeStatus?.them?.assets : tradeStatus?.me?.assets;
+
+  if (!tradeAssets || typeof window.RefreshTradeStatus !== "function") {
+    console.warn("[TF2TradingUtils] addAssets: trade state API not available.");
+    window.dispatchEvent(new CustomEvent(eventId, { detail: { addedCount: 0 } }));
+    return;
+  }
+
+  const inTrade = new Set(tradeAssets.map((a) => a.assetid));
+  let addedCount = 0;
+
+  for (const assetid of assetids ?? []) {
+    if (inTrade.has(assetid)) continue;
+    tradeAssets.push({ appid: TF2_APPID, contextid: TF2_CONTEXTID, assetid, amount: 1 });
+    inTrade.add(assetid);
+    addedCount++;
+  }
+
+  if (addedCount > 0) {
+    tradeStatus.version++;
+    window.RefreshTradeStatus(tradeStatus);
+  }
+
+  console.log(`[TF2TradingUtils] addAssets(${side}): added ${addedCount}/${(assetids ?? []).length}`);
+  window.dispatchEvent(new CustomEvent(eventId, { detail: { addedCount } }));
+});
+
+// ─────────────────────────────────────────────────────────────
 // tf2utils_add_currency / tf2utils_add_their_currency
 // Adds items straight into Steam's own trade state
 // (window.g_rgCurrentTradeStatus.me/them.assets) and asks the page
@@ -449,12 +494,162 @@ window.addEventListener("tf2utils_clear_side", (e) => {
 
   if (assets.length === 0) return;
 
-  assets.length = 0;
-  tradeStatus.version++;
-  window.RefreshTradeStatus(tradeStatus);
+  // Removed one at a time, refreshing after each — a single bulk
+  // `assets.length = 0` + one RefreshTradeStatus() call left some
+  // inventory grid tiles empty afterward (confirmed live: the item
+  // vanished from its slot instead of reappearing as available),
+  // seemingly because Steam's own per-item "un-hide this tile" side
+  // effect doesn't fully process when too many items disappear between
+  // refreshes. This is slower for a large side, but correctness matters
+  // more than speed for a clear action.
+  while (assets.length > 0) {
+    assets.pop();
+    tradeStatus.version++;
+    window.RefreshTradeStatus(tradeStatus);
+  }
 
   console.log(`[TF2TradingUtils] clearSide(${side}): cleared`);
 });
+
+// ─────────────────────────────────────────────────────────────
+// tf2utils_search_items
+// Live search for the addItemPanel's autocomplete — matches any item
+// name (not just currency), grouped by exact display name (market_hash_name
+// already bakes quality/killstreak/Non-Craftable/etc. into that string,
+// so two genuinely different variants naturally end up as separate
+// groups here; two items that share every one of those and only differ
+// in something market_hash_name doesn't carry, e.g. paint or an
+// Unusual's specific spell, can't be told apart this way — same
+// resolution Steam's own inventory stacking has).
+// Payload: { eventId, side: "me" | "them", query }
+// Response: [{ name, name_color, icon_url, count }], best matches first,
+// capped to a manageable dropdown size.
+// ─────────────────────────────────────────────────────────────
+const ITEM_SEARCH_RESULTS_LIMIT = 20;
+
+window.addEventListener("tf2utils_search_items", (e) => {
+  const { eventId, side, query } = e.detail ?? {};
+  if (!eventId) return;
+
+  const itemMap     = side === "them" ? g_partnerItemMap : g_myItemMap;
+  const tradeAssets  = side === "them" ? window.g_rgCurrentTradeStatus?.them?.assets : window.g_rgCurrentTradeStatus?.me?.assets;
+  const results      = searchItems(itemMap, tradeAssets, query ?? "");
+
+  window.dispatchEvent(new CustomEvent(eventId, { detail: results }));
+});
+
+function searchItems(itemMap, tradeAssets, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const inTrade = new Set((tradeAssets ?? []).map((a) => a.assetid));
+  const groups  = new Map(); // display name -> { name, name_color, icon_url, count }
+
+  for (const info of itemMap.values()) {
+    if (inTrade.has(info.assetid)) continue;
+    const name = info.market_hash_name || info.name;
+    if (!name || !name.toLowerCase().includes(q)) continue;
+
+    if (!groups.has(name)) {
+      groups.set(name, { name, name_color: info.name_color, icon_url: info.icon_url, count: 0 });
+    }
+    groups.get(name).count++;
+  }
+
+  // Names starting with the query first, then alphabetical within each group.
+  return Array.from(groups.values())
+    .sort((a, b) => {
+      const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+      return aStarts !== bStarts ? aStarts - bStarts : a.name.localeCompare(b.name);
+    })
+    .slice(0, ITEM_SEARCH_RESULTS_LIMIT);
+}
+
+// ─────────────────────────────────────────────────────────────
+// tf2utils_add_item_by_name / tf2utils_add_their_item_by_name
+// Adds N copies of one exact item name to the trade — same direct
+// trade-state write addCurrencyToAssets() uses below, generalized to
+// any name instead of the four hardcoded currency ones. The name is
+// expected to be an exact display name as returned by
+// tf2utils_search_items above (picked from the autocomplete dropdown),
+// not raw user input — see addItemPanel/content.js.
+// Payload: { name, count }
+// ─────────────────────────────────────────────────────────────
+window.addEventListener("tf2utils_add_item_by_name", (e) => {
+  const { addedAny, missing } = addItemsToAssets(
+    g_myItemMap, window.g_rgCurrentTradeStatus?.me?.assets, "Your inventory", [e.detail ?? {}]
+  );
+  if (missing.length) {
+    window.dispatchEvent(new CustomEvent("tf2utils_item_missing", { detail: missing }));
+  }
+  console.log(`[TF2TradingUtils] addItemByName(me): added ${addedAny ? "some" : "no"} items, missing:`, missing);
+});
+
+window.addEventListener("tf2utils_add_their_item_by_name", (e) => {
+  const { addedAny, missing } = addItemsToAssets(
+    g_partnerItemMap, window.g_rgCurrentTradeStatus?.them?.assets, "Their inventory", [e.detail ?? {}]
+  );
+  if (missing.length) {
+    window.dispatchEvent(new CustomEvent("tf2utils_item_missing", { detail: missing }));
+  }
+  console.log(`[TF2TradingUtils] addItemByName(them): added ${addedAny ? "some" : "no"} items, missing:`, missing);
+});
+
+// items: [{ name, count }]
+function addItemsToAssets(itemMap, tradeAssets, notLoadedLabel, items) {
+  if (itemMap.size === 0) {
+    return {
+      addedAny: false,
+      missing: [{ name: `${notLoadedLabel} not loaded yet — please wait and try again`, requested: 1, found: 0 }],
+    };
+  }
+
+  if (!tradeAssets || typeof window.RefreshTradeStatus !== "function") {
+    return {
+      addedAny: false,
+      missing: [{ name: "Steam trade API not available — try reloading the page", requested: 1, found: 0 }],
+    };
+  }
+
+  const inTrade = new Set(tradeAssets.map((a) => a.assetid));
+  const missing = [];
+  let addedAny  = false;
+
+  for (const { name: targetName, count } of items) {
+    if (!targetName || !count) continue;
+    let added = 0;
+
+    for (const info of itemMap.values()) {
+      if (added >= count) break;
+      if (inTrade.has(info.assetid)) continue;
+      const name = info.market_hash_name || info.name;
+      if (name !== targetName) continue;
+
+      tradeAssets.push({
+        appid:     TF2_APPID,
+        contextid: TF2_CONTEXTID,
+        assetid:   info.assetid,
+        amount:    1,
+      });
+
+      inTrade.add(info.assetid);
+      added++;
+      addedAny = true;
+    }
+
+    if (added < count) {
+      missing.push({ name: targetName, requested: count, found: added });
+    }
+  }
+
+  if (addedAny) {
+    window.g_rgCurrentTradeStatus.version++;
+    window.RefreshTradeStatus(window.g_rgCurrentTradeStatus);
+  }
+
+  return { addedAny, missing };
+}
 
 function addCurrencyToAssets(itemMap, tradeAssets, notLoadedLabel, amounts) {
   if (itemMap.size === 0) {
