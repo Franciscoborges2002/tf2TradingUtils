@@ -1,19 +1,25 @@
 /**
  * @TF2TradingUtils - tradeOfferPanel
  * Panel of trade offer utilities, injected directly above the trade
- * summary panel (showTradeDetails).
- * Currently: quickly add keys and metal to the trade, from either your own
- * or the trade partner's inventory. Two modes: detailed (per-denomination
- * inputs) and compact (e.g. "5 keys 5.44 ref").
+ * summary panel (showTradeDetails). Two sections:
+ * - Currency (top): quickly add keys and metal to the trade, from
+ *   either your own or the trade partner's inventory. Two modes:
+ *   detailed (per-denomination inputs) and compact (e.g. "5 keys 5.44 ref").
+ * - Add Item (bottom): type any item name, pick the exact matching
+ *   variant from a live autocomplete dropdown, then a quantity — for
+ *   bulk-adding duplicates. Also has an "＋ Add Visible Page" button
+ *   that adds every item currently rendered in the inventory grid.
+ * Both sections share the same yours/theirs side and the same "🗑
+ * clear this side of the trade" action.
  *
  * Link: https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer/tradeOfferPanel
  */
 
 import { COLOR_ACCENT, COLOR_DANGER, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
-import { TF2_CURRENCY, TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
+import { TF2_APPID, TF2_CONTEXTID, TF2_CURRENCY, TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
 
-const PANEL_ID  = "tf2utils-addcurrency-panel";
-const STYLES_ID = "tf2utils-addcurrency-styles";
+const PANEL_ID  = "tf2utils-tradepanel";
+const STYLES_ID = "tf2utils-tradepanel-styles";
 
 // showTradeDetails' panel id — kept in sync manually, used to insert
 // this panel directly above the trade summary.
@@ -30,20 +36,24 @@ const SHORT_TO_NAME = Object.fromEntries(
   Object.entries(TF2_CURRENCY_BY_NAME).map(([name, c]) => [name, c.short])
 );
 
-let g_mode       = "detailed"; // "detailed" | "compact"
-let g_activeSide = "me";       // "me" | "them" — whose inventory tab is selected
+const SEARCH_DEBOUNCE_MS = 200;
+
+let g_mode       = "detailed"; // "detailed" | "compact" — currency section only
+let g_activeSide = "me";       // "me" | "them" — whose inventory tab is selected, shared by both sections
+let g_selected    = null; // currently picked item-search result, or null
+let g_searchTimer = null;
 
 // ─────────────────────────────────────────────────────────────
 // Entry point
 // ─────────────────────────────────────────────────────────────
-export async function addCurrency() {
+export async function tradeOfferPanel() {
   const ready = await waitFor(
     () => !!document.getElementById("your_slots"),
     200, 10_000
   );
 
   if (!ready) {
-    console.warn("[TF2TradingUtils] addCurrency: trade slots not found.");
+    console.warn("[TF2TradingUtils] tradeOfferPanel: trade slots not found.");
     return;
   }
 
@@ -64,18 +74,18 @@ export async function addCurrency() {
   window.addEventListener("tf2utils_my_inventory_ready",    () => refreshAvailable(panel), { once: true });
   window.addEventListener("tf2utils_their_inventory_ready", () => refreshAvailable(panel), { once: true });
 
-  // Listen for "missing items" events fired from pageContext
-  window.addEventListener("tf2utils_currency_missing", (e) => {
-    showMissingPopup(panel, e.detail);
-  });
+  // Listen for "missing items" events fired from pageContext — currency
+  // and by-name item adds each fire their own event, same popup either way.
+  window.addEventListener("tf2utils_currency_missing", (e) => showMissingPopup(panel, e.detail));
+  window.addEventListener("tf2utils_item_missing",     (e) => showMissingPopup(panel, e.detail));
 
-  // Switch between "my inventory" and "their inventory" currency when the
-  // user changes the Steam inventory tab. Bound directly to the known tab
+  // Switch between "my inventory" and "their inventory" when the user
+  // changes the Steam inventory tab. Bound directly to the known tab
   // elements (rather than delegated on document) so it still fires even
   // if Steam's own tab handler calls stopPropagation().
   bindInventoryTabSwitch(panel);
 
-  console.log("[TF2TradingUtils] addCurrency active.");
+  console.log("[TF2TradingUtils] tradeOfferPanel active.");
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -114,7 +124,7 @@ async function insertPanel(panel) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PageContext bridge helpers
+// PageContext bridge helpers — currency
 // ─────────────────────────────────────────────────────────────
 function getAvailableCurrency() {
   return new Promise((resolve) => {
@@ -129,6 +139,64 @@ function getAvailableCurrency() {
 function dispatchAddCurrency(amounts) {
   const addEvent = g_activeSide === "me" ? "tf2utils_add_currency" : "tf2utils_add_their_currency";
   window.dispatchEvent(new CustomEvent(addEvent, { detail: amounts }));
+}
+
+// ─────────────────────────────────────────────────────────────
+// PageContext bridge helpers — add item by name / add visible page
+// ─────────────────────────────────────────────────────────────
+function searchItems(query) {
+  return new Promise((resolve) => {
+    const eventId = `tf2utils_itemsearch_${Date.now()}`;
+    const timeout = setTimeout(() => resolve([]), 5_000);
+    window.addEventListener(eventId, (e) => { clearTimeout(timeout); resolve(e.detail); }, { once: true });
+    window.dispatchEvent(new CustomEvent("tf2utils_search_items", { detail: { eventId, side: g_activeSide, query } }));
+  });
+}
+
+function dispatchAddItem(name, count) {
+  const addEvent = g_activeSide === "me" ? "tf2utils_add_item_by_name" : "tf2utils_add_their_item_by_name";
+  window.dispatchEvent(new CustomEvent(addEvent, { detail: { name, count } }));
+}
+
+// "Add Visible Page" — every inventory tile currently rendered on
+// screen (whatever page/scroll position Steam's own inventory grid is
+// on), not the whole inventory. Reads assetids straight off the tile
+// element ids (same "item<appid>_<contextid>_<assetid>" format
+// pageContext's own buildMap()/readSlot() use) directly in this
+// isolated-world content script — no pageContext round-trip needed for
+// that part, only for the actual trade-state write below.
+//
+// NOT verified against a live trade offer page — Steam's exact
+// pagination markup wasn't available to check. Rather than guess a
+// specific pagination class name, this uses `offsetParent === null` as
+// a generic "not actually rendered right now" test, which should hold
+// regardless of exactly how Steam hides the other pages (as long as
+// it's done via CSS display, which is the common way). If it turns out
+// to grab the wrong set of tiles, this is the first place to look.
+function getVisibleInventoryAssetIds() {
+  const prefix = `item${TF2_APPID}_${TF2_CONTEXTID}_`;
+  const tiles  = document.querySelectorAll(`[id^="${prefix}"]`);
+  const ids    = [];
+
+  for (const el of tiles) {
+    if (el.closest("#your_slots") || el.closest("#their_slots")) continue; // trade slots, not inventory
+    if (el.offsetParent === null) continue; // not currently rendered — a different page/hidden
+    ids.push(el.id.slice(prefix.length));
+  }
+
+  return ids;
+}
+
+function addVisiblePage() {
+  return new Promise((resolve) => {
+    const assetids = getVisibleInventoryAssetIds();
+    if (!assetids.length) { resolve(0); return; }
+
+    const eventId = `tf2utils_addvisible_${Date.now()}`;
+    const timeout = setTimeout(() => resolve(0), 5_000);
+    window.addEventListener(eventId, (e) => { clearTimeout(timeout); resolve(e.detail?.addedCount ?? 0); }, { once: true });
+    window.dispatchEvent(new CustomEvent("tf2utils_add_assets", { detail: { eventId, side: g_activeSide, assetids } }));
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -165,13 +233,14 @@ function bindInventoryTabSwitch(panel) {
     g_activeSide = side;
     updateSideLabel(panel);
     refreshAvailable(panel);
+    clearSelection(panel);
   };
 
   yourTab?.addEventListener("click", () => switchTo("me"));
   theirTab?.addEventListener("click", () => switchTo("them"));
 
   if (!yourTab || !theirTab) {
-    console.warn("[TF2TradingUtils] addCurrency: inventory tab element(s) not found — side switching disabled.");
+    console.warn("[TF2TradingUtils] tradeOfferPanel: inventory tab element(s) not found — side switching disabled.");
   }
 }
 
@@ -188,7 +257,7 @@ function buildPanel() {
 
   const title = document.createElement("span");
   title.className   = "ac-title";
-  title.textContent = "💰 Add Currency";
+  title.textContent = "🔧 Trade Panel";
   header.appendChild(title);
 
   const sideBadge = document.createElement("span");
@@ -207,6 +276,24 @@ function buildPanel() {
   };
   header.appendChild(modeToggle);
 
+  const addPageBtn = document.createElement("button");
+  addPageBtn.className   = "ac-addpage-btn";
+  addPageBtn.textContent = "＋ Add Visible Page";
+  addPageBtn.title       = "Add every item currently shown in the inventory grid to the trade";
+  addPageBtn.onclick = async () => {
+    addPageBtn.disabled = true;
+    const prevText = addPageBtn.textContent;
+    addPageBtn.textContent = "Adding…";
+    const added = await addVisiblePage();
+    addPageBtn.textContent = `Added ${added}`;
+    setTimeout(() => {
+      addPageBtn.textContent = prevText;
+      addPageBtn.disabled = false;
+    }, 1500);
+    setTimeout(() => refreshAvailable(panel), 600);
+  };
+  header.appendChild(addPageBtn);
+
   const clearSideBtn = document.createElement("button");
   clearSideBtn.className   = "ac-clear-side-btn";
   clearSideBtn.textContent = "🗑";
@@ -221,7 +308,7 @@ function buildPanel() {
 
   panel.appendChild(header);
 
-  // ── Detailed body ──────────────────────────────────────────
+  // ── Currency: detailed body ────────────────────────────────
   const detailedBody = document.createElement("div");
   detailedBody.className   = "ac-body";
   detailedBody.style.display = "";
@@ -301,7 +388,7 @@ function buildPanel() {
   detailedBody.appendChild(detailedFooter);
   panel.appendChild(detailedBody);
 
-  // ── Compact body ───────────────────────────────────────────
+  // ── Currency: compact body ─────────────────────────────────
   const compactBody = document.createElement("div");
   compactBody.className    = "ac-body";
   compactBody.style.display = "none";
@@ -335,7 +422,199 @@ function buildPanel() {
     setTimeout(() => refreshAvailable(panel), 600);
   }
 
+  // ── Divider ─────────────────────────────────────────────────
+  const divider = document.createElement("div");
+  divider.className   = "ac-divider";
+  divider.textContent = "Add Item";
+  panel.appendChild(divider);
+
+  // ── Add Item by name ───────────────────────────────────────
+  const itemBody = document.createElement("div");
+  itemBody.className = "ac-body";
+
+  const searchWrap = document.createElement("div");
+  searchWrap.className = "ai-search-wrap";
+
+  const searchInput = document.createElement("input");
+  searchInput.type        = "text";
+  searchInput.className   = "ai-search-input";
+  searchInput.placeholder = "Type an item name…";
+  searchWrap.appendChild(searchInput);
+
+  const dropdown = document.createElement("div");
+  dropdown.className = "ai-dropdown";
+  dropdown.style.display = "none";
+  searchWrap.appendChild(dropdown);
+
+  searchInput.addEventListener("input", () => {
+    clearTimeout(g_searchTimer);
+    const query = searchInput.value;
+    if (!query.trim()) { hideDropdown(dropdown); return; }
+    g_searchTimer = setTimeout(async () => {
+      const results = await searchItems(query);
+      renderDropdown(dropdown, results, panel, searchInput);
+    }, SEARCH_DEBOUNCE_MS);
+  });
+
+  // Hide dropdown on outside click, not on click inside it (selection handler needs it first)
+  document.addEventListener("click", (e) => {
+    if (!searchWrap.contains(e.target)) hideDropdown(dropdown);
+  });
+
+  itemBody.appendChild(searchWrap);
+
+  // Selected item + quantity row (hidden until something is picked)
+  const selectedRow = document.createElement("div");
+  selectedRow.className = "ai-selected-row";
+  selectedRow.style.display = "none";
+
+  const selectedIcon = document.createElement("img");
+  selectedIcon.className = "ai-selected-icon";
+  selectedRow.appendChild(selectedIcon);
+
+  const selectedName = document.createElement("span");
+  selectedName.className = "ai-selected-name";
+  selectedRow.appendChild(selectedName);
+
+  const selectedAvail = document.createElement("span");
+  selectedAvail.className = "ac-avail";
+  selectedRow.appendChild(selectedAvail);
+
+  const qtyInput = document.createElement("input");
+  qtyInput.type      = "number";
+  qtyInput.min       = "1";
+  qtyInput.value     = "1";
+  qtyInput.className = "ac-input";
+  qtyInput.addEventListener("input", () => {
+    const max = parseInt(qtyInput.max) || 1;
+    let val = parseInt(qtyInput.value) || 1;
+    if (val > max) val = max;
+    if (val < 1)   val = 1;
+    qtyInput.value = val;
+  });
+  selectedRow.appendChild(qtyInput);
+
+  const qtyBtnPlus = document.createElement("button");
+  qtyBtnPlus.className   = "ac-btn";
+  qtyBtnPlus.textContent = "+1";
+  qtyBtnPlus.onclick = () => {
+    const max = parseInt(qtyInput.max) || 1;
+    const val = parseInt(qtyInput.value) || 1;
+    if (val < max) qtyInput.value = val + 1;
+  };
+  selectedRow.appendChild(qtyBtnPlus);
+
+  const qtyBtnMax = document.createElement("button");
+  qtyBtnMax.className   = "ac-btn ac-btn--dim";
+  qtyBtnMax.textContent = "max";
+  qtyBtnMax.onclick = () => { qtyInput.value = qtyInput.max; };
+  selectedRow.appendChild(qtyBtnMax);
+
+  const btnChange = document.createElement("button");
+  btnChange.className   = "ac-btn ac-btn--dim";
+  btnChange.textContent = "✕";
+  btnChange.title       = "Change item";
+  btnChange.onclick     = () => { clearSelection(panel); searchInput.focus(); };
+  selectedRow.appendChild(btnChange);
+
+  itemBody.appendChild(selectedRow);
+
+  // Footer
+  const itemFooter = document.createElement("div");
+  itemFooter.className = "ac-footer";
+  itemFooter.style.display = "none";
+
+  const addItemBtn = makeAddButton(() => {
+    if (!g_selected) return;
+    const count = parseInt(qtyInput.value) || 1;
+    dispatchAddItem(g_selected.name, count);
+    clearSelection(panel);
+    searchInput.value = "";
+    searchInput.focus();
+    setTimeout(() => refreshAvailable(panel), 600);
+  });
+  itemFooter.appendChild(addItemBtn);
+  itemBody.appendChild(itemFooter);
+
+  panel.appendChild(itemBody);
+
+  // Stash references for select/clear helpers below.
+  panel._ai = { searchInput, dropdown, selectedRow, selectedIcon, selectedName, selectedAvail, qtyInput, footer: itemFooter };
+
   return panel;
+}
+
+function renderDropdown(dropdown, results, panel, searchInput) {
+  dropdown.innerHTML = "";
+
+  if (!results.length) {
+    const empty = document.createElement("div");
+    empty.className   = "ai-dropdown-empty";
+    empty.textContent = "No matching items";
+    dropdown.appendChild(empty);
+    dropdown.style.display = "block";
+    return;
+  }
+
+  for (const item of results) {
+    const row = document.createElement("div");
+    row.className = "ai-dropdown-row";
+
+    const icon = document.createElement("img");
+    icon.className = "ai-dropdown-icon";
+    icon.src = item.icon_url || "";
+    row.appendChild(icon);
+
+    const name = document.createElement("span");
+    name.className   = "ai-dropdown-name";
+    name.textContent = item.name;
+    if (item.name_color) name.style.color = `#${item.name_color}`;
+    row.appendChild(name);
+
+    const count = document.createElement("span");
+    count.className   = "ai-dropdown-count";
+    count.textContent = `×${item.count}`;
+    row.appendChild(count);
+
+    row.addEventListener("click", () => {
+      selectItem(panel, item);
+      searchInput.value = item.name;
+      hideDropdown(dropdown);
+    });
+
+    dropdown.appendChild(row);
+  }
+
+  dropdown.style.display = "block";
+}
+
+function selectItem(panel, item) {
+  g_selected = item;
+  const { selectedRow, selectedIcon, selectedName, selectedAvail, qtyInput, footer } = panel._ai;
+
+  selectedIcon.src = item.icon_url || "";
+  selectedName.textContent = item.name;
+  selectedName.style.color = item.name_color ? `#${item.name_color}` : "";
+  selectedAvail.textContent = item.count;
+
+  qtyInput.max   = item.count;
+  qtyInput.value = 1;
+
+  selectedRow.style.display = "flex";
+  footer.style.display = "flex";
+}
+
+function clearSelection(panel) {
+  g_selected = null;
+  const ai = panel?._ai;
+  if (!ai) return;
+  ai.selectedRow.style.display = "none";
+  ai.footer.style.display = "none";
+  hideDropdown(ai.dropdown);
+}
+
+function hideDropdown(dropdown) {
+  dropdown.style.display = "none";
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -366,7 +645,9 @@ function parseCompactInput(str) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Insufficient items popup
+// Insufficient items popup — shared by both currency and by-name item
+// adds (they fire "tf2utils_currency_missing" / "tf2utils_item_missing"
+// respectively, but with the same { name, requested, found } shape).
 // ─────────────────────────────────────────────────────────────
 function showMissingPopup(panel, missing) {
   // Remove any existing popup
@@ -490,6 +771,19 @@ function injectStyles() {
     }
     .ac-mode-toggle:hover { border-color: ${COLOR_ACCENT}; color: ${COLOR_ACCENT}; }
 
+    .ac-addpage-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 3px;
+      color: rgba(255,255,255,0.6);
+      font-size: 10px;
+      padding: 2px 6px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .ac-addpage-btn:hover    { border-color: ${COLOR_ACCENT}; color: ${COLOR_ACCENT}; }
+    .ac-addpage-btn:disabled { opacity: 0.5; cursor: default; }
+
     .ac-clear-side-btn {
       background: none;
       border: 1px solid rgba(255,255,255,0.12);
@@ -577,6 +871,105 @@ function injectStyles() {
       outline: none;
     }
     .ac-compact-input:focus { border-color: ${COLOR_ACCENT}; }
+
+    /* Section divider */
+    .ac-divider {
+      padding: 5px 10px 3px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.35);
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* Add Item search */
+    .ai-search-wrap {
+      position: relative;
+    }
+    .ai-search-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 5px 8px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 4px;
+      color: #fff;
+      font-size: 12px;
+      outline: none;
+    }
+    .ai-search-input:focus { border-color: ${COLOR_ACCENT}; }
+
+    .ai-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      background: ${COLOR_PANEL_BG};
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 4px;
+      z-index: 9999;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    .ai-dropdown-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    .ai-dropdown-row:hover { background: rgba(255,255,255,0.08); }
+    .ai-dropdown-icon {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px;
+    }
+    .ai-dropdown-name {
+      flex: 1;
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ai-dropdown-count {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      flex-shrink: 0;
+    }
+    .ai-dropdown-empty {
+      padding: 8px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      text-align: center;
+    }
+
+    /* Selected item row */
+    .ai-selected-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ai-selected-icon {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px;
+    }
+    .ai-selected-name {
+      flex: 1;
+      font-size: 11px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     /* Footer */
     .ac-footer {
