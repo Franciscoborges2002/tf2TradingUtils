@@ -10,5 +10,5 @@
 | inventoryCurrencyCounter | Shows a live keys/metal/Earbuds count and total value for your TF2 inventory. | [inventoryCurrencyCounter](./inventoryCurrencyCounter/) | [changeLog](./inventoryCurrencyCounter/CHANGELOG.md) |
 | itemDescriptionToggle | Adds a button to hide/show an item's description text in the inventory item info panel. | [itemDescriptionToggle](./itemDescriptionToggle/) | [changeLog](./itemDescriptionToggle/CHANGELOG.md) |
 | itemLinks     | Shows item links in a player's inventory.    | [itemLinks](./itemLinks/)     | [changeLog](./itemLinks/CHANGELOG.md)     |
-| profileLinks | Show usefull external tf2 realted websites links of an steam account. | [profileLinks](./profileLinks/) | [changeLog](./profileLinks/CHANGELOG.md) |
+| profileLinks | Show usefull external tf2 realted websites links of an steam account, plus the same for the trade partner on each entry of the offers inbox/sent and trade history pages. | [profileLinks](./profileLinks/) | [changeLog](./profileLinks/CHANGELOG.md) |
 | tradeOfferCurrency | Shows a two-column currency total (one side per trade party) for each trade on the offers inbox/sent and trade history pages. | [tradeOfferCurrency](./tradeOfferCurrency/) | [changeLog](./tradeOfferCurrency/CHANGELOG.md) |

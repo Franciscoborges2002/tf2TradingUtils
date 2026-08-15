@@ -75,6 +75,14 @@ async function scriptRouter() {
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/tradeOfferCurrency",
     ]);
   }
+
+  if (url.pathname.includes("tradeoffers") || url.pathname.includes("tradehistory")) {
+    loadTradeOfferProfileLinks();
+    EXT_SCRIPT_INFO.scripts.push([
+      "tradeOfferProfileLinks",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/profileLinks",
+    ]);
+  }
 }
 
 //Start the script
@@ -129,6 +137,15 @@ function loadTradeOfferCurrency() {
       chrome.runtime.getURL("steamcommunity.com/tradeOfferCurrency/content.js")
     );
     addTradeCurrencyTotals();
+  })();
+}
+
+function loadTradeOfferProfileLinks() {
+  (async () => {
+    const { tradeOfferProfileLinks } = await import(
+      chrome.runtime.getURL("steamcommunity.com/profileLinks/content.js")
+    );
+    tradeOfferProfileLinks();
   })();
 }
 
