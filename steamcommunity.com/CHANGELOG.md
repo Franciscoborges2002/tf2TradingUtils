@@ -5,6 +5,8 @@
 - Added itemDescriptionToggle
 - Fixed itemLinks/itemDescriptionToggle not applying to the first item shown when the inventory page loads — the render can finish slightly after their MutationObserver attaches, which then never fires again for that same item
 - Renamed loadSteamLinks to steamLinks in script name display
+- Renamed steamLinks to profileLinks (script and folder) — it's not really "Steam" links, it's third-party site links shown on a Steam profile page
+- profileLinks: added a liquid.tf store button (`https://liquid.tf/store/<steamid64>`)
 
 # Version 1.0.3
 

@@ -38,6 +38,14 @@ function scriptRouter() {
       "Item Links",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/itemLinks",
     ]);
+
+    if (url.pathname.includes("/profiles/")) {
+      loadProfileLinksNewUI();
+      EXT_SCRIPT_INFO.scripts.push([
+        "Profile Links",
+        "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/newUI/profileLinks",
+      ]);
+    }
   } else {
     /* start scripts for oldUI */
 
@@ -70,6 +78,20 @@ function scriptRouter() {
       "Item Links",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/itemLinks",
     ]);
+
+    // Profile pages — /profiles/<id>, /u/<vanity> and /friends/<id> all
+    // render the same ".profile .information .buttons" block.
+    if (
+      url.pathname.includes("/profiles/") ||
+      url.pathname.includes("/u/") ||
+      url.pathname.includes("/friends/")
+    ) {
+      loadProfileLinks();
+      EXT_SCRIPT_INFO.scripts.push([
+        "Profile Links",
+        "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/oldUI/profileLinks",
+      ]);
+    }
   }
 }
 
@@ -117,6 +139,15 @@ function loadItemLinks() {
   })();
 }
 
+function loadProfileLinks() {
+  (async () => {
+    const { addProfileLinks } = await import(
+      chrome.runtime.getURL("backpack.tf/oldUI/profileLinks/content.js")
+    );
+    addProfileLinks();
+  })();
+}
+
 function loadFilterSpecialListingsNewUI() {
   (async () => {
     const { filterSpecialListingsNewUI } = await import(
@@ -141,6 +172,15 @@ function loadItemLinksNewUI() {
       chrome.runtime.getURL("backpack.tf/newUI/itemLinks/content.js")
     );
     addItemLinksNewUI();
+  })();
+}
+
+function loadProfileLinksNewUI() {
+  (async () => {
+    const { addProfileLinksNewUI } = await import(
+      chrome.runtime.getURL("backpack.tf/newUI/profileLinks/content.js")
+    );
+    addProfileLinksNewUI();
   })();
 }
 

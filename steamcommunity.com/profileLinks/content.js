@@ -23,9 +23,15 @@ const linksInfo = [
     classes: ["btn_profile_action", "btn_medium"],
     dropdown_classes: ["popup_menu_item"],
   },
+  {
+    label: "liquid.tf",
+    href: (id) => `https://liquid.tf/store/${id}`,
+    classes: ["btn_profile_action", "btn_medium"],
+    dropdown_classes: ["popup_menu_item"],
+  },
 ];
 
-export function steamLinks() {
+export function profileLinks() {
   let url = window.location.toString(); // Get the url of the page
 
   if (
