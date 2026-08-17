@@ -34,6 +34,12 @@ async function scriptRouter() {
       "itemDescriptionToggle",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/itemDescriptionToggle",
     ]);
+
+    loadUnusualEffectBackground();
+    EXT_SCRIPT_INFO.scripts.push([
+      "unusualEffectBackground",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/unusualEffectBackground",
+    ]);
   }
 
   if(url.pathname.includes("profile") || url.pathname.includes("id")){
@@ -190,6 +196,27 @@ function loadItemDescriptionToggle() {
 
     new MutationObserver(() => addItemDescriptionToggle())
       .observe(target, { childList: true, subtree: true });
+  })();
+}
+
+function loadUnusualEffectBackground() {
+  (async () => {
+    const { addUnusualEffectBackground } = await import(
+      chrome.runtime.getURL("steamcommunity.com/unusualEffectBackground/content.js")
+    );
+
+    runWithRetries(addUnusualEffectBackground);
+
+    // Unlike itemLinks/itemDescriptionToggle (detail-panel only), this
+    // script also drives grid-cell (inventory tile) backgrounds — new
+    // tiles can render into .itemHolder well outside #iteminfo0/1, with
+    // no detail-panel mutation of their own. Confirmed live: scoping
+    // this to #iteminfo0/1 meant grid tiles only ever caught up when
+    // the user happened to click an item (mutating the detail panel).
+    // document.body + subtree still covers every #iteminfo0/1 change
+    // too, just not exclusively.
+    new MutationObserver(() => addUnusualEffectBackground())
+      .observe(document.body, { childList: true, subtree: true });
   })();
 }
 

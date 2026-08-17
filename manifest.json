@@ -48,6 +48,15 @@
       "run_at": "document_idle"
     },
     {
+      "matches": [
+        "https://steamcommunity.com/profiles/*",
+        "https://steamcommunity.com/id/*"
+      ],
+      "js": ["./steamcommunity.com/inventoryFetchBridge/content.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
       "matches": ["https://steamcommunity.com/tradeoffer/*"],
       "js": ["./steamTradeOffer/content.js"]
     },
