@@ -8,6 +8,7 @@
 - Renamed steamLinks to profileLinks (script and folder) — it's not really "Steam" links, it's third-party site links shown on a Steam profile page
 - profileLinks: added a liquid.tf store button (`https://liquid.tf/store/<steamid64>`), plus Steam/Rep.TF/bp.tf/posts.tf/liquid.tf quick-links for the trade partner on each entry of the offers inbox/sent and trade history pages
 - Added unusualEffectBackground — shows an Unusual item's own particle effect as its icon's background, in both the inventory item info panel and the inventory grid tiles
+- Added inventoryFetchBridge — observes the inventory page's own item-data requests so other scripts (unusualEffectBackground, inventoryCurrencyCounter) don't need to make their own
 
 # Version 1.0.3
 

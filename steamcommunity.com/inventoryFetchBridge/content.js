@@ -39,9 +39,22 @@
 
 const INVENTORY_URL_RE = /\/inventory\/\d+\/440\/2(?:\?|$)/;
 
-// assetid -> that item's full description object (from the response's
-// own `descriptions[]` array, matched via classid_instanceid).
+// assetid -> that item's description object (from the response's own
+// `descriptions[]` array, matched via classid_instanceid) plus its own
+// `amount` off the matching `assets[]` entry — spread onto the
+// description rather than kept separate, so existing consumers reading
+// description fields off this map's values don't need to change shape.
 const g_itemDescByAssetId = new Map();
+
+// The inventory's own total item count, straight off the response's
+// `total_inventory_count` field — constant regardless of which page a
+// given response covers. Lets a consumer (inventoryCurrencyCounter)
+// tell whether this map already has the WHOLE inventory without
+// needing to fetch anything itself. NOTE: assumed field name, not yet
+// confirmed against a real response in this codebase's own testing —
+// consumers must treat it as a hint (fall back to their own fetch if
+// it's ever missing/wrong), not a guarantee.
+let g_totalInventoryCount = null;
 
 function mergeInventoryResponse(data) {
   const descByClassInstance = new Map();
@@ -53,10 +66,14 @@ function mergeInventoryResponse(data) {
   for (const asset of data?.assets ?? []) {
     const desc = descByClassInstance.get(`${asset.classid}_${asset.instanceid}`);
     if (desc && !g_itemDescByAssetId.has(asset.assetid)) added++;
-    if (desc) g_itemDescByAssetId.set(asset.assetid, desc);
+    if (desc) g_itemDescByAssetId.set(asset.assetid, { ...desc, amount: parseInt(asset.amount, 10) || 1 });
   }
 
-  console.log(`[TF2Utils] inventoryFetchBridge: observed inventory response — +${added} new, ${g_itemDescByAssetId.size} known total.`);
+  if (typeof data?.total_inventory_count === "number") {
+    g_totalInventoryCount = data.total_inventory_count;
+  }
+
+  console.log(`[TF2Utils] inventoryFetchBridge: observed inventory response — +${added} new, ${g_itemDescByAssetId.size} known total${g_totalInventoryCount != null ? ` of ${g_totalInventoryCount}` : ""}.`);
 
   // Steam prerenders multiple inventory "pages" worth of tiles ahead of
   // the one currently shown (confirmed live: page 3's data loads,
@@ -111,12 +128,13 @@ XMLHttpRequest.prototype.send = function (...args) {
 
 // ─────────────────────────────────────────────────────────────
 // tf2utils_inv_get_map — request/response bridge. Payload:
-// { eventId }. Responds on `eventId` with the current
-// assetid -> description Map (grows over time as more of the page's
-// own requests complete).
+// { eventId }. Responds on `eventId` with
+// { map, totalCount }: the current assetid -> description Map (grows
+// over time as more of the page's own requests complete) plus the
+// inventory's total item count (see g_totalInventoryCount above).
 // ─────────────────────────────────────────────────────────────
 window.addEventListener("tf2utils_inv_get_map", (e) => {
   const eventId = e.detail?.eventId;
   if (!eventId) return;
-  window.dispatchEvent(new CustomEvent(eventId, { detail: g_itemDescByAssetId }));
+  window.dispatchEvent(new CustomEvent(eventId, { detail: { map: g_itemDescByAssetId, totalCount: g_totalInventoryCount } }));
 });
