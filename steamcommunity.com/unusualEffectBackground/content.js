@@ -65,7 +65,7 @@ function requestInventoryMap() {
   return new Promise((resolve) => {
     const eventId = `tf2utils_invmap_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const timeout = setTimeout(() => resolve(new Map()), 3000);
-    window.addEventListener(eventId, (e) => { clearTimeout(timeout); resolve(e.detail ?? new Map()); }, { once: true });
+    window.addEventListener(eventId, (e) => { clearTimeout(timeout); resolve(e.detail?.map ?? new Map()); }, { once: true });
     window.dispatchEvent(new CustomEvent("tf2utils_inv_get_map", { detail: { eventId } }));
   });
 }
