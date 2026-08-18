@@ -56,7 +56,6 @@ import {
   resolveCrateSeries,
   CRATE_NUMBER_RE,
   getItemNameByDefindex,
-  CRATE_NUMBER_RE,
 } from "../../utils/itemLinks.js";
 
 const LINK_ACCENTS = {

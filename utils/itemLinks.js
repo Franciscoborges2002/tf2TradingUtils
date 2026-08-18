@@ -377,9 +377,6 @@ export async function isAmbiguousCrateName(name) {
   return (table[name]?.length ?? 0) > 1;
 }
 
-/** Crate/case "#N"/"Series #N" suffix shape, shared by every itemLinks script. */
-export const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
-
 /**
  * Resolves the crate number + ambiguity flag mannco.store/skinport.com/
  * stntrading.eu need, for callers that would otherwise each match
