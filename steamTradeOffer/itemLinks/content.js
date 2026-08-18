@@ -53,6 +53,8 @@ import {
   skinportUrl,
   crateTfUrl,
   getKnownCrateNumber,
+  resolveCrateSeries,
+  CRATE_NUMBER_RE,
   getItemNameByDefindex,
   CRATE_NUMBER_RE,
 } from "../../utils/itemLinks.js";
@@ -248,19 +250,22 @@ async function buildLinks(rawName, assetId) {
   // marketplace.tf as a "c<N>" sku modifier. stntrading.eu is the
   // opposite (a separate page per series/case number), so stnName below
   // is built from rawName instead, keeping it.
-  const crateMatch = rawName.match(CRATE_NUMBER_RE);
-  const crateNumber = crateMatch ? crateMatch[1] : null;
-  const nameWithoutCrate = crateMatch ? rawName.slice(0, crateMatch.index) : rawName;
-
+  const nameWithoutCrate = rawName.replace(CRATE_NUMBER_RE, "");
   const attrs = parseItemName(nameWithoutCrate);
+  const { crateNumber, isAmbiguous } = await resolveCrateSeries(rawName, attrs.name);
+
+  // mannco.store/skinport.com only want the crate number for ambiguous
+  // multi-series names (see resolveCrateSeries()) — bp.tf stats/
+  // marketplace.tf below want it regardless.
+  const manncoSkinportCrateNumber = isAmbiguous ? crateNumber : undefined;
 
   const manncoHref = attrs.quality === "Unusual"
     ? null // no reliable Unusual effect name available from this menu
-    : mannCoStoreUrl({ name: nameWithoutCrate, quality: attrs.quality });
+    : mannCoStoreUrl({ name: nameWithoutCrate, quality: attrs.quality, crateNumber: manncoSkinportCrateNumber });
 
   const skinportHref = attrs.quality === "Unusual"
     ? null // same reasoning as mannco.store above
-    : skinportUrl({ name: nameWithoutCrate, quality: attrs.quality });
+    : skinportUrl({ name: nameWithoutCrate, quality: attrs.quality, crateNumber: manncoSkinportCrateNumber });
 
   const stnName = rawName
     .replace(/^Non-Craftable\s+/i, "")
@@ -277,13 +282,13 @@ async function buildLinks(rawName, assetId) {
   const links = [
     { label: "bp.tf stats", href: bpStatsHref },
     { label: "bp.tf history", href: assetId ? `https://backpack.tf/item/${assetId}` : null },
-    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable: attrs.craftable }) },
+    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable: attrs.craftable, isAmbiguousSeries: isAmbiguous }) },
     { label: "mannco.store", href: manncoHref },
     { label: "skinport.com", href: skinportHref },
     // Only for names Steam's own (unescaped) Market link would mangle
     // — see the file header for why. Everything else already has a
     // working native link, so this would just be a redundant duplicate.
-    crateMatch ? { label: "Steam Market", href: steamMarketUrl(rawName) } : null,
+    crateNumber != null ? { label: "Steam Market", href: steamMarketUrl(rawName) } : null,
   ].filter((link) => link?.href);
 
   try {

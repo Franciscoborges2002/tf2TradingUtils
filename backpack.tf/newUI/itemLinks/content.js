@@ -17,7 +17,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/new
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
 import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
-import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl, CRATE_NUMBER_RE } from "../../../utils/itemLinks.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl, resolveCrateSeries, CRATE_NUMBER_RE } from "../../../utils/itemLinks.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])
@@ -72,9 +72,22 @@ export function addItemLinksNewUI() {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
-function processTooltip(popper) {
-  if (popper.querySelector(`.${EXTRA_LINKS_CLASS}`)) return;
+async function processTooltip(popper) {
+  // The reserved-flag check guards a real race: the ambiguity check
+  // below is async, and without it, a second processTooltip() call for
+  // this same popper before the first one's await resolves could pass
+  // the "not yet injected" check above and inject the row twice.
+  if (popper.querySelector(`.${EXTRA_LINKS_CLASS}`) || popper.dataset.tf2utilsProcessing) return;
+  popper.dataset.tf2utilsProcessing = "1";
 
+  try {
+    await processTooltipInner(popper);
+  } finally {
+    delete popper.dataset.tf2utilsProcessing;
+  }
+}
+
+async function processTooltipInner(popper) {
   const tooltip = popper.querySelector(".item-tooltip");
   if (!tooltip) return; // tippy tooltips aren't all item tooltips
 
@@ -82,16 +95,15 @@ function processTooltip(popper) {
   const linksContainers = tooltip.querySelectorAll(".item-tooltip__content__links");
   if (!titleEl || !linksContainers.length) return;
 
-  // Same crate case/series-number issue as backpack.tf oldUI (see that
-  // script's itemLinks for the full explanation): mannco.store doesn't
-  // distinguish crates by that number, so it's stripped for
-  // fullDisplayName — but stntrading.eu is the opposite (a separate
-  // page per series/case number), so stnName below is built from
-  // rawTitle instead, keeping it.
+  // stntrading.eu keeps a crate's case/series number as part of the
+  // name (see rawTitle/stnName below); mannco.store/skinport.com only
+  // want it for ambiguous multi-series names (see resolveCrateSeries()).
   const rawTitle = titleEl.textContent.trim();
-  const crateMatch = rawTitle.match(CRATE_NUMBER_RE);
-  const crateNumber = crateMatch ? crateMatch[1] : null;
   const fullDisplayName = rawTitle.replace(CRATE_NUMBER_RE, "");
+  const bareName = fullDisplayName.replace(/^Non-Craftable\s+/i, "");
+
+  const { crateNumber, isAmbiguous } = await resolveCrateSeries(rawTitle, bareName);
+  const manncoSkinportCrateNumber = isAmbiguous ? crateNumber : undefined;
 
   if (/Non-Tradable/i.test(fullDisplayName)) return;
 
@@ -120,14 +132,14 @@ function processTooltip(popper) {
   // link somewhere wrong.
   const manncoHref = qualityName === "Unusual"
     ? null
-    : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName });
+    : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName, crateNumber: manncoSkinportCrateNumber });
 
   // skinport.com wants the same full descriptive name mannco.store does
   // — no Unusual effect name is reliably available from this tooltip
   // either, so skip skinport.com for Unusual items for the same reason.
   const skinportHref = qualityName === "Unusual"
     ? null
-    : skinportUrl({ name: fullDisplayName, quality: qualityName });
+    : skinportUrl({ name: fullDisplayName, quality: qualityName, crateNumber: manncoSkinportCrateNumber });
 
   // stntrading.eu bakes craftability into its own name/prefix — strip
   // "Non-Craftable " back out so it isn't duplicated. It also has no
@@ -147,7 +159,7 @@ function processTooltip(popper) {
 
   const links = [
     { label: "mannco.store", href: manncoHref },
-    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable }) },
+    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable, isAmbiguousSeries: isAmbiguous }) },
     { label: "skinport.com", href: skinportHref },
   ].filter((link) => link.href);
 

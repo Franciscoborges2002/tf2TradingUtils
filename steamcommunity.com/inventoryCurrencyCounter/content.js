@@ -5,13 +5,31 @@
  * actually in your inventory — useful since backpack.tf's own
  * inventory cache can lag behind or fail to refresh.
  *
- * Reads straight from the same inventory endpoint the page itself
- * uses (steamcommunity.com/inventory/<steamid64>/440/2?...), rather
- * than scraping the rendered item grid. That's far more robust than
- * the earlier icon-hash-matching approach: items are matched by their
- * real market_hash_name (no per-item icon hash to hunt down), it
- * isn't limited to whatever's currently scrolled into view, and it
- * handles pagination for large inventories via start_assetid.
+ * Shows a count right away from steamcommunity.com/inventoryFetchBridge
+ * — it already observes the page's own calls to the same inventory
+ * endpoint (steamcommunity.com/inventory/<steamid64>/440/2?...) for
+ * unusualEffectBackground's grid-cell support, so this first count
+ * costs no request of its own. Steam only progressively loads pages as
+ * the user scrolls though, so that first count can be partial — the
+ * bridge's first response also carries the inventory's real
+ * total_inventory_count, so this immediately knows exactly how partial.
+ *
+ * Never fetches on its own beyond that — every automatic re-render
+ * (mutation observer, tab switch, or the bridge observing more of the
+ * inventory) only ever re-reads the bridge's data, so an already
+ * partial count updates itself for free as the user scrolls, with no
+ * request of this script's own. Only clicking ↻ Refresh makes an
+ * actual request: sized off total_inventory_count (e.g. 2539) and
+ * capped at 2000 (confirmed live: a single request for the exact
+ * total, 2539, failed — 2000 didn't), so a large inventory takes a
+ * couple of big requests (2000 + 539) instead of looping through it 75
+ * at a time. Success replaces the panel with that authoritative count;
+ * a failure leaves the bridge-based estimate up with a hint to click
+ * Refresh again. Falls back to 75-item pages (Steam's own page size)
+ * only if total_inventory_count isn't known yet.
+ *
+ * Items are matched by their real market_hash_name (no per-item icon
+ * hash to hunt down, unlike the earlier icon-hash-matching approach).
  *
  * Also tracks a small list of notable non-currency items (currently
  * just Earbuds), matched by name the same way. Kept local to this
@@ -131,29 +149,102 @@ function getOwnerSteamId64() {
   return tagsContainer?.id.match(/^tags_(\d{17})_/)?.[1] ?? null;
 }
 
-// backpack.tf's classic grid renders 16 items per page — the page
-// controls' own page count (e.g. "1 of 83") times 16 gives a request
-// size that's guaranteed to cover the whole inventory in one call,
-// rather than guessing at a fixed max.
-const ITEMS_PER_PAGE = 16;
-const DEFAULT_REQUEST_COUNT = 2000; // fallback if page controls aren't found
-
-function estimateInventorySize() {
-  const maxPage = parseInt(document.getElementById("pagecontrol_max")?.textContent, 10);
-  return maxPage > 0 ? maxPage * ITEMS_PER_PAGE : null;
+/** Asks inventoryFetchBridge (world: "MAIN") for whatever it's
+ *  observed so far — { map, totalCount } — timing out to an empty,
+ *  unknown-total state if the bridge script never responds (e.g. an
+ *  older cached build without it). */
+function requestInventoryState() {
+  return new Promise((resolve) => {
+    const eventId = `tf2utils_invmap_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const timeout = setTimeout(() => resolve({ map: new Map(), totalCount: null }), 1500);
+    window.addEventListener(eventId, (e) => {
+      clearTimeout(timeout);
+      resolve(e.detail ?? { map: new Map(), totalCount: null });
+    }, { once: true });
+    window.dispatchEvent(new CustomEvent("tf2utils_inv_get_map", { detail: { eventId } }));
+  });
 }
 
-/** Fetches the full TF2 inventory (paginated via start_assetid) and
- *  returns a Map of market_hash_name -> total amount owned. */
-async function fetchInventoryNameCounts(steamId64) {
+/** market_hash_name -> total amount owned, straight off the bridge's
+ *  own assetid -> { ...description, amount } map. */
+function nameCountsFromBridgeMap(map) {
+  const nameCounts = new Map();
+  for (const desc of map.values()) {
+    const name = desc.market_hash_name || desc.name;
+    if (!name) continue;
+    nameCounts.set(name, (nameCounts.get(name) ?? 0) + (desc.amount ?? 1));
+  }
+  return nameCounts;
+}
+
+/** Reads { keyPriceRef, earbudsPriceKeys, earbudsPriceRef } from the
+ *  popup's Settings view (chrome.storage.local, shared across the
+ *  whole extension — no messaging needed to reach it from here). */
+function loadSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["settings"], (result) => resolve(result.settings ?? {}));
+  });
+}
+
+/** A Map<market_hash_name, amount> -> the { keys, ref, rec, scrap, ...tracked } shape renderPanel expects. */
+function countsFromNameCounts(nameCounts) {
+  const counts = { keys: 0, ref: 0, rec: 0, scrap: 0 };
+  for (const key of Object.keys(TRACKED_ITEMS)) counts[key] = 0;
+
+  for (const [name, amount] of nameCounts) {
+    const key = NAME_TO_KEY[name];
+    if (key) counts[key] += amount;
+  }
+
+  return counts;
+}
+
+/** Quick, request-free estimate straight from inventoryFetchBridge's
+ *  currently observed data, plus the inventory's own real item count
+ *  (confirmed live via a real response's `total_inventory_count`,
+ *  e.g. 2539) — lets the caller size its own confirming request
+ *  exactly instead of guessing or paginating blindly. */
+async function loadQuickCounts() {
+  const { map: bridgeMap, totalCount } = await requestInventoryState();
+  const counts = countsFromNameCounts(nameCountsFromBridgeMap(bridgeMap));
+  const isPartial = totalCount != null && bridgeMap.size < totalCount;
+  return { counts, isPartial, totalCount, loadedCount: bridgeMap.size };
+}
+
+// Steam's own page requests 75 items at a time (confirmed via
+// inventoryFetchBridge's observed requests) — used as the request size
+// when totalCount isn't known going in (e.g. the bridge hasn't seen a
+// response at all yet).
+const INVENTORY_REQUEST_COUNT = 75;
+
+// A single request sized to the exact total_inventory_count (e.g.
+// 2539) failed live — but 2000 is confirmed to work, so requests are
+// capped at this size and chunked: a 2539-item inventory becomes one
+// 2000 request plus one 539 request, instead of either an oversized
+// single request or looping 75 at a time (~34 requests).
+const MAX_INVENTORY_REQUEST_COUNT = 2000;
+
+/** The single authoritative fetch. When `totalCount` (the inventory's
+ *  own real item count, off the bridge's first observed response) is
+ *  known, each request is sized to whatever's left, capped at
+ *  MAX_INVENTORY_REQUEST_COUNT — so a large inventory takes a couple
+ *  of big requests instead of looping in 75-item pages. Falls back to
+ *  75-sized pages if totalCount wasn't known going in. Steam's own
+ *  `more_items`/`last_assetid` still governs when to actually stop,
+ *  regardless of the size estimate. Returns a
+ *  Map<market_hash_name, amount>. */
+async function fetchFullNameCounts(steamId64, totalCount) {
   const nameCounts = new Map();
   let startAssetId = null;
-  const requestCount = estimateInventorySize() ?? DEFAULT_REQUEST_COUNT;
+  let assetsSeen = 0;
 
   for (;;) {
+    const remaining = totalCount ? totalCount - assetsSeen : null;
+    const count = remaining > 0 ? Math.min(remaining, MAX_INVENTORY_REQUEST_COUNT) : INVENTORY_REQUEST_COUNT;
+
     const url = new URL(`https://steamcommunity.com/inventory/${steamId64}/${TF2_APPID}/${TF2_CONTEXTID}`);
     url.searchParams.set("l", "english");
-    url.searchParams.set("count", String(requestCount));
+    url.searchParams.set("count", String(count));
     url.searchParams.set("preserve_bbcode", "1");
     url.searchParams.set("raw_asset_properties", "1");
     if (startAssetId) url.searchParams.set("start_assetid", startAssetId);
@@ -179,37 +270,12 @@ async function fetchInventoryNameCounts(steamId64) {
       nameCounts.set(name, (nameCounts.get(name) ?? 0) + amount);
     }
 
+    assetsSeen += data.assets?.length ?? 0;
     if (!data.more_items || !data.last_assetid) break;
     startAssetId = data.last_assetid;
   }
 
   return nameCounts;
-}
-
-/** Reads { keyPriceRef, earbudsPriceKeys, earbudsPriceRef } from the
- *  popup's Settings view (chrome.storage.local, shared across the
- *  whole extension — no messaging needed to reach it from here). */
-function loadSettings() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(["settings"], (result) => resolve(result.settings ?? {}));
-  });
-}
-
-async function loadCounts() {
-  const steamId64 = getOwnerSteamId64();
-  if (!steamId64) throw new Error("couldn't determine the inventory owner's steamid64");
-
-  const nameCounts = await fetchInventoryNameCounts(steamId64);
-
-  const counts = { keys: 0, ref: 0, rec: 0, scrap: 0 };
-  for (const key of Object.keys(TRACKED_ITEMS)) counts[key] = 0;
-
-  for (const [name, amount] of nameCounts) {
-    const key = NAME_TO_KEY[name];
-    if (key) counts[key] += amount;
-  }
-
-  return counts;
 }
 
 // Formats a raw ref amount (possibly fractional) as decimal ref, same
@@ -290,7 +356,7 @@ function renderError(panel, err) {
   panel.appendChild(retryBtn);
 }
 
-function renderPanel(panel, counts, settings) {
+function renderPanel(panel, counts, settings, isPartial, fetchError, loadedCount, totalCount) {
   panel.innerHTML = "";
 
   const header = document.createElement("div");
@@ -298,14 +364,17 @@ function renderPanel(panel, counts, settings) {
 
   const title = document.createElement("span");
   title.className = "tf2utils-inv-currency-title";
-  title.textContent = "Currency In this inventory:";
+  const loadedLabel = totalCount != null ? `${loadedCount}/${totalCount} items loaded` : null;
+  title.textContent = "Currency In this inventory"
+    + (loadedLabel ? ` (${loadedLabel})` : (isPartial ? " (unconfirmed estimate)" : ""))
+    + ":";
   header.appendChild(title);
 
   const refreshBtn = document.createElement("button");
   refreshBtn.className = "tf2utils-inv-currency-refresh";
   refreshBtn.textContent = "↻ Refresh";
-  refreshBtn.title = "Re-fetch straight from Steam (bypasses any stale cache)";
-  refreshBtn.onclick = () => reload(panel);
+  refreshBtn.title = "Re-fetch the exact count straight from Steam";
+  refreshBtn.onclick = () => reload(panel, { forceFullFetch: true });
   header.appendChild(refreshBtn);
 
   panel.appendChild(header);
@@ -358,6 +427,18 @@ function renderPanel(panel, counts, settings) {
 
   panel.appendChild(breakdown);
 
+  if (fetchError) {
+    const hint = document.createElement("span");
+    hint.className = "tf2utils-inv-currency-hint";
+    hint.textContent = `Fetching the exact count from Steam failed (${fetchError.message}) — the numbers above are just an estimate. Click ↻ Refresh to retry.`;
+    panel.appendChild(hint);
+  } else if (isPartial) {
+    const hint = document.createElement("span");
+    hint.className = "tf2utils-inv-currency-hint";
+    hint.textContent = "This is only a partial count — click ↻ Refresh to fetch the exact total from Steam.";
+    panel.appendChild(hint);
+  }
+
   // Row: total inventory value in ref, using the settings prices —
   // needs both a key price and an Earbuds price set to mean anything.
   const totalValueRef = computeTotalValueRef(counts, settings);
@@ -399,13 +480,51 @@ function renderPanel(panel, counts, settings) {
   }
 }
 
-async function reload(panel) {
+// Per-page-load state for the authoritative fetch — kept outside
+// reload() so it's only ever attempted via an explicit forceFullFetch
+// (the Refresh button). Automatic triggers (mutation observer, bridge
+// updates, tab-switch) only ever re-render off inventoryFetchBridge's
+// own data — they never touch Steam directly.
+let fullFetchStatus = "idle"; // idle | pending | done | failed
+let fullFetchCounts = null;
+let fullFetchError = null;
+
+async function reload(panel, { forceFullFetch = false } = {}) {
   renderLoading(panel);
+
+  let quick, settings;
   try {
-    const [counts, settings] = await Promise.all([loadCounts(), loadSettings()]);
-    renderPanel(panel, counts, settings);
+    [quick, settings] = await Promise.all([loadQuickCounts(), loadSettings()]);
   } catch (err) {
     renderError(panel, err);
+    return;
+  }
+
+  if (forceFullFetch) {
+    fullFetchStatus = "idle";
+    fullFetchError = null;
+  }
+
+  if (fullFetchStatus === "done") {
+    renderPanel(panel, fullFetchCounts, settings, false, null, quick.totalCount, quick.totalCount);
+  } else {
+    renderPanel(panel, quick.counts, settings, quick.isPartial, fullFetchStatus === "failed" ? fullFetchError : null, quick.loadedCount, quick.totalCount);
+  }
+
+  if (!forceFullFetch) return; // only Steam's own data can confirm the count — only fetch it when explicitly asked to
+
+  const steamId64 = getOwnerSteamId64();
+  if (!steamId64) return; // can't fetch without it — quick estimate stays up
+
+  fullFetchStatus = "pending";
+  try {
+    fullFetchCounts = countsFromNameCounts(await fetchFullNameCounts(steamId64, quick.totalCount));
+    fullFetchStatus = "done";
+    renderPanel(panel, fullFetchCounts, settings, false, null, quick.totalCount, quick.totalCount);
+  } catch (err) {
+    fullFetchStatus = "failed";
+    fullFetchError = err;
+    renderPanel(panel, quick.counts, settings, quick.isPartial, err, quick.loadedCount, quick.totalCount);
   }
 }
 
@@ -468,4 +587,20 @@ export function showInventoryCurrencyCounter() {
   // Switching game tabs (e.g. TF2 -> Steam -> TF2) updates the URL
   // hash without a full page reload.
   window.addEventListener("hashchange", tryLoad);
+
+  // inventoryFetchBridge dispatches this whenever it observes a new
+  // page of the inventory (e.g. the user scrolling further) — since
+  // counts come entirely from its map, re-render then too, so a
+  // partial count silently completes itself instead of needing a
+  // manual refresh click. Debounced the same way as the mutation
+  // observer above, since a fast scroll can fire this repeatedly.
+  let bridgeUpdateTimer = null;
+  window.addEventListener("tf2utils_inv_updated", () => {
+    if (!loaded) return;
+    clearTimeout(bridgeUpdateTimer);
+    bridgeUpdateTimer = setTimeout(() => {
+      const panel = document.getElementById(PANEL_ID);
+      if (panel) reload(panel);
+    }, 300);
+  });
 }

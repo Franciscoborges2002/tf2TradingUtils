@@ -28,16 +28,28 @@ async function scriptRouter() {
       "inventoryCurrencyCounter",
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/inventoryCurrencyCounter",
     ]);
+
+    loadItemDescriptionToggle();
+    EXT_SCRIPT_INFO.scripts.push([
+      "itemDescriptionToggle",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/itemDescriptionToggle",
+    ]);
+
+    loadUnusualEffectBackground();
+    EXT_SCRIPT_INFO.scripts.push([
+      "unusualEffectBackground",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/unusualEffectBackground",
+    ]);
   }
 
   if(url.pathname.includes("profile") || url.pathname.includes("id")){
   bots = await loadBotDb();
   console.log(bots);
   /* If there is the next in hostname, redirect to newUI scripts */
-  loadSteamLinks();
+  loadProfileLinks();
     EXT_SCRIPT_INFO.scripts.push([
-      "loadSteamLinks",
-      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/steamLinks",
+      "profileLinks",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/profileLinks",
     ]);
     loadBotRep(bots);
     EXT_SCRIPT_INFO.scripts.push([
@@ -69,6 +81,14 @@ async function scriptRouter() {
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/tradeOfferCurrency",
     ]);
   }
+
+  if (url.pathname.includes("tradeoffers") || url.pathname.includes("tradehistory")) {
+    loadTradeOfferProfileLinks();
+    EXT_SCRIPT_INFO.scripts.push([
+      "tradeOfferProfileLinks",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/profileLinks",
+    ]);
+  }
 }
 
 //Start the script
@@ -77,14 +97,14 @@ scriptRouter();
 /* 
 Utility funtions to load scripts
 */
-function loadSteamLinks() {
+function loadProfileLinks() {
   (async () => {
     // Load module dynamically
-    const { steamLinks } = await import(
-      chrome.runtime.getURL("steamcommunity.com/steamLinks/content.js")
+    const { profileLinks } = await import(
+      chrome.runtime.getURL("steamcommunity.com/profileLinks/content.js")
     );
 
-    steamLinks();
+    profileLinks();
   })();
 }
 
@@ -126,6 +146,15 @@ function loadTradeOfferCurrency() {
   })();
 }
 
+function loadTradeOfferProfileLinks() {
+  (async () => {
+    const { tradeOfferProfileLinks } = await import(
+      chrome.runtime.getURL("steamcommunity.com/profileLinks/content.js")
+    );
+    tradeOfferProfileLinks();
+  })();
+}
+
 function loadInventoryCurrencyCounter() {
   (async () => {
     const { showInventoryCurrencyCounter } = await import(
@@ -142,7 +171,7 @@ function loadItemLinks() {
       chrome.runtime.getURL("steamcommunity.com/itemLinks/content.js")
     );
 
-    showItemLinks();
+    runWithRetries(showItemLinks);
 
     const target = document.querySelector("#iteminfo0") ||
                    document.querySelector("#iteminfo1") ||
@@ -151,6 +180,66 @@ function loadItemLinks() {
     new MutationObserver(() => showItemLinks())
       .observe(target, { childList: true, subtree: true });
   })();
+}
+
+function loadItemDescriptionToggle() {
+  (async () => {
+    const { addItemDescriptionToggle } = await import(
+      chrome.runtime.getURL("steamcommunity.com/itemDescriptionToggle/content.js")
+    );
+
+    runWithRetries(addItemDescriptionToggle);
+
+    const target = document.querySelector("#iteminfo0") ||
+                   document.querySelector("#iteminfo1") ||
+                   document.body;
+
+    new MutationObserver(() => addItemDescriptionToggle())
+      .observe(target, { childList: true, subtree: true });
+  })();
+}
+
+function loadUnusualEffectBackground() {
+  (async () => {
+    const { addUnusualEffectBackground } = await import(
+      chrome.runtime.getURL("steamcommunity.com/unusualEffectBackground/content.js")
+    );
+
+    runWithRetries(addUnusualEffectBackground);
+
+    // Unlike itemLinks/itemDescriptionToggle (detail-panel only), this
+    // script also drives grid-cell (inventory tile) backgrounds — new
+    // tiles can render into .itemHolder well outside #iteminfo0/1, with
+    // no detail-panel mutation of their own. Confirmed live: scoping
+    // this to #iteminfo0/1 meant grid tiles only ever caught up when
+    // the user happened to click an item (mutating the detail panel).
+    // document.body + subtree still covers every #iteminfo0/1 change
+    // too, just not exclusively.
+    new MutationObserver(() => addUnusualEffectBackground())
+      .observe(document.body, { childList: true, subtree: true });
+  })();
+}
+
+/**
+ * Runs `fn` immediately, then again on a short interval for a bounded
+ * window. The very first item Steam shows on inventory page load can
+ * finish rendering into #iteminfo0/#iteminfo1 (and, for TF2-gated
+ * scripts, the TF2 grid container getting its own final id) slightly
+ * after this router's dynamic import resolves — a MutationObserver set
+ * up right after that render already happened never fires for it,
+ * since nothing changes there again until the user clicks a different
+ * item, so relying on the observer alone silently misses the first
+ * item specifically. Safe to call repeatedly: every function passed
+ * here already guards its own "already processed" state internally.
+ */
+function runWithRetries(fn, { retries = 10, intervalMs = 300 } = {}) {
+  fn();
+  let attempt = 0;
+  const timer = setInterval(() => {
+    attempt++;
+    fn();
+    if (attempt >= retries) clearInterval(timer);
+  }, intervalMs);
 }
 
 // Small helper so it works in Chrome + Firefox

@@ -64,6 +64,12 @@ Join our Steam group to share feedback, get updates, or suggest new features:
 
 ---
 
+## Credits
+
+Unusual effect preview images (used for the effect background on inventory items) are provided by [**itempedia.tf**](https://itempedia.tf).
+
+---
+
 ## Contributing
 
 Pull requests, ideas, and feedback are always welcome!

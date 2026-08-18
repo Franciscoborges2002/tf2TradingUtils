@@ -93,10 +93,10 @@ function loadPartnerLinks() {
 
 function loadTradeOfferPanel() {
   (async () => {
-    const { addCurrency } = await import(
+    const { tradeOfferPanel } = await import(
       chrome.runtime.getURL("steamTradeOffer/tradeOfferPanel/content.js")
     );
-    addCurrency();
+    tradeOfferPanel();
   })();
 }
 
