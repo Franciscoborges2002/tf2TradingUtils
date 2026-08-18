@@ -8,6 +8,8 @@
 - Fixed: bp.tf stats and marketplace.tf links for Festive weapons (e.g. "Festive Eyelander") dropped the "Festive " and linked to the plain weapon instead
 - Fixed: bp.tf stats for "Festive Force-A-Nature" used the wrong casing ("Festive Force-A-Nature" instead of "Festive Force-a-Nature")
 - Fixed: Genuine and Collector's quality weren't recognized at all
+- Fixed the merchant.tf link dropping craftability entirely (e.g. "Non-Craftable Duck Journal" linked to the craftable search instead of "non-craftable-duck-journal")
+- Added a gladiator.tf sales-page link
 
 # Version 1.0.1
 

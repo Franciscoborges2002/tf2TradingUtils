@@ -7,7 +7,7 @@ quick links for each item to external trading sites.
 Link:
 https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapItemsTableLinks
 */
-import { backpackStatsUrl, stnTradingUrl } from "../../utils/itemLinks.js";
+import { backpackStatsUrl, stnTradingUrl, merchantTfUrl, gladiatorTfUrl, CRATE_NUMBER_RE } from "../../utils/itemLinks.js";
 
 var table = document.getElementById("itembanking-list"); //Get the table in the website
 
@@ -41,7 +41,11 @@ export function scrapItemsTableLinks() {
             getLinkBackpack(itemName) + //Call the function to get the link of bp.tf
             '" target="_blank">BP</a> | <a href="' +
             getLinkSTN(itemName) + //get the link of stntrading.eu
-            '" target="_blank">STN</a>';
+            '" target="_blank">STN</a> | <a href="' +
+            getLinkMerchant(itemName) + //get the link of merchant.tf
+            '" target="_blank">Merchant</a> | <a href="' +
+            getLinkGladiator(itemName) + //get the link of gladiator.tf
+            '" target="_blank">Gladiator</a>';
         }
       }
     }
@@ -301,4 +305,66 @@ function getLinkBackpack(itemName) {
   const name = isTaunt ? itemName : itemName.replace("The ", "");
 
   return backpackStatsUrl({ name, quality, craftable: true });
+}
+
+/**
+ * Function to generate the links to merchant.tf. merchant.tf's
+ * "/trade/<slug>" is just a search-bar prefill (see merchantTfUrl()'s
+ * own doc), so this doesn't need the name-typo fixups getLinkSTN()
+ * needs for an exact page match — a close-enough query still surfaces
+ * the right item in the search results.
+ */
+function getLinkMerchant(itemName) {
+  const crateMatch = itemName.match(CRATE_NUMBER_RE);
+  let name = crateMatch ? itemName.slice(0, crateMatch.index) : itemName;
+
+  const craftable = !name.includes("Non-Craftable");
+  if (!craftable) name = name.replace("Non-Craftable ", "");
+
+  let quality;
+  if (name.includes("Vintage")) {
+    quality = "Vintage";
+    name = name.replace("Vintage ", "");
+  } else if (name.includes("Genuine")) {
+    quality = "Genuine";
+    name = name.replace("Genuine ", "");
+  } else if (name.includes("Strange")) {
+    quality = "Strange";
+    name = name.replace("Strange ", "");
+  } else if (name.includes("Collectors")) {
+    quality = "Collector's";
+    name = name.replace("Collectors ", "");
+  }
+
+  return merchantTfUrl({ name, quality, craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
+}
+
+/**
+ * Function to generate the links to gladiator.tf. Same parsing
+ * getLinkMerchant() does — gladiatorTfUrl() takes the same
+ * name/quality/craftable/crateNumber shape merchantTfUrl() does.
+ */
+function getLinkGladiator(itemName) {
+  const crateMatch = itemName.match(CRATE_NUMBER_RE);
+  let name = crateMatch ? itemName.slice(0, crateMatch.index) : itemName;
+
+  const craftable = !name.includes("Non-Craftable");
+  if (!craftable) name = name.replace("Non-Craftable ", "");
+
+  let quality;
+  if (name.includes("Vintage")) {
+    quality = "Vintage";
+    name = name.replace("Vintage ", "");
+  } else if (name.includes("Genuine")) {
+    quality = "Genuine";
+    name = name.replace("Genuine ", "");
+  } else if (name.includes("Strange")) {
+    quality = "Strange";
+    name = name.replace("Strange ", "");
+  } else if (name.includes("Collectors")) {
+    quality = "Collector's";
+    name = name.replace("Collectors ", "");
+  }
+
+  return gladiatorTfUrl({ name, quality, craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
 }

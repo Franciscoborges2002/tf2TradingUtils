@@ -16,7 +16,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
-import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, skinportUrl, crateTfUrl, getKnownCrateNumber, wikiUrl } from "../../utils/itemLinks.js";
+import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, getKnownCrateNumber, wikiUrl } from "../../utils/itemLinks.js";
 
 // scrap.tf's own hover tooltip text drops diacritics for at least this
 // one item — it literally renders "Quackenbirdt" with no accent at all
@@ -362,11 +362,50 @@ async function makeLinks(name, itemEl) {
   // which only resolves names with exactly one known series (see
   // getKnownCrateNumber()'s own docs).
   let crateTfHref = null;
+  let crateNumber;
   try {
-    const crateNumber = await getKnownCrateNumber(classifiedsName);
+    crateNumber = await getKnownCrateNumber(classifiedsName);
     crateTfHref = await crateTfUrl({ name: classifiedsName, crateNumber, craftable: !isUncraft });
   } catch (err) {
     console.warn("[TF2Utils] crate.tf link failed:", err);
+  }
+
+  // merchant.tf's "/trade/<slug>" is just a search-bar prefill, not an
+  // exact lookup key (see merchantTfUrl()'s own doc) — so unlike
+  // mannco.store/skinport.com above, Unusuals aren't skipped here: the
+  // effect name (when known) just gets folded into the search text for
+  // a narrower result instead of being required for a match.
+  const merchantSearchName = qualityName === "Unusual" && unusualEffectName
+    ? `${unusualEffectName} ${fullDisplayName}`
+    : fullDisplayName;
+  const merchantHref = merchantTfUrl({ name: merchantSearchName, quality: qualityName, craftable: !isUncraft, crateNumber });
+
+  // pricedb.io needs the same defindex schema lookup marketplace.tf
+  // does — same failure isolation as that block above.
+  let pricedbHref = null;
+  try {
+    pricedbHref = await pricedbUrl({
+      name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, festive: isFestivizedItem, crateNumber,
+    });
+  } catch (err) {
+    console.warn("[TF2Utils] pricedb.io link failed:", err);
+  }
+
+  // liquid.tf needs the same defindex schema lookup — same failure
+  // isolation as the blocks above. No effectId here (same gap
+  // marketplaceHref/pricedbHref above already have — scrap.tf's tooltip
+  // only exposes the effect NAME, not its numeric id), and
+  // isAmbiguousSeries is always false — same reasoning as crateTfHref's
+  // own comment above: scrap.tf's tooltip title never shows a crate's
+  // series number as literal text, so there's nothing genuine to echo
+  // into the slug.
+  let liquidTfHref = null;
+  try {
+    liquidTfHref = await liquidTfUrl({
+      name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, effectName: unusualEffectName, crateNumber, isAmbiguousSeries: false,
+    });
+  } catch (err) {
+    console.warn("[TF2Utils] liquid.tf link failed:", err);
   }
 
   const links = [
@@ -395,6 +434,22 @@ async function makeLinks(name, itemEl) {
     {
       label: "crate.tf",
       href: crateTfHref,
+    },
+    {
+      label: "merchant.tf",
+      href: merchantHref,
+    },
+    {
+      label: "gladiator.tf",
+      href: gladiatorTfUrl({ name: fullDisplayName, quality: qualityName, craftable: !isUncraft, crateNumber }),
+    },
+    {
+      label: "pricedb.io",
+      href: pricedbHref,
+    },
+    {
+      label: "liquid.tf",
+      href: liquidTfHref,
     },
     {
       label: "Steam Market",

@@ -42,6 +42,12 @@ export const SITE_BRAND_COLORS = {
   scrapTf:       "#C0392B", // no logo given yet — placeholder red accent
   skinport:      "#F2A93B", // no logo given yet — placeholder orange accent
   crateTf:       "#5C8A3A", // no logo given yet — placeholder green accent
+  merchantTf:    "#2F6FED", // blue ship-icon/"TF" text from their logo mark
+  pricedb:       "#3B82F6", // blue "TF2" text from their logo mark
+  liquidTf:      "#3E7CF6", // blue swirl icon and ".tf" text from their logo mark
+  repTf:         "#4CAF50", // green checkmark/shield icon from their logo mark
+  steamdb:       "#FFFFFF", // their logo is monochrome white on black
+  gladiatorTf:   "#E8A33D", // amber/gold helmet-crest accent from their logo mark
 };
 
 // backpack.tf's own colors for each killstreak tier (see addKSButtons)

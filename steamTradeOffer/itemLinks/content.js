@@ -54,6 +54,7 @@ import {
   crateTfUrl,
   getKnownCrateNumber,
   getItemNameByDefindex,
+  CRATE_NUMBER_RE,
 } from "../../utils/itemLinks.js";
 
 const LINK_ACCENTS = {
@@ -238,14 +239,6 @@ function ksPrefixFor(ksTier) {
   if (ksTier === 1) return "Killstreak ";
   return "";
 }
-
-// Crates carry their series/case number as a trailing "#N" — sometimes
-// with a "Series " word first (e.g. "Mann Co. Supply Munition Series
-// #91" — "Series" isn't part of the schema name either, unlike themed
-// cosmetic cases, whose "Case"/"Cooler"/etc. IS part of the name and
-// stays). Same regex as backpack.tf/oldUI/itemLinks and
-// stntrading.eu/itemLinks — see those for the full reasoning.
-const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
 
 async function buildLinks(rawName, assetId) {
   // Strip the crate number up front for mannco.store/bp.tf stats/

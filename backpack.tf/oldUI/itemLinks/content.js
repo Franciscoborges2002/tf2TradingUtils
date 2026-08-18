@@ -19,7 +19,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/old
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
 import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
-import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl, CRATE_NUMBER_RE } from "../../../utils/itemLinks.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])
@@ -34,11 +34,6 @@ const LINK_ACCENTS = {
 };
 
 const KEY_NAME_RE = /Mann Co\. Supply Crate Key/i;
-
-// Same crate/case number shape used across every other itemLinks
-// script (backpack.tf itself suffixes crates with it, "Series" only
-// present for base supply crates, not themed cosmetic cases).
-const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
 
 // backpack.tf's own stats page for one specific crate series (e.g.
 // /stats/Unique/Salvaged%20Mann%20Co.%20Supply%20Crate/Tradable/Craftable/30)
