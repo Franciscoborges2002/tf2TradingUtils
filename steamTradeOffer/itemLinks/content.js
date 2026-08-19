@@ -56,8 +56,8 @@ import {
   resolveCrateSeries,
   CRATE_NUMBER_RE,
   getItemNameByDefindex,
-  CRATE_NUMBER_RE,
 } from "../../utils/itemLinks.js";
+import { getSettings } from "../../utils/settings.js";
 
 const LINK_ACCENTS = {
   "bp.tf stats": SITE_BRAND_COLORS.backpackTf,
@@ -243,6 +243,8 @@ function ksPrefixFor(ksTier) {
 }
 
 async function buildLinks(rawName, assetId) {
+  const settings = await getSettings();
+
   // Strip the crate number up front for mannco.store/bp.tf stats/
   // marketplace.tf — none of those distinguish crates by it as literal
   // name text the way backpack.tf's own name does — then reattach it
@@ -272,16 +274,31 @@ async function buildLinks(rawName, assetId) {
     .replace(/Festivized\s+/i, "")
     .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
 
-  const bpStatsHref = backpackStatsUrl({
-    name: ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name,
-    quality: attrs.quality,
-    craftable: attrs.craftable,
-    effectId: crateNumber ?? undefined,
-  });
+  // Single "bp.tf stats"/"bp.tf history" pair, following the popup's
+  // "Default bp.tf version" setting. The crate-number-as-trailing-
+  // path-segment trick (effectId below) only exists on classic
+  // backpack.tf's stats URL shape — next.backpack.tf's query-param one
+  // has no equivalent (see backpackStatsUrl()'s own doc), so the next
+  // variant is just less precise for crates, same gap as everywhere
+  // else next.backpack.tf is used.
+  const bpStatsHref = settings.bpTfVersion === "next"
+    ? backpackStatsUrl({
+        name: attrs.name, quality: attrs.quality, craftable: attrs.craftable,
+        ksTier: attrs.ksTier, australium: attrs.australium, next: true,
+      })
+    : backpackStatsUrl({
+        name: ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name,
+        quality: attrs.quality,
+        craftable: attrs.craftable,
+        effectId: crateNumber ?? undefined,
+      });
+  const bpHistoryHref = assetId
+    ? `https://${settings.bpTfVersion === "next" ? "next." : ""}backpack.tf/item/${assetId}`
+    : null;
 
   const links = [
     { label: "bp.tf stats", href: bpStatsHref },
-    { label: "bp.tf history", href: assetId ? `https://backpack.tf/item/${assetId}` : null },
+    { label: "bp.tf history", href: bpHistoryHref },
     { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable: attrs.craftable, isAmbiguousSeries: isAmbiguous }) },
     { label: "mannco.store", href: manncoHref },
     { label: "skinport.com", href: skinportHref },

@@ -17,6 +17,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, getKnownCrateNumber, wikiUrl } from "../../utils/itemLinks.js";
+import { getSettings } from "../../utils/settings.js";
 
 // scrap.tf's own hover tooltip text drops diacritics for at least this
 // one item — it literally renders "Quackenbirdt" with no accent at all
@@ -185,6 +186,8 @@ Function to create the links to be displayed
   - itemEl: HTML item element (get more information about the item, ks, paint, unu effect)
 */
 async function makeLinks(name, itemEl) {
+  const settings = await getSettings();
+
   // --- QUALITY DETECTION ---
   // Default: Unique
   let qualityName = "Unique";
@@ -284,7 +287,7 @@ async function makeLinks(name, itemEl) {
   }
 
   // Remove "Australium " — not part of the bare schema name the
-  // query-param-based links (Next Bp Stats, marketplace.tf) expect
+  // query-param-based links (next.backpack.tf stats, marketplace.tf) expect
   const classifiedsName = baseName.replace(/^Australium /i, "");
 
   // Full descriptive name (Festivized + killstreak tier + item name) —
@@ -408,16 +411,20 @@ async function makeLinks(name, itemEl) {
     console.warn("[TF2Utils] liquid.tf link failed:", err);
   }
 
+  // Single "Bp Stats" button, following the popup's "Default bp.tf
+  // version" setting — classic and next.backpack.tf need genuinely
+  // different fields (see backpackStatsUrl()'s own doc), so both are
+  // still built, just only one is ever shown.
+  const bpStatsHref = settings.bpTfVersion === "next"
+    ? backpackStatsUrl({
+        name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, next: true,
+      })
+    : backpackStatsUrl({ name: fullDisplayName, quality: qualityName, craftable: !isUncraft });
+
   const links = [
     {
       label: "Bp Stats",
-      href: backpackStatsUrl({ name: fullDisplayName, quality: qualityName, craftable: !isUncraft }),
-    },
-    {
-      label: "Next Bp Stats",
-      href: backpackStatsUrl({
-        name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, next: true,
-      }),
+      href: bpStatsHref,
     },
     {
       label: "mannco.store",

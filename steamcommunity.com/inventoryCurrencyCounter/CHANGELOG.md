@@ -8,3 +8,4 @@
 - Now shows an estimate from `inventoryFetchBridge`'s already-observed data instead of making its own request — updates itself for free as the bridge sees more of the inventory (e.g. while scrolling), with a hint when it's still partial
 - Makes an actual request only when ↻ Refresh is clicked, sized off the inventory's real `total_inventory_count` and capped at 2000  — a couple of big requests instead of looping through it 75 at a time. A failed fetch keeps the estimate up with a hint to try again
 - Title now shows how many items have loaded so far (e.g. "2412/2539 items loaded")
+- Now reads pricing settings via the shared `utils/settings.js` instead of its own local read

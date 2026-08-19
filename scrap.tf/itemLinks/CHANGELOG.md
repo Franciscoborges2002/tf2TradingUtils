@@ -11,6 +11,7 @@
 - Fixed Steam Market link for reward/unlock crates (e.g. "Non-Craftable Unlocked Cosmetic Crate Multi-Class") — their Market listing name drops "Non-Craftable" entirely, unlike every other Non-Craftable item
 - Fixed the merchant.tf link dropping craftability entirely — a Non-Craftable item now correctly links to its "non-craftable-" prefixed search
 - Added a gladiator.tf sales-page link
+- "Bp Stats" and "Next Bp Stats" are now a single "Bp Stats" button that follows the popup's new "Default bp.tf version" setting
 
 # Version 1.1.0
 

@@ -9,6 +9,8 @@
 - Fixed the Earbuds price row's Keys/Ref inputs in the Settings view overflowing the popup width instead of splitting evenly
 - Added a "Show item descriptions by default" checkbox to the Settings view, for the Steam inventory item description toggle
 - Added an "Unusual effect background size" setting (1–1.8×), for the Steam inventory unusualEffectBackground script
+- Added a "Default bp.tf version" setting (classic vs. next.backpack.tf), used by every script's bp.tf stats/history links. The "List on backpack.tf" listing CTA always stays classic regardless, since listings are easier to create there
+- Settings are now read/written via the shared `utils/settings.js` (canonical defaults + validation), instead of the popup's own save handler and each consuming content script duplicating their own ad-hoc parsing/clamping
 
 # Version 1.0.1 (1.1.1)
 

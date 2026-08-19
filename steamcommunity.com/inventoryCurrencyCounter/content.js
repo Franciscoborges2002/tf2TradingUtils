@@ -42,6 +42,7 @@
 
 import { TF2_APPID, TF2_CONTEXTID, TF2_CURRENCY } from "../../utils/constants/tf2Economy.js";
 import { COLOR_ACCENT, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
+import { getSettings } from "../../utils/settings.js";
 
 const PANEL_ID  = "tf2utils-inv-currency-panel";
 const STYLES_ID = "tf2utils-inv-currency-styles";
@@ -175,15 +176,6 @@ function nameCountsFromBridgeMap(map) {
     nameCounts.set(name, (nameCounts.get(name) ?? 0) + (desc.amount ?? 1));
   }
   return nameCounts;
-}
-
-/** Reads { keyPriceRef, earbudsPriceKeys, earbudsPriceRef } from the
- *  popup's Settings view (chrome.storage.local, shared across the
- *  whole extension — no messaging needed to reach it from here). */
-function loadSettings() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(["settings"], (result) => resolve(result.settings ?? {}));
-  });
 }
 
 /** A Map<market_hash_name, amount> -> the { keys, ref, rec, scrap, ...tracked } shape renderPanel expects. */
@@ -494,7 +486,7 @@ async function reload(panel, { forceFullFetch = false } = {}) {
 
   let quick, settings;
   try {
-    [quick, settings] = await Promise.all([loadQuickCounts(), loadSettings()]);
+    [quick, settings] = await Promise.all([loadQuickCounts(), getSettings()]);
   } catch (err) {
     renderError(panel, err);
     return;

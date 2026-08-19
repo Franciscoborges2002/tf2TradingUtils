@@ -1,5 +1,6 @@
 # Version 1.1.0 (v1.3.0)
 
+- "bp.tf stats"/"next.bp.tf stats" and "bp.tf history"/"next.bp.tf history" are now single buttons each, following the popup's new "Default bp.tf version" setting
 - Added mannco.store, skinport.com, marketplace.tf, crate.tf (crates/cases only), next.bp.tf stats, and bp.tf/next.bp.tf History links (the last two keyed by the item's asset id, parsed out of the "Inspect in Game" link)
 - Removed the old single "backpack.tf" link — replaced by the more clearly labeled "bp.tf stats"
 - Quality/craftable/killstreak-tier/Australium/Festivized are now parsed off the item's full name and its "Tags:" line, instead of assuming every item is Unique quality and craftable — needed for marketplace.tf and next.bp.tf stats to resolve correctly for non-Unique items
