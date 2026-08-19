@@ -13,11 +13,11 @@ import {
   resolveCrateSeries,
   CRATE_NUMBER_RE,
   wikiUrl,
-  CRATE_NUMBER_RE,
 } from "../../utils/itemLinks.js";
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 import { TF2_QUALITY_NAMES, TF2_CRAFTABILITY } from "../../utils/constants/tf2Economy.js";
+import { getSettings } from "../../utils/settings.js";
 
 let effectsDataPromise = null; //to get the utils effects ids
 
@@ -25,7 +25,6 @@ let effectsDataPromise = null; //to get the utils effects ids
 // set of different places rather than one undifferentiated button mass.
 const LINK_ACCENTS = {
   "bp.tf stats": SITE_BRAND_COLORS.backpackTf,
-  "next.bp.tf stats": SITE_BRAND_COLORS.backpackTf,
   "mannco.store": SITE_BRAND_COLORS.manncoStore,
   "skinport.com": SITE_BRAND_COLORS.skinport,
   "marketplace.tf": SITE_BRAND_COLORS.marketplaceTf,
@@ -47,6 +46,8 @@ export async function showItemLinks() {
   // For a mistyped/unknown item (e.g. a stale link), stntrading.eu
   // renders a ".error-box" page instead — there's no <h1> at all here,
   // so grabbing it directly below would throw.
+  const settings = await getSettings();
+
   if (document.querySelector(".error-box")) return;
 
   const itemName = document.querySelector("h1").innerHTML; //Get the name of the item
@@ -54,13 +55,12 @@ export async function showItemLinks() {
   if (!placeAddLink) return;
 
   const isUnusual = itemName.includes("Unusual");
-  // Fetched once and reused — Bp Stats, Next Bp Stats and mannco.store
-  // all need the same Unusual effect for this item.
+  // Fetched once and reused — Bp Stats and mannco.store both need the
+  // same Unusual effect for this item.
   const effect = isUnusual ? await findUnusualEffect(itemName) : null;
 
   const links = [
-    { label: "bp.tf stats", href: await createBpStatsLink(itemName, isUnusual, effect, false) },
-    { label: "next.bp.tf stats", href: await createBpStatsLink(itemName, isUnusual, effect, true) },
+    { label: "bp.tf stats", href: await createBpStatsLink(itemName, isUnusual, effect, settings.bpTfVersion === "next") },
     { label: "mannco.store", href: await createManncoLink(itemName, isUnusual, effect) },
     { label: "skinport.com", href: await createSkinportLink(itemName, isUnusual) },
     { label: "marketplace.tf", href: await createMarketplaceLink(itemName) },

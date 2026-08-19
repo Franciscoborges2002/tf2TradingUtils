@@ -33,6 +33,7 @@
 
 import { isTf2InventoryActive } from "../../utils/steamInventory.js";
 import { UnusualIds } from "../../utils/UnusualIds.js";
+import { getSettings } from "../../utils/settings.js";
 
 // ─────────────────────────────────────────────────────────────
 // Grid-cell (inventory tile) backgrounds. Tiles carry no effect-name
@@ -199,20 +200,10 @@ function particleUrl(effectId) {
 // How much bigger than the item icon's own box the effect renders —
 // centered on the icon, so it spills out past the icon's edges on
 // every side instead of being clipped tightly to it. User-configurable
-// (popup Settings, "Unusual effect background size", 1–1.8×) —
-// fetched once and reused, same "read once from chrome.storage.local"
-// pattern itemDescriptionToggle's getShowByDefault() uses.
-let effectScalePromise = null;
-function getEffectScale() {
-  if (!effectScalePromise) {
-    effectScalePromise = new Promise((resolve) => {
-      chrome.storage.local.get(["settings"], (result) => {
-        const value = result.settings?.unusualEffectScale;
-        resolve(typeof value === "number" && value > 0 ? value : 1.3);
-      });
-    });
-  }
-  return effectScalePromise;
+// (popup Settings, "Unusual effect background size", 1–1.8×).
+async function getEffectScale() {
+  const settings = await getSettings();
+  return settings.unusualEffectScale;
 }
 
 // Grid tiles on an inventory "page" other than the currently displayed

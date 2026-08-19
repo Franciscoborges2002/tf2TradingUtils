@@ -27,6 +27,7 @@
  */
 
 import { COLOR_ACCENT } from "../../utils/constants/colors.js";
+import { getSettings } from "../../utils/settings.js";
 
 const STYLES_ID = "tf2utils-item-desc-toggle-styles";
 const TOGGLE_BTN_CLASS = "tf2utils-desc-toggle-btn";
@@ -63,18 +64,9 @@ function findDescriptionContainer(root) {
   return parent;
 }
 
-// Fetched once and reused — every item's panel wants the same setting,
-// no need to hit chrome.storage.local again for each one.
-let showByDefaultPromise = null;
-function getShowByDefault() {
-  if (!showByDefaultPromise) {
-    showByDefaultPromise = new Promise((resolve) => {
-      chrome.storage.local.get(["settings"], (result) => {
-        resolve(result.settings?.showItemDescriptionsByDefault !== false);
-      });
-    });
-  }
-  return showByDefaultPromise;
+async function getShowByDefault() {
+  const settings = await getSettings();
+  return settings.showItemDescriptionsByDefault;
 }
 
 function makeToggleButton(descBlock, showByDefault) {

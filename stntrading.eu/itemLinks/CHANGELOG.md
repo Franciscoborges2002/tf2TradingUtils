@@ -11,6 +11,7 @@
 - Fixed: Genuine and Collector's quality weren't recognized at all
 - Fixed the merchant.tf link dropping craftability entirely (e.g. "Non-Craftable Duck Journal" linked to the craftable search instead of "non-craftable-duck-journal")
 - Added a gladiator.tf sales-page link
+- "bp.tf stats" and "next.bp.tf stats" are now a single "bp.tf stats" button that follows the popup's new "Default bp.tf version" setting
 
 # Version 1.0.1
 

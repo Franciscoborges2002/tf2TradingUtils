@@ -8,13 +8,14 @@ Link:
 https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapItemsTableLinks
 */
 import { backpackStatsUrl, stnTradingUrl, merchantTfUrl, gladiatorTfUrl, CRATE_NUMBER_RE } from "../../utils/itemLinks.js";
+import { getSettings } from "../../utils/settings.js";
 
 var table = document.getElementById("itembanking-list"); //Get the table in the website
 
 /**
  * Main Function to put the links
  */
-export function scrapItemsTableLinks() {
+export async function scrapItemsTableLinks() {
   var iterateRow = 0, // Iterated row
     column= 0,// Iterated Column
     itemName,//To have the item name
@@ -26,6 +27,8 @@ export function scrapItemsTableLinks() {
       return
     }
 
+  // Same for every row — read once rather than per-item.
+  const settings = await getSettings();
 
   // Iterate for all rows of the table
   while ((row = table.rows[iterateRow++])) {
@@ -38,7 +41,7 @@ export function scrapItemsTableLinks() {
           cell.innerHTML =
             itemName +
             ' <br/> <a href="' +
-            getLinkBackpack(itemName) + //Call the function to get the link of bp.tf
+            getLinkBackpack(itemName, settings) + //Call the function to get the link of bp.tf
             '" target="_blank">BP</a> | <a href="' +
             getLinkSTN(itemName) + //get the link of stntrading.eu
             '" target="_blank">STN</a> | <a href="' +
@@ -278,9 +281,10 @@ function getLinkSTN(itemName) {
 }
 
 /**
- * Function to generate the links to backpack.tf
+ * Function to generate the links to backpack.tf, following the popup's
+ * "Default bp.tf version" setting (settings.bpTfVersion).
  */
-function getLinkBackpack(itemName) {
+function getLinkBackpack(itemName, settings) {
   let quality = "Unique";
 
   //if the name includes vintage
@@ -304,7 +308,7 @@ function getLinkBackpack(itemName) {
   const isTaunt = itemName.includes("Taunt:");
   const name = isTaunt ? itemName : itemName.replace("The ", "");
 
-  return backpackStatsUrl({ name, quality, craftable: true });
+  return backpackStatsUrl({ name, quality, craftable: true, next: settings.bpTfVersion === "next" });
 }
 
 /**

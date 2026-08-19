@@ -1,4 +1,5 @@
 import { TF2_CURRENCY } from "../utils/constants/tf2Economy.js";
+import { getSettings, updateSettings } from "../utils/settings.js";
 
 // Shared with the settings and calculator views below — the key price
 // (in ref) from chrome.storage.local, kept in sync across both without
@@ -7,8 +8,8 @@ import { TF2_CURRENCY } from "../utils/constants/tf2Economy.js";
 let currentKeyPriceRef = null;
 let onKeyPriceChanged  = () => {};
 
-chrome.storage.local.get(["settings"], (result) => {
-  currentKeyPriceRef = result.settings?.keyPriceRef || null;
+getSettings().then((settings) => {
+  currentKeyPriceRef = settings.keyPriceRef || null;
   onKeyPriceChanged();
 });
 
@@ -151,37 +152,44 @@ document.addEventListener("DOMContentLoaded", () => {
   const earbudsRefInput   = document.getElementById("settings-earbuds-ref");
   const showDescInput     = document.getElementById("settings-show-item-descriptions");
   const effectScaleInput  = document.getElementById("settings-unusual-effect-scale");
+  const bpVersionInput    = document.getElementById("settings-bp-version");
   const saveBtn           = document.getElementById("settings-save");
   const savedMsg          = document.getElementById("settings-saved-msg");
 
-  chrome.storage.local.get(["settings"], (result) => {
-    const settings = result.settings ?? {};
-    if (settings.keyPriceRef != null)      keyPriceInput.value    = settings.keyPriceRef;
-    if (settings.earbudsPriceKeys != null) earbudsKeysInput.value = settings.earbudsPriceKeys;
-    if (settings.earbudsPriceRef != null)  earbudsRefInput.value  = settings.earbudsPriceRef;
-    // Shown by default unless the user's explicitly turned it off.
-    showDescInput.checked = settings.showItemDescriptionsByDefault !== false;
-    effectScaleInput.value = settings.unusualEffectScale ?? 1.3;
+  getSettings().then((settings) => {
+    keyPriceInput.value    = settings.keyPriceRef;
+    earbudsKeysInput.value = settings.earbudsPriceKeys;
+    earbudsRefInput.value  = settings.earbudsPriceRef;
+    showDescInput.checked  = settings.showItemDescriptionsByDefault;
+    effectScaleInput.value = settings.unusualEffectScale;
+    bpVersionInput.value   = settings.bpTfVersion;
   });
 
   function saveSettings() {
-    const keyPriceRef      = parseFloat(keyPriceInput.value) || 0;
-    const earbudsPriceKeys = parseFloat(earbudsKeysInput.value) || 0;
-    const earbudsPriceRef  = parseFloat(earbudsRefInput.value) || 0;
-    const showItemDescriptionsByDefault = showDescInput.checked;
-    const unusualEffectScale = Math.min(1.8, Math.max(1, parseFloat(effectScaleInput.value) || 1.3));
-
-    chrome.storage.local.set({ settings: { keyPriceRef, earbudsPriceKeys, earbudsPriceRef, showItemDescriptionsByDefault, unusualEffectScale } }, () => {
-      currentKeyPriceRef = keyPriceRef || null;
+    // Raw parsed values, NaN and all — updateSettings() validates/
+    // clamps/defaults everything centrally, so there's no need to
+    // duplicate that logic here.
+    updateSettings({
+      keyPriceRef: parseFloat(keyPriceInput.value),
+      earbudsPriceKeys: parseFloat(earbudsKeysInput.value),
+      earbudsPriceRef: parseFloat(earbudsRefInput.value),
+      showItemDescriptionsByDefault: showDescInput.checked,
+      unusualEffectScale: parseFloat(effectScaleInput.value),
+      bpTfVersion: bpVersionInput.value,
+    }).then((saved) => {
+      // Reflects back whatever validateSettings() actually clamped/
+      // normalized (e.g. an out-of-range effect scale), rather than
+      // leaving the form showing the raw, un-clamped value typed in.
+      currentKeyPriceRef = saved.keyPriceRef || null;
       onKeyPriceChanged();
-      effectScaleInput.value = unusualEffectScale;
+      effectScaleInput.value = saved.unusualEffectScale;
       savedMsg.textContent = "Saved";
       setTimeout(() => { savedMsg.textContent = ""; }, 1500);
     });
   }
 
   saveBtn.addEventListener("click", saveSettings);
-  [keyPriceInput, earbudsKeysInput, earbudsRefInput, effectScaleInput].forEach((el) => {
+  [keyPriceInput, earbudsKeysInput, earbudsRefInput, effectScaleInput, bpVersionInput].forEach((el) => {
     el.addEventListener("keydown", (e) => { if (e.key === "Enter") saveSettings(); });
   });
 });
