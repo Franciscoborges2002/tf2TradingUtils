@@ -9,11 +9,13 @@ import {
   steamMarketUrl,
   skinportUrl,
   crateTfUrl,
+  wikiUrl,
+} from "../../utils/itemLinks.js";
+import {
   getKnownCrateNumber,
   resolveCrateSeries,
   CRATE_NUMBER_RE,
-  wikiUrl,
-} from "../../utils/itemLinks.js";
+} from "../../utils/tf2ItemSchema.js";
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 import { TF2_QUALITY_NAMES, TF2_CRAFTABILITY } from "../../utils/constants/tf2Economy.js";

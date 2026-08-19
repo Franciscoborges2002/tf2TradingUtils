@@ -7,7 +7,8 @@ quick links for each item to external trading sites.
 Link:
 https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapItemsTableLinks
 */
-import { backpackStatsUrl, stnTradingUrl, merchantTfUrl, gladiatorTfUrl, CRATE_NUMBER_RE } from "../../utils/itemLinks.js";
+import { backpackStatsUrl, stnTradingUrl, merchantTfUrl, gladiatorTfUrl } from "../../utils/itemLinks.js";
+import { CRATE_NUMBER_RE } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
 
 var table = document.getElementById("itembanking-list"); //Get the table in the website

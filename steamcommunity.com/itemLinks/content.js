@@ -11,8 +11,8 @@ import {
   skinportUrl,
   crateTfUrl,
   backpackSellUrl,
-  getKnownCrateNumber,
 } from "../../utils/itemLinks.js";
+import { getKnownCrateNumber } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
 
 const QUALITY_WORDS = [

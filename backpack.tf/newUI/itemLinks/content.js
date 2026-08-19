@@ -17,7 +17,8 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/new
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
 import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
-import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl, resolveCrateSeries, CRATE_NUMBER_RE } from "../../../utils/itemLinks.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
+import { resolveCrateSeries, CRATE_NUMBER_RE } from "../../../utils/tf2ItemSchema.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])

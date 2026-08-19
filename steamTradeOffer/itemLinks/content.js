@@ -52,11 +52,13 @@ import {
   steamMarketUrl,
   skinportUrl,
   crateTfUrl,
+} from "../../utils/itemLinks.js";
+import {
   getKnownCrateNumber,
   resolveCrateSeries,
   CRATE_NUMBER_RE,
   getItemNameByDefindex,
-} from "../../utils/itemLinks.js";
+} from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
 
 const LINK_ACCENTS = {
