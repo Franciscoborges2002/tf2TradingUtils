@@ -73,23 +73,21 @@ export const TF2_CURRENCY_BY_CLASSID = Object.fromEntries(
 );
 
 /**
- * TF2's quality id per quality name, as used in the game's own item
- * schema (and the "sku" format — defindex;quality — shared by
- * backpack.tf, prices.tf, TF2Autobot and marketplace.tf).
+ * TF2's quality id per quality name to id
  */
 export const TF2_QUALITY_IDS = {
-  Normal: 0,
-  Genuine: 1,
-  Vintage: 3,
-  Unusual: 5,
-  Unique: 6,
-  Community: 7,
-  Valve: 8,
+  "Normal": 0,
+  "Genuine": 1,
+  "Vintage": 3,
+  "Unusual": 5,
+  "Unique": 6,
+  "Community": 7,
+  "Valve": 8,
   "Self-Made": 9,
-  Customized: 10,
-  Strange: 11,
-  Completed: 12,
-  Haunted: 13,
+  "Customized": 10,
+  "Strange": 11,
+  "Completed": 12,
+  "Haunted": 13,
   "Collector's": 14,
   "Decorated Weapon": 15,
 };
@@ -99,3 +97,29 @@ export const TF2_QUALITY_NAMES = Object.keys(TF2_QUALITY_IDS);
 
 /** TF2's two craftability states, as shown in item names/URLs across every site here. */
 export const TF2_CRAFTABILITY = ["Craftable", "Non-Craftable"];
+
+/**
+ * Killstreak sheen name to id
+ */
+export const TF2_KS_SHEEN_IDS = {
+  "Team Shine": 1,
+  "Deadly Daffodil": 2,
+  "Manndarin": 3,
+  "Mean Green": 4,
+  "Agonizing Emerald": 5,
+  "Villainous Violet": 6,
+  "Hot Rod": 7,
+};
+
+/**
+ * Killstreaker effect name to id
+ */
+export const TF2_KS_KILLSTREAKER_IDS = {
+  "Fire Horns": 2002,
+  "Cerebral Discharge": 2003,
+  "Tornado": 2004,
+  "Flames": 2005,
+  "Singularity": 2006,
+  "Incinerator": 2007,
+  "Hypno-Beam": 2008,
+};

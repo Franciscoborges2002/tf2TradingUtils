@@ -12,6 +12,7 @@
 - Fixed the merchant.tf link dropping craftability entirely — a Non-Craftable item now correctly links to its "non-craftable-" prefixed search
 - Added a gladiator.tf sales-page link
 - "Bp Stats" and "Next Bp Stats" are now a single "Bp Stats" button that follows the popup's new "Default bp.tf version" setting
+- Brought back a "Bp Classifieds" link (removed in this same version, above) — now also filters by killstreak sheen/killstreaker when the item has one, for a more specific comparison
 
 # Version 1.1.0
 

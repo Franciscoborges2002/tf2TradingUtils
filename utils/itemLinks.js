@@ -97,15 +97,36 @@ export function backpackStatsUrl({ name, quality = "Unique", craftable = true, e
  * Unlike the stats page, this is query-param based and needs the
  * numeric quality id (not the quality name) plus killstreak tier.
  *
+ * Sheen/killstreaker are both numeric ids and use the exact same param
+ * name ("sheen"/"killstreaker") on both classic and next.backpack.tf —
+ * no `next`-branching needed for these two, unlike killstreak tier's
+ * param name. Confirmed against two real URLs: classic
+ * ".../classifieds?item=Ambassador&quality=11&tradable=1&craftable=1&australium=1&killstreak_tier=3&killstreaker=2003&sheen=3"
+ * (Killstreaker: Cerebral Discharge, Sheen: Manndarin) and next
+ * ".../classifieds?itemName=Ambassador&quality=11&australium=1&killstreakTier=3&sheen=1&killstreaker=2005"
+ * (Sheen: Team Shine, Killstreaker: Flames) — same ids either way (2005
+ * = Flames in both), confirming one shared numbering, not two.
+ *
+ * Passed through independently of `ksTier` — real Specialized (tier 2)
+ * items only ever have a sheen, real Professional (tier 3) ones always
+ * have both, but that's a fact about the item, not something this
+ * function should enforce: a caller that only managed to parse one of
+ * the two off its page should still get a URL for what it has, not be
+ * forced to supply both or neither.
+ *
  * @param {object} opts
  * @param {string} opts.name - item name (classic backpack.tf strips the Australium prefix itself, so pass it without "Australium ")
  * @param {number} opts.qualityId
  * @param {boolean} [opts.craftable=true]
  * @param {boolean} [opts.australium] - omitted from the query entirely when not given
  * @param {number} [opts.ksTier=0]
+ * @param {number} [opts.sheen] - killstreak sheen id (Specialized/Professional Killstreak only) — omitted entirely when not given
+ * @param {number} [opts.killstreaker] - killstreaker effect id (Professional Killstreak only) — omitted entirely when not given
  * @param {boolean} [opts.next=false] - use next.backpack.tf instead of backpack.tf
  */
-export function backpackClassifiedsUrl({ name, qualityId, craftable = true, australium, ksTier = 0, next = false }) {
+export function backpackClassifiedsUrl({
+  name, qualityId, craftable = true, australium, ksTier = 0, sheen, killstreaker, next = false,
+}) {
   const base = next ? "https://next.backpack.tf/classifieds" : "https://backpack.tf/classifieds";
   const itemParam = next ? "itemName" : "item";
   const ksParam = next ? "killstreakTier" : "killstreak_tier";
@@ -114,6 +135,8 @@ export function backpackClassifiedsUrl({ name, qualityId, craftable = true, aust
   let url = `${base}?${itemParam}=${encodeURIComponent(name)}&quality=${qualityId}&tradable=1&craftable=${craftParam}`;
   if (australium != null) url += `&australium=${australium ? 1 : -1}`;
   url += `&${ksParam}=${ksTier}`;
+  if (sheen != null) url += `&sheen=${sheen}`;
+  if (killstreaker != null) url += `&killstreaker=${killstreaker}`;
   return url;
 }
 

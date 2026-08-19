@@ -16,7 +16,8 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
-import { steamMarketUrl, backpackStatsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, getKnownCrateNumber, wikiUrl } from "../../utils/itemLinks.js";
+import { TF2_QUALITY_IDS, TF2_KS_SHEEN_IDS, TF2_KS_KILLSTREAKER_IDS } from "../../utils/constants/tf2Economy.js";
+import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, getKnownCrateNumber, wikiUrl } from "../../utils/itemLinks.js";
 import { getSettings } from "../../utils/settings.js";
 
 // scrap.tf's own hover tooltip text drops diacritics for at least this
@@ -225,6 +226,17 @@ async function makeLinks(name, itemEl) {
   // --- KILLSTREAK DETECTION ---
   const { prefix: ksPrefix, tier: ksTier } = getKillstreakInfo(itemEl);
 
+  // --- SHEEN / KILLSTREAKER DETECTION ---
+  // Neither is part of the item's own name — same "indicator line in
+  // the hover tooltip" story as Festivized/Uncraftable. Only used for
+  // the Bp Classifieds link below (its own search filters); every
+  // other destination here has no equivalent field. Real Specialized
+  // (tier 2) items only ever have a sheen; Professional (tier 3) ones
+  // have both — but nothing here enforces that, since a caller should
+  // still get a URL for whatever it actually found.
+  const sheenName = getSheenName();
+  const killstreakerName = getKillstreakerName();
+
   // --- CRAFTABILITY DETECTION ---
   // "Uncraftable" isn't part of the item's name either — same as
   // Festivized, it's a separate indicator line in the hover tooltip's
@@ -421,10 +433,28 @@ async function makeLinks(name, itemEl) {
       })
     : backpackStatsUrl({ name: fullDisplayName, quality: qualityName, craftable: !isUncraft });
 
+  // Bp Classifieds — the one destination here with sheen/killstreaker
+  // search filters, so it's the only place those are worth resolving
+  // to their numeric ids at all.
+  const bpClassifiedsHref = backpackClassifiedsUrl({
+    name: classifiedsName,
+    qualityId: TF2_QUALITY_IDS[qualityName] ?? TF2_QUALITY_IDS.Unique,
+    craftable: !isUncraft,
+    australium: isAustralium,
+    ksTier,
+    sheen: sheenName ? TF2_KS_SHEEN_IDS[sheenName] : undefined,
+    killstreaker: killstreakerName ? TF2_KS_KILLSTREAKER_IDS[killstreakerName] : undefined,
+    next: settings.bpTfVersion === "next",
+  });
+
   const links = [
     {
       label: "Bp Stats",
       href: bpStatsHref,
+    },
+    {
+      label: "Specific Bp Classifieds",
+      href: bpClassifiedsHref,
     },
     {
       label: "mannco.store",
@@ -513,18 +543,42 @@ function isUncraftable() {
   return contentEl ? contentEl.textContent.includes("Uncraftable") : false;
 }
 
-/* Function to extract the effect name */
-function getUnusualEffectName() {
+/** Hover tooltip content as plain text — <br> converted to newlines, every other tag stripped — shared by every single-line extractor below. */
+function getHoverContentText() {
   const contentEl = getHoverContentEl();
   if (!contentEl) return null;
-
-  // Convert <br> into newlines, then strip any remaining tags.
-  const text = contentEl.innerHTML
+  return contentEl.innerHTML
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]*>/g, "")
     .trim();
+}
 
-  // Grab ONLY the effect line
-  const match = text.match(/^Effect:\s*(.+)$/im);
+/** One "<label>: <value>" line out of the hover tooltip's content, e.g. getHoverContentLine("Sheen") -> "Team Shine". */
+function getHoverContentLine(label) {
+  const text = getHoverContentText();
+  if (!text) return null;
+  const match = text.match(new RegExp(`^${label}:\\s*(.+)$`, "im"));
   return match ? match[1].trim() : null;
+}
+
+/* Function to extract the effect name */
+function getUnusualEffectName() {
+  return getHoverContentLine("Effect");
+}
+
+/** The killstreak sheen name, e.g. "Team Shine" (Specialized/Professional Killstreak items only). */
+function getSheenName() {
+  return getHoverContentLine("Sheen");
+}
+
+/**
+ * The killstreaker effect name, e.g. "Flames" (Professional Killstreak
+ * items only). NOT confirmed against a real Professional Killstreak
+ * tooltip — no such item was available to check against; inferred
+ * from the confirmed "Sheen: X" line's exact format by symmetry. If
+ * that guess is wrong, this just returns null (same as "no
+ * killstreaker"), same as any other item without one.
+ */
+function getKillstreakerName() {
+  return getHoverContentLine("Killstreaker");
 }
