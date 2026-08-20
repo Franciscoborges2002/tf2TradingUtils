@@ -16,7 +16,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/new
 */
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
-import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
+import { TF2_QUALITY_IDS, TF2_CURRENCY } from "../../../utils/constants/tf2Economy.js";
 import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
 import { resolveCrateSeries, CRATE_NUMBER_RE } from "../../../utils/tf2ItemSchema.js";
 
@@ -31,8 +31,6 @@ const LINK_ACCENTS = {
   "skinport.com": SITE_BRAND_COLORS.skinport,
   "crate.tf": SITE_BRAND_COLORS.crateTf,
 };
-
-const KEY_NAME_RE = /Mann Co\. Supply Crate Key/i;
 
 const EXTRA_LINKS_CLASS = "tf2utils-newui-extra-links";
 
@@ -103,7 +101,13 @@ async function processTooltipInner(popper) {
   const fullDisplayName = rawTitle.replace(CRATE_NUMBER_RE, "");
   const bareName = fullDisplayName.replace(/^Non-Craftable\s+/i, "");
 
-  const { crateNumber, isAmbiguous } = await resolveCrateSeries(rawTitle, bareName);
+  // Cheap sync check first — resolveCrateSeries() does the same
+  // CRATE_NUMBER_RE test internally before its own (async) ambiguity
+  // lookup, but doing it here too means most items (no crate number at
+  // all) never enter that async function in the first place.
+  const { crateNumber, isAmbiguous } = CRATE_NUMBER_RE.test(rawTitle)
+    ? await resolveCrateSeries(rawTitle, bareName)
+    : { crateNumber: null, isAmbiguous: false };
   const manncoSkinportCrateNumber = isAmbiguous ? crateNumber : undefined;
 
   if (/Non-Tradable/i.test(fullDisplayName)) return;
@@ -133,14 +137,14 @@ async function processTooltipInner(popper) {
   // link somewhere wrong.
   const manncoHref = qualityName === "Unusual"
     ? null
-    : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName, crateNumber: manncoSkinportCrateNumber });
+    : mannCoStoreUrl(fullDisplayName, qualityName, { crateNumber: manncoSkinportCrateNumber });
 
   // skinport.com wants the same full descriptive name mannco.store does
   // — no Unusual effect name is reliably available from this tooltip
   // either, so skip skinport.com for Unusual items for the same reason.
   const skinportHref = qualityName === "Unusual"
     ? null
-    : skinportUrl({ name: fullDisplayName, quality: qualityName, crateNumber: manncoSkinportCrateNumber });
+    : skinportUrl(fullDisplayName, qualityName, { crateNumber: manncoSkinportCrateNumber });
 
   // stntrading.eu bakes craftability into its own name/prefix — strip
   // "Non-Craftable " back out so it isn't duplicated. It also has no
@@ -160,13 +164,13 @@ async function processTooltipInner(popper) {
 
   const links = [
     { label: "mannco.store", href: manncoHref },
-    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable, isAmbiguousSeries: isAmbiguous }) },
+    { label: "stntrading.eu", href: stnTradingUrl(stnName, undefined, { craftable, isAmbiguousSeries: isAmbiguous }) },
     { label: "skinport.com", href: skinportHref },
   ].filter((link) => link.href);
 
   // scrap.tf has no per-item page — its keys market page is the one
   // static exception worth linking to directly.
-  if (KEY_NAME_RE.test(fullDisplayName)) {
+  if (TF2_CURRENCY.keys.nameRe.test(fullDisplayName)) {
     links.push({ label: "scrap.tf", href: "https://scrap.tf/keys" });
   }
 
@@ -185,7 +189,7 @@ async function processTooltipInner(popper) {
   // takes craftability as its own separate field instead), so that's
   // stripped back out here even though fullDisplayName keeps it.
   if (crateNumber != null || !craftable) {
-    crateTfUrl({ name: fullDisplayName.replace(/^Non-Craftable\s+/i, ""), crateNumber, craftable })
+    crateTfUrl(fullDisplayName.replace(/^Non-Craftable\s+/i, ""), undefined, { crateNumber, craftable })
       .then((href) => {
         if (href && row.isConnected) appendLink(row, { label: "crate.tf", href });
       })

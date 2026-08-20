@@ -4,6 +4,7 @@ Fixed the merchant.tf link never accounting for craftability at all — a Non-Cr
 Added a gladiator.tf sales-page link
 Fixed a crash on load — imported CRATE_NUMBER_RE from utils/itemLinks.js, which never actually exported it; now centralized there and imported by every site that needs it, instead of each keeping its own copy
 The BP link now follows the popup's new "Default bp.tf version" setting instead of always using classic backpack.tf
+Internal: utils/itemLinks.js builders now take (name, quality, options) instead of one combined object; CRATE_NUMBER_RE moved again, now in utils/tf2ItemSchema.js
 
 ## Version 1.0.1
 

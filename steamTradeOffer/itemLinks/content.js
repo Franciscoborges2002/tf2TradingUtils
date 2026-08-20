@@ -256,7 +256,13 @@ async function buildLinks(rawName, assetId) {
   // is built from rawName instead, keeping it.
   const nameWithoutCrate = rawName.replace(CRATE_NUMBER_RE, "");
   const attrs = parseItemName(nameWithoutCrate);
-  const { crateNumber, isAmbiguous } = await resolveCrateSeries(rawName, attrs.name);
+  // Cheap sync check first — resolveCrateSeries() does the same
+  // CRATE_NUMBER_RE test internally before its own (async) ambiguity
+  // lookup, but doing it here too means most items (no crate number at
+  // all) never enter that async function in the first place.
+  const { crateNumber, isAmbiguous } = CRATE_NUMBER_RE.test(rawName)
+    ? await resolveCrateSeries(rawName, attrs.name)
+    : { crateNumber: null, isAmbiguous: false };
 
   // mannco.store/skinport.com only want the crate number for ambiguous
   // multi-series names (see resolveCrateSeries()) — bp.tf stats/
@@ -265,11 +271,11 @@ async function buildLinks(rawName, assetId) {
 
   const manncoHref = attrs.quality === "Unusual"
     ? null // no reliable Unusual effect name available from this menu
-    : mannCoStoreUrl({ name: nameWithoutCrate, quality: attrs.quality, crateNumber: manncoSkinportCrateNumber });
+    : mannCoStoreUrl(nameWithoutCrate, attrs.quality, { crateNumber: manncoSkinportCrateNumber });
 
   const skinportHref = attrs.quality === "Unusual"
     ? null // same reasoning as mannco.store above
-    : skinportUrl({ name: nameWithoutCrate, quality: attrs.quality, crateNumber: manncoSkinportCrateNumber });
+    : skinportUrl(nameWithoutCrate, attrs.quality, { crateNumber: manncoSkinportCrateNumber });
 
   const stnName = rawName
     .replace(/^Non-Craftable\s+/i, "")
@@ -284,13 +290,10 @@ async function buildLinks(rawName, assetId) {
   // variant is just less precise for crates, same gap as everywhere
   // else next.backpack.tf is used.
   const bpStatsHref = settings.bpTfVersion === "next"
-    ? backpackStatsUrl({
-        name: attrs.name, quality: attrs.quality, craftable: attrs.craftable,
-        ksTier: attrs.ksTier, australium: attrs.australium, next: true,
+    ? backpackStatsUrl(attrs.name, attrs.quality, {
+        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, next: true,
       })
-    : backpackStatsUrl({
-        name: ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name,
-        quality: attrs.quality,
+    : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
         craftable: attrs.craftable,
         effectId: crateNumber ?? undefined,
       });
@@ -301,7 +304,7 @@ async function buildLinks(rawName, assetId) {
   const links = [
     { label: "bp.tf stats", href: bpStatsHref },
     { label: "bp.tf history", href: bpHistoryHref },
-    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable: attrs.craftable, isAmbiguousSeries: isAmbiguous }) },
+    { label: "stntrading.eu", href: stnTradingUrl(stnName, undefined, { craftable: attrs.craftable, isAmbiguousSeries: isAmbiguous }) },
     { label: "mannco.store", href: manncoHref },
     { label: "skinport.com", href: skinportHref },
     // Only for names Steam's own (unescaped) Market link would mangle
@@ -315,9 +318,8 @@ async function buildLinks(rawName, assetId) {
     // the bundled table is only needed as a fallback for pages that
     // don't expose it at all (see getKnownCrateNumber()'s own docs).
     const resolvedCrateNumber = crateNumber ?? await getKnownCrateNumber(attrs.name);
-    const marketplaceHref = await marketplaceTfUrl({
-      name: attrs.name, quality: attrs.quality, craftable: attrs.craftable,
-      ksTier: attrs.ksTier, australium: attrs.australium, festive: attrs.festive,
+    const marketplaceHref = await marketplaceTfUrl(attrs.name, attrs.quality, {
+      craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festive,
       crateNumber: resolvedCrateNumber ?? undefined,
     });
     if (marketplaceHref) links.push({ label: "marketplace.tf", href: marketplaceHref });
@@ -325,7 +327,7 @@ async function buildLinks(rawName, assetId) {
     // crate.tf only has pages for crates/cases — crateTfUrl() itself
     // returns null with no crate number, so this naturally stays absent
     // for every other item rather than needing its own type check here.
-    const crateTfHref = await crateTfUrl({ name: attrs.name, crateNumber: resolvedCrateNumber, craftable: attrs.craftable });
+    const crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber: resolvedCrateNumber, craftable: attrs.craftable });
     if (crateTfHref) links.push({ label: "crate.tf", href: crateTfHref });
   } catch (err) {
     console.warn("[TF2Utils] marketplace.tf/crate.tf link failed:", err);

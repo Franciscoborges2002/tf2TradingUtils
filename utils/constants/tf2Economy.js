@@ -30,6 +30,10 @@ export const TF2_CONTEXTID = 2;
 export const TF2_CURRENCY = {
   keys: {
     name:       "Mann Co. Supply Crate Key",
+    // Matches the name inside a full item display name — backpack.tf
+    // oldUI/newUI itemLinks use this to spot a Key and link straight to
+    // scrap.tf's keys market page instead (scrap.tf has no per-item page).
+    nameRe:     /Mann Co\. Supply Crate Key/i,
     short:      "Keys",
     scrapValue: null,
     iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEAaR4uURrwvz0N252yVaDVWrRTno9m4ccG2GNqxlQoZrC2aG9hcVGUWflbX_drrVu5UGki5sAij6tOtQ",

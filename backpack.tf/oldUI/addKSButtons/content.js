@@ -143,12 +143,7 @@ function createButtonsStats(url) {
 
     /* Add linking — classic backpack.tf/stats has no separate
        killstreak-tier field, so the tier prefix is baked into name */
-    link.href = backpackStatsUrl({
-      name: (info.urlCompletitionStats || "") + baseItemName,
-      quality,
-      craftable,
-      effectId,
-    });
+    link.href = backpackStatsUrl((info.urlCompletitionStats || "") + baseItemName, quality, { craftable, effectId });
 
     /* Append to the overall div of the buttons */
     divButtons.appendChild(link);

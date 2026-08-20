@@ -7,3 +7,4 @@
 * Added a skinport.com link, using the same full display name mannco.store does
 * Added a crate.tf link, crates/cases only
 * Fixed mannco.store/skinport.com links for crate/case names that span multiple series under one shared display name (e.g. "Mann Co. Supply Crate", "Salvaged Mann Co. Supply Crate")
+* Internal: utils/itemLinks.js builders now take (name, quality, options) instead of one combined object; crate/defindex data moved to utils/tf2ItemSchema.js

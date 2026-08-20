@@ -6,6 +6,7 @@
 - Quality/craftable/killstreak-tier/Australium/Festivized are now parsed off the item's full name and its "Tags:" line, instead of assuming every item is Unique quality and craftable — needed for marketplace.tf and next.bp.tf stats to resolve correctly for non-Unique items
 - Added a "List on backpack.tf" button, styled as its own standalone CTA rather than another entry in the link row (skipped for Non-Tradable items and for someone else's inventory) — its asset id, along with the History links', is now read primarily from the inventory grid's own tile id rather than the "Inspect in Game" link, which several items don't have at all
 - Fixed all links showing up for other games' items too (CS2, etc.) on the shared multi-game inventory page — even on first load, before Steam's own URL hash reflects which game tab is actually active
+- Internal: utils/itemLinks.js builders now take (name, quality, options) instead of one combined object; crate/defindex data moved to utils/tf2ItemSchema.js
 
 # Version 1.0.0
 

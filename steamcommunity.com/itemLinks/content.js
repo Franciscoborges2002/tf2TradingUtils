@@ -204,9 +204,9 @@ export function showItemLinks() {
   if (sellUrl) title.insertAdjacentElement("afterend", anchorEl);
 
   const marketUrl = steamMarketUrl(itemName);
-  const manncoUrl = attrs.quality === "Unusual" ? null : mannCoStoreUrl({ name: itemName });
-  const skinportUrlHref = attrs.quality === "Unusual" ? null : skinportUrl({ name: itemName });
-  const stnUrl = stnTradingUrl({ name: itemName, craftable: attrs.craftable });
+  const manncoUrl = attrs.quality === "Unusual" ? null : mannCoStoreUrl(itemName);
+  const skinportUrlHref = attrs.quality === "Unusual" ? null : skinportUrl(itemName);
+  const stnUrl = stnTradingUrl(itemName, undefined, { craftable: attrs.craftable });
 
   const links = document.createElement("div");
   links.className = "custom-market-links";
@@ -241,13 +241,10 @@ export function showItemLinks() {
     // Single "bp.tf stats"/"bp.tf history" pair, following the popup's
     // "Default bp.tf version" setting.
     const bpStatsHref = settings.bpTfVersion === "next"
-      ? backpackStatsUrl({
-          name: attrs.name, quality: attrs.quality, craftable: attrs.craftable,
-          ksTier: attrs.ksTier, australium: attrs.australium, next: true,
+      ? backpackStatsUrl(attrs.name, attrs.quality, {
+          craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, next: true,
         })
-      : backpackStatsUrl({
-          name: ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name,
-          quality: attrs.quality,
+      : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
           craftable: attrs.craftable,
         });
     if (links.isConnected) links.appendChild(makeLinkBtn({ label: "bp.tf stats", href: bpStatsHref }));
@@ -258,9 +255,8 @@ export function showItemLinks() {
     if (bpHistoryHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "bp.tf history", href: bpHistoryHref }));
 
     const crateNumber = await getKnownCrateNumber(attrs.name);
-    const href = await marketplaceTfUrl({
-      name: attrs.name, quality: attrs.quality, craftable: attrs.craftable,
-      ksTier: attrs.ksTier, australium: attrs.australium, festive: attrs.festive,
+    const href = await marketplaceTfUrl(attrs.name, attrs.quality, {
+      craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festive,
       crateNumber: crateNumber ?? undefined,
     });
     if (href && links.isConnected) links.appendChild(makeLinkBtn({ label: "marketplace.tf", href }));
@@ -268,7 +264,7 @@ export function showItemLinks() {
     // crate.tf only has pages for crates/cases — crateTfUrl() returns
     // null with no crate number, so this naturally stays absent for
     // every other item rather than needing its own type check here.
-    const crateTfHref = await crateTfUrl({ name: attrs.name, crateNumber, craftable: attrs.craftable });
+    const crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber, craftable: attrs.craftable });
     if (crateTfHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "crate.tf", href: crateTfHref }));
   })().catch((err) => console.warn("[TF2Utils] extra item link failed:", err));
 

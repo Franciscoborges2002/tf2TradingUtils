@@ -19,6 +19,23 @@
  */
 export const CRATE_NUMBER_RE = /\s+(?:Series\s+)?#(\d+)\s*$/i;
 
+/**
+ * Cheap upfront check: does this item's name even suggest it's a
+ * crate/case at all? Most crate/case names contain "Crate" or "Case",
+ * but several real crate-family items use their own distinct word
+ * instead, with neither: "Munition" (e.g. "Mann Co. Supply Munition
+ * #91", defindex 5802 vs. #90's 5781 — same multi-series-under-one-name
+ * ambiguity as the base "Mann Co. Supply Crate" family), "Cooler" (e.g.
+ * "Aqua Summer 2013 Cooler #66"), and "Reel" ("Mann Co. Audition Reel",
+ * "Mann Co. Director's Cut Reel" — each its own unique, unambiguous
+ * name, unlike the other examples here, but still a crate-type item).
+ * Meant to gate the more expensive crate-number lookups
+ * (resolveCrateSeries() below, and any site-specific stats-page URL
+ * fallback) so neither runs at all for the vast majority of items that
+ * obviously aren't one.
+ */
+export const IS_CRATE_CASE_RE = /\b(?:Crate|Case|Munition|Cooler|Reel)\b/i;
+
 // name (schema's item_name, no quality/killstreak/etc. prefix) -> defindex.
 // Bundled locally (utils/data/tf2ItemDefindexes.json, ~180KB) rather than
 // fetched from a live API, extracted from schema.autobot.tf's full TF2

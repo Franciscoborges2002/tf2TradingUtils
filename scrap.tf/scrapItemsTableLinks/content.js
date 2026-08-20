@@ -271,7 +271,7 @@ function getLinkSTN(itemName) {
     itemName.includes("Festivizer") ||
     itemName.includes("Duck Journal");
 
-  url = stnTradingUrl({ name: itemName, craftable: !isNonCraftable });
+  url = stnTradingUrl(itemName, undefined, { craftable: !isNonCraftable });
 
   if (itemName.includes("Collectors")) {
     //stntrading doesnt have collectors items
@@ -309,7 +309,7 @@ function getLinkBackpack(itemName, settings) {
   const isTaunt = itemName.includes("Taunt:");
   const name = isTaunt ? itemName : itemName.replace("The ", "");
 
-  return backpackStatsUrl({ name, quality, craftable: true, next: settings.bpTfVersion === "next" });
+  return backpackStatsUrl(name, quality, { craftable: true, next: settings.bpTfVersion === "next" });
 }
 
 /**
@@ -341,7 +341,7 @@ function getLinkMerchant(itemName) {
     name = name.replace("Collectors ", "");
   }
 
-  return merchantTfUrl({ name, quality, craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
+  return merchantTfUrl(name, quality, { craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
 }
 
 /**
@@ -371,5 +371,5 @@ function getLinkGladiator(itemName) {
     name = name.replace("Collectors ", "");
   }
 
-  return gladiatorTfUrl({ name, quality, craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
+  return gladiatorTfUrl(name, quality, { craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
 }

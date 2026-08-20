@@ -16,7 +16,7 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
-import { TF2_QUALITY_IDS, TF2_KS_SHEEN_IDS, TF2_KS_KILLSTREAKER_IDS } from "../../utils/constants/tf2Economy.js";
+import { TF2_KS_SHEEN_IDS, TF2_KS_KILLSTREAKER_IDS } from "../../utils/constants/tf2Economy.js";
 import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, wikiUrl } from "../../utils/itemLinks.js";
 import { getKnownCrateNumber } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
@@ -342,8 +342,8 @@ async function makeLinks(name, itemEl) {
     : craftabilityPrefix + festivizedPrefix + ksPrefix + manncoBaseName;
 
   const manncoHref = qualityName === "Unusual"
-    ? (unusualEffectName ? mannCoStoreUrl({ name: baseName, effectName: unusualEffectName }) : null)
-    : mannCoStoreUrl({ name: manncoDisplayName, quality: qualityName });
+    ? (unusualEffectName ? mannCoStoreUrl(baseName, undefined, { effectName: unusualEffectName }) : null)
+    : mannCoStoreUrl(manncoDisplayName, qualityName);
 
   // skinport.com wants the plain descriptive name (Non-Craftable/
   // Festivized/killstreak-tier prefixes included, but NOT mannco.store's
@@ -356,15 +356,15 @@ async function makeLinks(name, itemEl) {
   // than guessed wrong.
   const skinportHref = qualityName === "Unusual"
     ? null
-    : skinportUrl({ name: craftabilityPrefix + festivizedPrefix + ksPrefix + baseName, quality: qualityName });
+    : skinportUrl(craftabilityPrefix + festivizedPrefix + ksPrefix + baseName, qualityName);
 
   // marketplace.tf needs a network fetch (defindex lookup) — don't let a
   // failure there (offline, blocked request, etc.) take down every other
   // link in the modal.
   let marketplaceHref = null;
   try {
-    marketplaceHref = await marketplaceTfUrl({
-      name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, festive: isFestivizedItem,
+    marketplaceHref = await marketplaceTfUrl(classifiedsName, qualityName, {
+      craftable: !isUncraft, ksTier, australium: isAustralium, festivized: isFestivizedItem,
     });
   } catch (err) {
     console.warn("[TF2Utils] marketplace.tf link failed:", err);
@@ -381,7 +381,7 @@ async function makeLinks(name, itemEl) {
   let crateNumber;
   try {
     crateNumber = await getKnownCrateNumber(classifiedsName);
-    crateTfHref = await crateTfUrl({ name: classifiedsName, crateNumber, craftable: !isUncraft });
+    crateTfHref = await crateTfUrl(classifiedsName, undefined, { crateNumber, craftable: !isUncraft });
   } catch (err) {
     console.warn("[TF2Utils] crate.tf link failed:", err);
   }
@@ -394,14 +394,14 @@ async function makeLinks(name, itemEl) {
   const merchantSearchName = qualityName === "Unusual" && unusualEffectName
     ? `${unusualEffectName} ${fullDisplayName}`
     : fullDisplayName;
-  const merchantHref = merchantTfUrl({ name: merchantSearchName, quality: qualityName, craftable: !isUncraft, crateNumber });
+  const merchantHref = merchantTfUrl(merchantSearchName, qualityName, { craftable: !isUncraft, crateNumber });
 
   // pricedb.io needs the same defindex schema lookup marketplace.tf
   // does — same failure isolation as that block above.
   let pricedbHref = null;
   try {
-    pricedbHref = await pricedbUrl({
-      name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, festive: isFestivizedItem, crateNumber,
+    pricedbHref = await pricedbUrl(classifiedsName, qualityName, {
+      craftable: !isUncraft, ksTier, australium: isAustralium, festivized: isFestivizedItem, crateNumber,
     });
   } catch (err) {
     console.warn("[TF2Utils] pricedb.io link failed:", err);
@@ -417,8 +417,8 @@ async function makeLinks(name, itemEl) {
   // into the slug.
   let liquidTfHref = null;
   try {
-    liquidTfHref = await liquidTfUrl({
-      name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, effectName: unusualEffectName, crateNumber, isAmbiguousSeries: false,
+    liquidTfHref = await liquidTfUrl(classifiedsName, qualityName, {
+      craftable: !isUncraft, ksTier, australium: isAustralium, effectName: unusualEffectName, crateNumber, isAmbiguousSeries: false,
     });
   } catch (err) {
     console.warn("[TF2Utils] liquid.tf link failed:", err);
@@ -429,22 +429,18 @@ async function makeLinks(name, itemEl) {
   // different fields (see backpackStatsUrl()'s own doc), so both are
   // still built, just only one is ever shown.
   const bpStatsHref = settings.bpTfVersion === "next"
-    ? backpackStatsUrl({
-        name: classifiedsName, quality: qualityName, craftable: !isUncraft, ksTier, australium: isAustralium, next: true,
-      })
-    : backpackStatsUrl({ name: fullDisplayName, quality: qualityName, craftable: !isUncraft });
+    ? backpackStatsUrl(classifiedsName, qualityName, { craftable: !isUncraft, ksTier, australium: isAustralium, next: true })
+    : backpackStatsUrl(fullDisplayName, qualityName, { craftable: !isUncraft });
 
   // Bp Classifieds — the one destination here with sheen/killstreaker
   // search filters, so it's the only place those are worth resolving
   // to their numeric ids at all.
-  const bpClassifiedsHref = backpackClassifiedsUrl({
-    name: classifiedsName,
-    qualityId: TF2_QUALITY_IDS[qualityName] ?? TF2_QUALITY_IDS.Unique,
+  const bpClassifiedsHref = backpackClassifiedsUrl(classifiedsName, qualityName, {
     craftable: !isUncraft,
     australium: isAustralium,
     ksTier,
-    sheen: sheenName ? TF2_KS_SHEEN_IDS[sheenName] : undefined,
-    killstreaker: killstreakerName ? TF2_KS_KILLSTREAKER_IDS[killstreakerName] : undefined,
+    ksSheen: sheenName ? TF2_KS_SHEEN_IDS[sheenName] : undefined,
+    ksKillstreaker: killstreakerName ? TF2_KS_KILLSTREAKER_IDS[killstreakerName] : undefined,
     next: settings.bpTfVersion === "next",
   });
 
@@ -479,7 +475,7 @@ async function makeLinks(name, itemEl) {
     },
     {
       label: "gladiator.tf",
-      href: gladiatorTfUrl({ name: fullDisplayName, quality: qualityName, craftable: !isUncraft, crateNumber }),
+      href: gladiatorTfUrl(fullDisplayName, qualityName, { craftable: !isUncraft, crateNumber }),
     },
     {
       label: "pricedb.io",

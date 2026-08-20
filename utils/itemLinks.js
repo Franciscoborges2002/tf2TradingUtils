@@ -11,6 +11,23 @@
  * ./tf2ItemSchema.js instead — this file only builds URLs from an
  * already-resolved defindex/crate number, it doesn't resolve them itself.
  *
+ * Every builder below takes the same three arguments — `(name, quality,
+ * options)` — instead of each inventing its own shape (the state
+ * before this: `quality` vs `qualityId`, `festive` vs "baked into
+ * name", `sheen` vs `ksSheen`, steamMarketUrl()/wikiUrl() positional
+ * while everyone else took one big object). `options` uses the same
+ * field names everywhere something is shared (`craftable`, `effectId`,
+ * `ksTier`, `festivized`, `ksSheen`, `ksKillstreaker`, `australium`,
+ * `crateNumber`), but no builder requires every field — each only
+ * reads the subset its own URL shape actually has room for (documented
+ * on the function itself), and silently ignores the rest. A
+ * destination with no separate field for something at all (e.g.
+ * stntrading.eu has no killstreak/Australium field — that whole
+ * descriptive name is one string) genuinely can't take that field via
+ * `options`; its own doc says so. backpackSellUrl() and
+ * postsTfSearchPayload() are the two exceptions — neither builds from
+ * a single item's name/quality at all.
+ *
  * Only usable from files loaded as ES modules (anything dynamically
  * imported via a router's content.js) — see utils/constants/README.md.
  */
@@ -26,8 +43,8 @@ import { resolveDefindex } from "./tf2ItemSchema.js";
  * quality as its own separate field. Some sites' DOM doesn't always show
  * the quality word as literal text in the name (Genuine in particular),
  * so this prepends it if it's missing rather than assuming it's there.
- * Internal helper — steamMarketUrl() and mannCoStoreUrl() apply this
- * themselves when given a `quality`, callers don't need to call it.
+ * Internal helper — every builder that takes a `quality` applies this
+ * itself, callers don't need to call it.
  */
 function ensureQualityPrefix(name, quality) {
   const trimmed = name.trim();
@@ -45,8 +62,13 @@ export function steamMarketUrl(name, quality) {
   return `https://steamcommunity.com/market/listings/${TF2_APPID}/${encodeURIComponent(fullName)}`;
 }
 
-/** TF2 Wiki page for an item (full name). */
-export function wikiUrl(fullName) {
+/**
+ * TF2 Wiki page for an item.
+ * @param {string} name - item name (quality prefix present or not)
+ * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures the name starts with this quality word — same reasoning as steamMarketUrl()
+ */
+export function wikiUrl(name, quality) {
+  const fullName = ensureQualityPrefix(name, quality);
   return `https://wiki.teamfortress.com/wiki/${encodeURIComponent(fullName)}`;
 }
 
@@ -57,18 +79,25 @@ export function wikiUrl(fullName) {
  * classic backpack.tf is path-segment based; next.backpack.tf is
  * query-param based (and has no per-Unusual-effect filtering) —
  * confirmed against scrap.tf/ItemLinks's already-working next.backpack.tf
- * link, so `next: true` always builds that shape now.
+ * link, so `next: true` always builds that shape now. Neither variant
+ * has a separate Festivized field or page at all — confirmed live: a
+ * Festivized item's stats link should land on the plain item's page,
+ * so `festivized` isn't read here even though `options` carries it for
+ * other builders; bake killstreak tier into `name` for classic instead
+ * (see that param's own doc) if it applies.
  *
- * @param {object} opts
- * @param {string} opts.name - base item name, no quality/Non-Craftable prefix. For classic backpack.tf (next: false), bake any killstreak-tier prefix ("Killstreak ", "Specialized Killstreak ", "Professional Killstreak ") into this directly — the classic URL has no separate field for it.
- * @param {string} [opts.quality="Unique"]
- * @param {boolean} [opts.craftable=true]
- * @param {string|number} [opts.effectId] - Unusual effect id, appended as a trailing path segment (classic backpack.tf only — next.backpack.tf's stats query has no equivalent)
- * @param {number} [opts.ksTier] - killstreak tier (next.backpack.tf only; classic backpack.tf expects it baked into `name` instead)
- * @param {boolean} [opts.australium] - next.backpack.tf only, and only ever sent when true (matches the confirmed-working link, which omits it otherwise)
- * @param {boolean} [opts.next=false] - use next.backpack.tf instead of backpack.tf
+ * @param {string} name - base item name, no quality/Non-Craftable prefix. For classic backpack.tf (no `next`), bake any killstreak-tier prefix ("Killstreak ", "Specialized Killstreak ", "Professional Killstreak ") into this directly — the classic URL has no separate field for it.
+ * @param {string} [quality="Unique"]
+ * @param {object} [options]
+ * @param {boolean} [options.craftable=true]
+ * @param {string|number} [options.effectId] - Unusual effect id, appended as a trailing path segment (classic backpack.tf only — next.backpack.tf's stats query has no equivalent). Shares that same trailing segment with `crateNumber` below — pass whichever one actually applies to this item, never both.
+ * @param {string|number} [options.crateNumber] - crate/case series number — same trailing path segment `effectId` uses on classic (an item is never both Unusual and a crate), ignored on next.backpack.tf (no equivalent field there)
+ * @param {number} [options.ksTier] - killstreak tier (next.backpack.tf only; classic backpack.tf expects it baked into `name` instead)
+ * @param {boolean} [options.australium] - next.backpack.tf only, and only ever sent when true (matches the confirmed-working link, which omits it otherwise)
+ * @param {boolean} [options.next=false] - use next.backpack.tf instead of backpack.tf
  */
-export function backpackStatsUrl({ name, quality = "Unique", craftable = true, effectId, ksTier, australium, next = false }) {
+export function backpackStatsUrl(name, quality = "Unique", options = {}) {
+  const { craftable = true, effectId, crateNumber, ksTier, australium, next = false } = options;
   const craftParam = craftable ? 1 : -1;
 
   if (next) {
@@ -81,14 +110,17 @@ export function backpackStatsUrl({ name, quality = "Unique", craftable = true, e
 
   const craftSegment = craftable ? "Craftable" : "Non-Craftable";
   let url = `https://backpack.tf/stats/${encodeURIComponent(quality)}/${encodeURIComponent(name)}/Tradable/${craftSegment}`;
-  if (effectId != null) url += `/${effectId}`;
+  const trailingSegment = effectId ?? crateNumber;
+  if (trailingSegment != null) url += `/${trailingSegment}`;
   return url;
 }
 
 /**
  * backpack.tf (or next.backpack.tf) classifieds search for an item.
- * Unlike the stats page, this is query-param based and needs the
- * numeric quality id (not the quality name) plus killstreak tier.
+ * Unlike the stats page, this is query-param based — quality is sent
+ * as its numeric id, resolved from `quality` internally (same as every
+ * other numeric-quality destination here), not something the caller
+ * looks up itself.
  *
  * Sheen/killstreaker are both numeric ids and use the exact same param
  * name ("sheen"/"killstreaker") on both classic and next.backpack.tf —
@@ -100,26 +132,32 @@ export function backpackStatsUrl({ name, quality = "Unique", craftable = true, e
  * (Sheen: Team Shine, Killstreaker: Flames) — same ids either way (2005
  * = Flames in both), confirming one shared numbering, not two.
  *
- * Passed through independently of `ksTier` — real Specialized (tier 2)
- * items only ever have a sheen, real Professional (tier 3) ones always
- * have both, but that's a fact about the item, not something this
- * function should enforce: a caller that only managed to parse one of
- * the two off its page should still get a URL for what it has, not be
- * forced to supply both or neither.
+ * `ksSheen`/`ksKillstreaker` are passed through independently of
+ * `ksTier` — real Specialized (tier 2) items only ever have a sheen,
+ * real Professional (tier 3) ones always have both, but that's a fact
+ * about the item, not something this function should enforce: a
+ * caller that only managed to parse one of the two off its page
+ * should still get a URL for what it has, not be forced to supply
+ * both or neither.
  *
- * @param {object} opts
- * @param {string} opts.name - item name (classic backpack.tf strips the Australium prefix itself, so pass it without "Australium ")
- * @param {number} opts.qualityId
- * @param {boolean} [opts.craftable=true]
- * @param {boolean} [opts.australium] - omitted from the query entirely when not given
- * @param {number} [opts.ksTier=0]
- * @param {number} [opts.sheen] - killstreak sheen id (Specialized/Professional Killstreak only) — omitted entirely when not given
- * @param {number} [opts.killstreaker] - killstreaker effect id (Professional Killstreak only) — omitted entirely when not given
- * @param {boolean} [opts.next=false] - use next.backpack.tf instead of backpack.tf
+ * No confirmed Festivized filter param exists for this page yet
+ * (nothing in either real URL above sets one) — `festivized` in
+ * `options` is intentionally not read here until one is confirmed live.
+ *
+ * @param {string} name - item name (classic backpack.tf strips the Australium prefix itself, so pass it without "Australium ")
+ * @param {string} [quality="Unique"]
+ * @param {object} [options]
+ * @param {boolean} [options.craftable=true]
+ * @param {boolean} [options.australium] - omitted from the query entirely when not given
+ * @param {number} [options.ksTier=0]
+ * @param {number} [options.ksSheen] - killstreak sheen id (Specialized/Professional Killstreak only) — omitted entirely when not given
+ * @param {number} [options.ksKillstreaker] - killstreaker effect id (Professional Killstreak only) — omitted entirely when not given
+ * @param {boolean} [options.next=false] - use next.backpack.tf instead of backpack.tf
  */
-export function backpackClassifiedsUrl({
-  name, qualityId, craftable = true, australium, ksTier = 0, sheen, killstreaker, next = false,
-}) {
+export function backpackClassifiedsUrl(name, quality = "Unique", options = {}) {
+  const { craftable = true, australium, ksTier = 0, ksSheen, ksKillstreaker, next = false } = options;
+  const qualityId = TF2_QUALITY_IDS[quality] ?? TF2_QUALITY_IDS.Unique;
+
   const base = next ? "https://next.backpack.tf/classifieds" : "https://backpack.tf/classifieds";
   const itemParam = next ? "itemName" : "item";
   const ksParam = next ? "killstreakTier" : "killstreak_tier";
@@ -128,13 +166,22 @@ export function backpackClassifiedsUrl({
   let url = `${base}?${itemParam}=${encodeURIComponent(name)}&quality=${qualityId}&tradable=1&craftable=${craftParam}`;
   if (australium != null) url += `&australium=${australium ? 1 : -1}`;
   url += `&${ksParam}=${ksTier}`;
-  if (sheen != null) url += `&sheen=${sheen}`;
-  if (killstreaker != null) url += `&killstreaker=${killstreaker}`;
+  if (ksSheen != null) url += `&sheen=${ksSheen}`;
+  if (ksKillstreaker != null) url += `&killstreaker=${ksKillstreaker}`;
   return url;
 }
 
 /**
  * stntrading.eu item page.
+ *
+ * Unlike every other builder here, stntrading.eu's URL has no separate
+ * field for quality/killstreak/Australium/Festivized at all — the
+ * whole descriptive name (quality word, killstreak tier text,
+ * Festivized, Australium, all baked in by the caller) is one string,
+ * so only `name` and `craftable` do anything here; `quality` still
+ * gets applied via ensureQualityPrefix() (same as every other builder)
+ * in case the caller hasn't already baked it in, but there's no
+ * `options` field for the rest.
  *
  * Spaces are encoded as "+" (not %20), colons as %3A, apostrophes as
  * %27 and "#" as %23 (unlike every other site here, stntrading.eu
@@ -157,13 +204,16 @@ export function backpackClassifiedsUrl({
  * word gets one inserted; everything else (most crates, which are
  * already unambiguous by name alone) is left exactly as given.
  *
- * @param {object} opts
- * @param {string} opts.name - full item name (quality prefix included, as stntrading.eu shows it — keep any "Series #N"/"#N" crate suffix too, unlike mannco.store/marketplace.tf's separate crate handling)
- * @param {boolean} [opts.craftable=true]
- * @param {boolean} [opts.isAmbiguousSeries=false] - see doc above
+ * @param {string} name - full item name (quality prefix included, as stntrading.eu shows it — keep any "Series #N"/"#N" crate suffix too, unlike mannco.store/marketplace.tf's separate crate handling)
+ * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — only needed if `name` doesn't already include it
+ * @param {object} [options]
+ * @param {boolean} [options.craftable=true]
+ * @param {boolean} [options.isAmbiguousSeries=false] - see doc above
  */
-export function stnTradingUrl({ name, craftable = true, isAmbiguousSeries = false }) {
-  let workingName = name;
+export function stnTradingUrl(name, quality, options = {}) {
+  const { craftable = true, isAmbiguousSeries = false } = options;
+
+  let workingName = ensureQualityPrefix(name, quality);
   if (isAmbiguousSeries && !/Series\s+#\d+\s*$/i.test(workingName)) {
     workingName = workingName.replace(/#(\d+)\s*$/i, "Series #$1");
   }
@@ -216,14 +266,16 @@ export function stnTradingUrl({ name, craftable = true, isAmbiguousSeries = fals
  * "Salvaged Mann Co. Supply Crate" #30 -> ".../440-salvaged-mann-co-
  * supply-crate-series-30".
  *
- * @param {object} opts
- * @param {string} opts.name - full item name, as Steam displays it (no effect name, no "Series #N"/"#N" suffix) — include "Non-Craftable " if applicable
- * @param {string} [opts.quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
- * @param {string} [opts.effectName] - Unusual effect name, e.g. "Frostbite"
- * @param {number} [opts.appId] - defaults to TF2
- * @param {string|number} [opts.crateNumber] - only for crate/case names known to span multiple series under one display name — see doc above
+ * @param {string} name - full item name, as Steam displays it (no effect name, no "Series #N"/"#N" suffix) — include "Non-Craftable " if applicable
+ * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
+ * @param {object} [options]
+ * @param {string} [options.effectName] - Unusual effect name, e.g. "Frostbite"
+ * @param {number} [options.appId] - defaults to TF2
+ * @param {string|number} [options.crateNumber] - only for crate/case names known to span multiple series under one display name — see doc above
  */
-export function mannCoStoreUrl({ name, quality, effectName, appId = TF2_APPID, crateNumber }) {
+export function mannCoStoreUrl(name, quality, options = {}) {
+  const { effectName, appId = TF2_APPID, crateNumber } = options;
+
   const qualifiedName = ensureQualityPrefix(name, quality);
   const fullName = effectName ? `${effectName} ${qualifiedName}` : qualifiedName;
   const slug = fullName
@@ -284,12 +336,14 @@ export function mannCoStoreUrl({ name, quality, effectName, appId = TF2_APPID, c
  * before the "+uncraftable" suffix if both apply: confirmed "Salvaged
  * Mann Co. Supply Crate" #30 -> ".../salvaged-mann-co-supply-crate-series-30".
  *
- * @param {object} opts
- * @param {string} opts.name - full item name (quality/killstreak/Non-Craftable prefixes included, as Steam displays them; no "Series #N"/"#N" suffix)
- * @param {string} [opts.quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
- * @param {string|number} [opts.crateNumber] - only for crate/case names known to span multiple series under one display name — see doc above
+ * @param {string} name - full item name (quality/killstreak/Non-Craftable prefixes included, as Steam displays them; no "Series #N"/"#N" suffix)
+ * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
+ * @param {object} [options]
+ * @param {string|number} [options.crateNumber] - only for crate/case names known to span multiple series under one display name — see doc above
  */
-export function skinportUrl({ name, quality, crateNumber }) {
+export function skinportUrl(name, quality, options = {}) {
+  const { crateNumber } = options;
+
   // Non-Craftable is stripped before the quirk lookup below (not just
   // before slugifying) — ITEM_NAME_QUIRKS is keyed by the bare name, so
   // leaving "Non-Craftable " attached would make a Non-Craftable
@@ -358,14 +412,16 @@ export function skinportUrl({ name, quality, crateNumber }) {
  * name is ambiguous by itself, unlike the mannco.store/skinport.com
  * cases that need it).
  *
- * @param {object} opts
- * @param {string} opts.name - item name (quality/Non-Craftable prefix not needed — see `quality`/`craftable` — no "Series #N"/"#N" suffix). For Unusuals, include the effect name here too if available; it only narrows the search.
- * @param {string} [opts.quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
- * @param {boolean} [opts.craftable=true] - prepends "Non-Craftable " to the slug when false — see doc above
- * @param {string|number} [opts.crateNumber] - crate/case series number, appended whenever given (see doc above — unlike mannco.store/skinport.com, always pass it, not just for ambiguous names)
+ * @param {string} name - item name (quality/Non-Craftable prefix not needed — see `quality`/`craftable` — no "Series #N"/"#N" suffix). For Unusuals, include the effect name here too if available; it only narrows the search.
+ * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
+ * @param {object} [options]
+ * @param {boolean} [options.craftable=true] - prepends "Non-Craftable " to the slug when false — see doc above
+ * @param {string|number} [options.crateNumber] - crate/case series number, appended whenever given (see doc above — unlike mannco.store/skinport.com, always pass it, not just for ambiguous names)
  * @returns {string}
  */
-export function merchantTfUrl({ name, quality, craftable = true, crateNumber }) {
+export function merchantTfUrl(name, quality, options = {}) {
+  const { craftable = true, crateNumber } = options;
+
   const qualifiedName = ensureQualityPrefix(name, quality);
   const fullName = craftable ? qualifiedName : `Non-Craftable ${qualifiedName}`;
   const slug = fullName
@@ -404,14 +460,16 @@ export function merchantTfUrl({ name, quality, craftable = true, crateNumber }) 
  * already carry their own "The "/"." text as part of the item's real
  * name ("The C.A.P.P.E.R").
  *
- * @param {object} opts
- * @param {string} opts.name - the item's own descriptive name, quality/Non-Craftable/crate-number excluded but everything else (Taunt:/Strange Part: prefix, Festivized, killstreak tier text, Australium, Festive) baked in exactly as Steam would show it — same composition backpackStatsUrl()'s classic (non-`next`) `name` param and merchantTfUrl()'s `name` want
- * @param {string} [opts.quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
- * @param {boolean} [opts.craftable=true] - prepends "Non-Craftable " when false
- * @param {string|number} [opts.crateNumber] - crate/case series number, appended as " #<N>" whenever given (confirmed: unlike mannco.store/skinport.com, always appended, not just for ambiguous names)
+ * @param {string} name - the item's own descriptive name, quality/Non-Craftable/crate-number excluded but everything else (Taunt:/Strange Part: prefix, Festivized, killstreak tier text, Australium, Festive) baked in exactly as Steam would show it — same composition backpackStatsUrl()'s classic (non-`next`) `name` param and merchantTfUrl()'s `name` want
+ * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
+ * @param {object} [options]
+ * @param {boolean} [options.craftable=true] - prepends "Non-Craftable " when false
+ * @param {string|number} [options.crateNumber] - crate/case series number, appended as " #<N>" whenever given (confirmed: unlike mannco.store/skinport.com, always appended, not just for ambiguous names)
  * @returns {string}
  */
-export function gladiatorTfUrl({ name, quality, craftable = true, crateNumber }) {
+export function gladiatorTfUrl(name, quality, options = {}) {
+  const { craftable = true, crateNumber } = options;
+
   const qualifiedName = ensureQualityPrefix(name, quality);
   const fullName = craftable ? qualifiedName : `Non-Craftable ${qualifiedName}`;
   const withSeries = crateNumber != null ? `${fullName} #${crateNumber}` : fullName;
@@ -422,17 +480,17 @@ export function gladiatorTfUrl({ name, quality, craftable = true, crateNumber })
  * Builds the TF2 "sku" array — [defindex, qualityId, ...modifiers] —
  * shared by marketplace.tf and pricedb.io below, which key off the
  * exact same shape and modifier order (uncraftable, australium,
- * kt-<tier>, festive, u<effectId>, c<crateNumber>) and only differ in
- * how they join/format it into a URL.
+ * kt-<tier>, festivized, u<effectId>, c<crateNumber>) and only differ
+ * in how they join/format it into a URL.
  */
-function buildTf2Sku(defindex, quality, { craftable = true, ksTier, australium = false, festive = false, effectId, crateNumber } = {}) {
+function buildTf2Sku(defindex, quality, { craftable = true, ksTier, australium = false, festivized = false, effectId, crateNumber } = {}) {
   const qualityId = TF2_QUALITY_IDS[quality] ?? TF2_QUALITY_IDS.Unique;
   const sku = [defindex, qualityId];
 
   if (!craftable) sku.push("uncraftable");
   if (australium) sku.push("australium");
   if (ksTier) sku.push(`kt-${ksTier}`);
-  if (festive) sku.push("festive");
+  if (festivized) sku.push("festive");
   if (effectId != null) sku.push(`u${effectId}`);
   if (crateNumber != null) sku.push(`c${crateNumber}`);
 
@@ -444,24 +502,24 @@ function buildTf2Sku(defindex, quality, { craftable = true, ksTier, australium =
  * (defindex;quality[;modifiers]) rather than a name-based slug, so this
  * needs a name -> defindex schema lookup and is async.
  *
- * @param {object} opts
- * @param {string} opts.name - base item name, no quality/killstreak/Non-Craftable prefix (matches the TF2 schema's own item_name)
- * @param {string} [opts.quality="Unique"]
- * @param {boolean} [opts.craftable=true]
- * @param {number} [opts.ksTier] - killstreak tier (1 basic, 2 specialized, 3 professional)
- * @param {boolean} [opts.australium=false]
- * @param {boolean} [opts.festive=false]
- * @param {string|number} [opts.effectId] - Unusual effect id
- * @param {string|number} [opts.crateNumber] - crate/case series number (the "#142" backpack.tf shows, "Series #34" on stntrading.eu) — several crate types share one defindex and are only distinguished by this, e.g. "Bone-Chilling Bonanza Case" -> `5952;6;c142`
+ * @param {string} name - base item name, no quality/killstreak/Non-Craftable prefix (matches the TF2 schema's own item_name)
+ * @param {string} [quality="Unique"]
+ * @param {object} [options]
+ * @param {boolean} [options.craftable=true]
+ * @param {number} [options.ksTier] - killstreak tier (1 basic, 2 specialized, 3 professional)
+ * @param {boolean} [options.australium=false]
+ * @param {boolean} [options.festivized=false] - the sku's "festive" modifier — despite the name, this is the killstreak-fabricator Festivized effect, not a "Festive X" catalog item (those get their own defindex via `name` instead, no separate modifier needed)
+ * @param {string|number} [options.effectId] - Unusual effect id
+ * @param {string|number} [options.crateNumber] - crate/case series number (the "#142" backpack.tf shows, "Series #34" on stntrading.eu) — several crate types share one defindex and are only distinguished by this, e.g. "Bone-Chilling Bonanza Case" -> `5952;6;c142`
  * @returns {Promise<string|null>} null if the item name isn't in the schema
  */
-export async function marketplaceTfUrl({
-  name, quality = "Unique", craftable = true, ksTier, australium = false, festive = false, effectId, crateNumber,
-}) {
+export async function marketplaceTfUrl(name, quality = "Unique", options = {}) {
+  const { craftable = true, ksTier, australium = false, festivized = false, effectId, crateNumber } = options;
+
   const defindex = await resolveDefindex(name, crateNumber);
   if (defindex == null) return null;
 
-  const sku = buildTf2Sku(defindex, quality, { craftable, ksTier, australium, festive, effectId, crateNumber });
+  const sku = buildTf2Sku(defindex, quality, { craftable, ksTier, australium, festivized, effectId, crateNumber });
   return `https://marketplace.tf/items/tf2/${sku.join(";")}`;
 }
 
@@ -479,24 +537,24 @@ export async function marketplaceTfUrl({
  * Winter 2016 Cosmetic Case" #105 ->
  * https://pricedb.io/item/5865%3B6%3Buncraftable%3Bc105.
  *
- * @param {object} opts
- * @param {string} opts.name - base item name, no quality/killstreak/Non-Craftable prefix (matches the TF2 schema's own item_name)
- * @param {string} [opts.quality="Unique"]
- * @param {boolean} [opts.craftable=true]
- * @param {number} [opts.ksTier] - killstreak tier (1 basic, 2 specialized, 3 professional)
- * @param {boolean} [opts.australium=false]
- * @param {boolean} [opts.festive=false]
- * @param {string|number} [opts.effectId] - Unusual effect id
- * @param {string|number} [opts.crateNumber] - crate/case series number — several crate types share one defindex and are only distinguished by this, e.g. "Bone-Chilling Bonanza Case" -> `5952;6;c142`
+ * @param {string} name - base item name, no quality/killstreak/Non-Craftable prefix (matches the TF2 schema's own item_name)
+ * @param {string} [quality="Unique"]
+ * @param {object} [options]
+ * @param {boolean} [options.craftable=true]
+ * @param {number} [options.ksTier] - killstreak tier (1 basic, 2 specialized, 3 professional)
+ * @param {boolean} [options.australium=false]
+ * @param {boolean} [options.festivized=false] - see marketplaceTfUrl()'s own doc for why this is named `festivized`, not `festive`
+ * @param {string|number} [options.effectId] - Unusual effect id
+ * @param {string|number} [options.crateNumber] - crate/case series number — several crate types share one defindex and are only distinguished by this, e.g. "Bone-Chilling Bonanza Case" -> `5952;6;c142`
  * @returns {Promise<string|null>} null if the item name isn't in the schema
  */
-export async function pricedbUrl({
-  name, quality = "Unique", craftable = true, ksTier, australium = false, festive = false, effectId, crateNumber,
-}) {
+export async function pricedbUrl(name, quality = "Unique", options = {}) {
+  const { craftable = true, ksTier, australium = false, festivized = false, effectId, crateNumber } = options;
+
   const defindex = await resolveDefindex(name, crateNumber);
   if (defindex == null) return null;
 
-  const sku = buildTf2Sku(defindex, quality, { craftable, ksTier, australium, festive, effectId, crateNumber });
+  const sku = buildTf2Sku(defindex, quality, { craftable, ksTier, australium, festivized, effectId, crateNumber });
   return `https://pricedb.io/item/${encodeURIComponent(sku.join(";"))}`;
 }
 
@@ -563,21 +621,27 @@ function toLiquidTfBase62(n) {
  * Schadenfreude" (defindex 463) -> .../schadenfreude-7T-6, not
  * .../taunt-the-schadenfreude-7T-6.
  *
- * @param {object} opts
- * @param {string} opts.name - base item name, no quality/killstreak/Non-Craftable prefix (matches the TF2 schema's own item_name, "Taunt: " included for taunts)
- * @param {string} [opts.quality="Unique"]
- * @param {boolean} [opts.craftable=true]
- * @param {number} [opts.ksTier] - killstreak tier (1 basic, 2 specialized, 3 professional)
- * @param {boolean} [opts.australium=false]
- * @param {string|number} [opts.effectId] - Unusual effect id
- * @param {string} [opts.effectName] - Unusual effect name, e.g. "Frostbite" — used in the slug only (see doc above); the link still resolves without it, just with a less specific slug
- * @param {string|number} [opts.crateNumber] - crate/case series number, always passed through to the defindex lookup and the "c" modifier when known (same as marketplace.tf/pricedb.io)
- * @param {boolean} [opts.isAmbiguousSeries=false] - whether to also bake "Series #<crateNumber>" into the slug text — see doc above
+ * No confirmed Festivized handling exists for this site (no real
+ * example seen with one) — `festivized` in `options` is intentionally
+ * not read here.
+ *
+ * @param {string} name - base item name, no quality/killstreak/Non-Craftable prefix (matches the TF2 schema's own item_name, "Taunt: " included for taunts)
+ * @param {string} [quality="Unique"]
+ * @param {object} [options]
+ * @param {boolean} [options.craftable=true]
+ * @param {number} [options.ksTier] - killstreak tier (1 basic, 2 specialized, 3 professional)
+ * @param {boolean} [options.australium=false]
+ * @param {string|number} [options.effectId] - Unusual effect id
+ * @param {string} [options.effectName] - Unusual effect name, e.g. "Frostbite" — used in the slug only (see doc above); the link still resolves without it, just with a less specific slug
+ * @param {string|number} [options.crateNumber] - crate/case series number, always passed through to the defindex lookup and the "c" modifier when known (same as marketplace.tf/pricedb.io)
+ * @param {boolean} [options.isAmbiguousSeries=false] - whether to also bake "Series #<crateNumber>" into the slug text — see doc above
  * @returns {Promise<string|null>} null if the item name isn't in the schema
  */
-export async function liquidTfUrl({
-  name, quality = "Unique", craftable = true, ksTier, australium = false, effectId, effectName, crateNumber, isAmbiguousSeries = false,
-}) {
+export async function liquidTfUrl(name, quality = "Unique", options = {}) {
+  const {
+    craftable = true, ksTier, australium = false, effectId, effectName, crateNumber, isAmbiguousSeries = false,
+  } = options;
+
   const defindex = await resolveDefindex(name, crateNumber);
   if (defindex == null) return null;
 
@@ -630,13 +694,20 @@ export async function liquidTfUrl({
  * "Non-Craftable Unlocked Cosmetic Crate Multi-Class" ->
  * https://crate.tf/item/5860-6-uncraftable, no crate number anywhere.
  *
- * @param {object} opts
- * @param {string} opts.name - bare crate/case name, no "#N"/"Series #N" suffix (matches the TF2 schema's own item_name)
- * @param {string|number} [opts.crateNumber] - crate/case series number (the "#142" backpack.tf shows, "Series #34" on stntrading.eu) — omit only for a one-off reward crate with no series number at all
- * @param {boolean} [opts.craftable=true] - only consulted when crateNumber is omitted, to build the "uncraftable" sku variant above
+ * `quality` is accepted for signature consistency with every other
+ * builder here, but real crates are always Unique quality (the sku's
+ * quality segment is hardcoded accordingly) — it's ignored.
+ *
+ * @param {string} name - bare crate/case name, no "#N"/"Series #N" suffix (matches the TF2 schema's own item_name)
+ * @param {string} [quality] - ignored, see doc above
+ * @param {object} [options]
+ * @param {string|number} [options.crateNumber] - crate/case series number (the "#142" backpack.tf shows, "Series #34" on stntrading.eu) — omit only for a one-off reward crate with no series number at all
+ * @param {boolean} [options.craftable=true] - only consulted when crateNumber is omitted, to build the "uncraftable" sku variant above
  * @returns {Promise<string|null>} null if the item name isn't in the schema, or if there's neither a crate number nor a Non-Craftable variant to key off
  */
-export async function crateTfUrl({ name, crateNumber, craftable = true }) {
+export async function crateTfUrl(name, quality, options = {}) {
+  const { crateNumber, craftable = true } = options;
+
   const defindex = await resolveDefindex(name, crateNumber);
   if (defindex == null) return null;
 
@@ -651,8 +722,9 @@ export async function crateTfUrl({ name, crateNumber, craftable = true }) {
 
 /**
  * backpack.tf Classifieds "sell" listing draft for one specific item —
- * unlike every other link here, this isn't derivable from the item's
- * name/quality/etc. at all, just its Steam asset id.
+ * unlike every other builder here, this isn't derivable from the
+ * item's name/quality/etc. at all, just its Steam asset id, so it's
+ * the one exception to the `(name, quality, options)` shape.
  * @param {string|number} assetId
  */
 export function backpackSellUrl(assetId) {
@@ -663,7 +735,9 @@ export function backpackSellUrl(assetId) {
 export const POSTS_TF_SEARCH_RESULTS_URL = "https://posts.tf/posts/search/results";
 
 /**
- * posts.tf search request body.
+ * posts.tf search request body. Takes arrays of items rather than one
+ * item's name/quality/etc., so this is the other exception to the
+ * `(name, quality, options)` shape.
  *
  * posts.tf's search isn't URL-driven — the site itself only exposes a
  * POST https://posts.tf/api/posts/search?page=N endpoint, taking this

@@ -12,6 +12,7 @@
 - Fixed the merchant.tf link dropping craftability entirely (e.g. "Non-Craftable Duck Journal" linked to the craftable search instead of "non-craftable-duck-journal")
 - Added a gladiator.tf sales-page link
 - "bp.tf stats" and "next.bp.tf stats" are now a single "bp.tf stats" button that follows the popup's new "Default bp.tf version" setting
+- Internal: utils/itemLinks.js builders now take (name, quality, options) instead of one combined object; crate/defindex data moved to utils/tf2ItemSchema.js
 
 # Version 1.0.1
 

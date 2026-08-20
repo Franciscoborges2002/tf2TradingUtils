@@ -196,9 +196,7 @@ async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
   if (isUnusual) {
     if (!effect) return null; // no effect match — can't build a useful link
     const baseName = stripUnusualEffectName(itemNameRaw, effect.name);
-    return backpackStatsUrl({
-      name: baseName, quality: "Unusual", craftable: true, effectId: effect.id, next: useNext,
-    });
+    return backpackStatsUrl(baseName, "Unusual", { craftable: true, effectId: effect.id, next: useNext });
   }
 
   const crateMatch = itemNameRaw.match(CRATE_NUMBER_RE);
@@ -214,9 +212,7 @@ async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
   const baseForQuirk = festivePrefix ? name.slice(festivePrefix.length) : name;
   const quirk = ITEM_NAME_QUIRKS[baseForQuirk];
 
-  return backpackStatsUrl({
-    name: festivePrefix + (quirk?.backpackName ?? baseForQuirk),
-    quality,
+  return backpackStatsUrl(festivePrefix + (quirk?.backpackName ?? baseForQuirk), quality, {
     craftable,
     effectId: crateMatch ? crateMatch[1] : undefined,
     next: useNext,
@@ -326,17 +322,23 @@ async function createManncoLink(itemNameRaw, isUnusual, effect) {
     // Steam's own item name never includes.
     if (!effect) return "";
     const baseName = stripUnusualEffectName(name, effect.name);
-    return mannCoStoreUrl({ name: `Unusual ${baseName}`, effectName: effect.name });
+    return mannCoStoreUrl(`Unusual ${baseName}`, undefined, { effectName: effect.name });
   }
 
   // mannco.store only wants the crate number for ambiguous multi-series
   // names (see resolveCrateSeries()) — dropped for every other crate.
   const manncoName = name.replace(CRATE_NUMBER_RE, "");
-  const { crateNumber, isAmbiguous } = await resolveCrateSeries(name, manncoName);
+  // Cheap sync check first — resolveCrateSeries() does the same
+  // CRATE_NUMBER_RE test internally before its own (async) ambiguity
+  // lookup, but doing it here too means most items (no crate number at
+  // all) never enter that async function in the first place.
+  const { crateNumber, isAmbiguous } = CRATE_NUMBER_RE.test(name)
+    ? await resolveCrateSeries(name, manncoName)
+    : { crateNumber: null, isAmbiguous: false };
 
   // "Non-Craftable " (if present) is kept as-is — mannCoStoreUrl()
   // turns it into mannco.store's "uncraftable" slug word.
-  return mannCoStoreUrl({ name: manncoName, crateNumber: isAmbiguous ? crateNumber : undefined });
+  return mannCoStoreUrl(manncoName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined });
 }
 
 /**
@@ -356,9 +358,12 @@ async function createSkinportLink(itemNameRaw, isUnusual) {
 
   // Same multi-series exception as createManncoLink() above.
   const skinportName = name.replace(CRATE_NUMBER_RE, "");
-  const { crateNumber, isAmbiguous } = await resolveCrateSeries(name, skinportName);
+  // Cheap sync check first — see createManncoLink()'s own comment above.
+  const { crateNumber, isAmbiguous } = CRATE_NUMBER_RE.test(name)
+    ? await resolveCrateSeries(name, skinportName)
+    : { crateNumber: null, isAmbiguous: false };
 
-  return skinportUrl({ name: skinportName, crateNumber: isAmbiguous ? crateNumber : undefined });
+  return skinportUrl(skinportName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined });
 }
 
 /**
@@ -370,7 +375,7 @@ async function createSkinportLink(itemNameRaw, isUnusual) {
 async function createMarketplaceLink(itemNameRaw) {
   const attrs = await parseItemAttributes(itemNameRaw);
   if (!attrs) return null;
-  return marketplaceTfUrl(attrs);
+  return marketplaceTfUrl(attrs.name, attrs.quality, attrs);
 }
 
 /**
@@ -383,7 +388,7 @@ async function createMarketplaceLink(itemNameRaw) {
 async function createPricedbLink(itemNameRaw) {
   const attrs = await parseItemAttributes(itemNameRaw);
   if (!attrs) return null;
-  return pricedbUrl(attrs);
+  return pricedbUrl(attrs.name, attrs.quality, attrs);
 }
 
 /**
@@ -398,7 +403,7 @@ async function createPricedbLink(itemNameRaw) {
 async function createLiquidTfLink(itemNameRaw) {
   const attrs = await parseItemAttributes(itemNameRaw);
   if (!attrs) return null;
-  return liquidTfUrl(attrs);
+  return liquidTfUrl(attrs.name, attrs.quality, attrs);
 }
 
 /**
@@ -413,7 +418,7 @@ async function createLiquidTfLink(itemNameRaw) {
 async function createCrateTfLink(itemNameRaw) {
   const attrs = await parseItemAttributes(itemNameRaw);
   if (!attrs) return null;
-  return crateTfUrl(attrs);
+  return crateTfUrl(attrs.name, attrs.quality, attrs);
 }
 
 /**
@@ -432,7 +437,7 @@ function createMerchantTfLink(itemNameRaw) {
   const nameWithoutSeries = crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw;
   const { name, quality, craftable } = parseShallow(nameWithoutSeries);
 
-  return merchantTfUrl({ name, quality, craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
+  return merchantTfUrl(name, quality, { craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
 }
 
 /**
@@ -449,7 +454,7 @@ function createGladiatorTfLink(itemNameRaw) {
   const nameWithoutSeries = crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw;
   const { name, quality, craftable } = parseShallow(nameWithoutSeries);
 
-  return gladiatorTfUrl({ name, quality, craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
+  return gladiatorTfUrl(name, quality, { craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
 }
 
 // Load and cache the JSON dynamically
