@@ -20,6 +20,7 @@ import { TF2_KS_SHEEN_IDS, TF2_KS_KILLSTREAKER_IDS } from "../../utils/constants
 import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, wikiUrl } from "../../utils/itemLinks.js";
 import { getKnownCrateNumber } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
+import { loadIconSvg } from "../../utils/icons.js";
 
 // scrap.tf's own hover tooltip text drops diacritics for at least this
 // one item — it literally renders "Quackenbirdt" with no accent at all
@@ -32,10 +33,21 @@ const SCRAP_TF_NAME_CORRECTIONS = {
   "Quackenbirdt": "Quäckenbirdt",
 };
 
-export function ItemLinks() {
-  // store pending hover info
-  let pendingItemEl = null;
+/** Copies the item's display name to the clipboard, briefly swapping the button's icon to a checkmark (same copy/check icons stntrading.eu/copyClipboard uses) to confirm it worked. */
+function copyNameToClipboard(name, btn, copySvg, checkSvg) {
+  navigator.clipboard.writeText(name)
+    .then(() => {
+      btn.innerHTML = checkSvg;
+      btn.classList.add("tf2utils-mini-modal-copy-btn--done");
+      setTimeout(() => {
+        btn.innerHTML = copySvg;
+        btn.classList.remove("tf2utils-mini-modal-copy-btn--done");
+      }, 1200);
+    })
+    .catch((err) => console.warn("[TF2Utils] Failed to copy name:", err));
+}
 
+export function addItemLinks() {
   // Inject CSS
   const style = document.createElement("style");
   style.textContent = `
@@ -54,7 +66,8 @@ export function ItemLinks() {
       max-width:260px;
       display:block;
     }
-    #tf2utils-mini-modal .tf2utils-mini-modal-name{ font-weight:700; margin-bottom:8px; }
+    #tf2utils-mini-modal .tf2utils-mini-modal-name{ font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+    #tf2utils-mini-modal .tf2utils-mini-modal-name-text{ overflow-wrap:anywhere; }
     #tf2utils-mini-modal .tf2utils-mini-modal-btns{ display:flex; gap:8px; flex-wrap:wrap; padding: 4px; }
     #tf2utils-mini-modal .btn{
       border:1px solid #2e2e2e;
@@ -66,6 +79,22 @@ export function ItemLinks() {
       font-size:12px;
     }
     #tf2utils-mini-modal .btn:hover{ background: ${COLOR_PANEL_BG}; }
+    #tf2utils-mini-modal .tf2utils-mini-modal-copy-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex-shrink:0;
+      width:24px;
+      height:24px;
+      padding:0;
+      cursor:pointer;
+    }
+    /* [hidden] alone loses to the rule above (higher specificity: id +
+       class beats a bare attribute selector), so the copy button stayed
+       visible with no item selected — this wins the tie back. */
+    #tf2utils-mini-modal .tf2utils-mini-modal-copy-btn[hidden]{ display:none; }
+    #tf2utils-mini-modal .tf2utils-mini-modal-copy-btn svg{ display:block; }
+    #tf2utils-mini-modal .tf2utils-mini-modal-copy-btn--done{ color:#2e8b40; }
   `;
   document.head.appendChild(style);
 
@@ -73,13 +102,31 @@ export function ItemLinks() {
   const modal = document.createElement("div");
   modal.id = "tf2utils-mini-modal";
   modal.innerHTML = `
-    <div class="tf2utils-mini-modal-name">Middle-click or Ctrl+click an item…</div>
+    <div class="tf2utils-mini-modal-name">
+      <span class="tf2utils-mini-modal-name-text">Middle-click or Ctrl+click an item…</span>
+      <button type="button" class="btn tf2utils-mini-modal-copy-btn" title="Copy item name" aria-label="Copy item name" hidden></button>
+    </div>
     <div class="tf2utils-mini-modal-btns"></div>
   `;
   document.documentElement.appendChild(modal);
 
+  // Loaded once and cached (loadIconSvg() itself caches per icon name
+  // too) — by the time the user middle-clicks/ctrl-clicks an item, this
+  // has almost always already resolved, so updateModal() below can use
+  // it synchronously instead of re-awaiting on every click.
+  const copyBtn = modal.querySelector(".tf2utils-mini-modal-copy-btn");
+  let copySvg = "";
+  let checkSvg = "";
+  Promise.all([loadIconSvg("copy"), loadIconSvg("check")])
+    .then(([copy, check]) => {
+      copySvg = copy;
+      checkSvg = check;
+      copyBtn.innerHTML = copySvg;
+    })
+    .catch((err) => console.warn("[TF2Utils] Failed to load copy icon:", err));
+
   function updateModal(name, itemEl) {
-    const className = modal.querySelector(".tf2utils-mini-modal-name");
+    const nameText = modal.querySelector(".tf2utils-mini-modal-name-text");
     const classBtns = modal.querySelector(".tf2utils-mini-modal-btns");
 
     // Killstreak tier, Festivized and Non-Craftable don't always show up
@@ -94,7 +141,9 @@ export function ItemLinks() {
     if (isUncraftItem && !displayName.includes("Non-Craftable") && !displayName.includes("Uncraftable")) {
       displayName = "Non-Craftable " + displayName;
     }
-    className.textContent = displayName;
+    nameText.textContent = displayName;
+    copyBtn.hidden = false;
+    copyBtn.onclick = () => copyNameToClipboard(displayName, copyBtn, copySvg, checkSvg);
     classBtns.innerHTML = "";
 
     makeLinks(name, itemEl)
@@ -111,30 +160,21 @@ export function ItemLinks() {
       .catch((err) => console.warn("[TF2Utils] Failed to build item links:", err));
   }
 
-  // Watch for hover tooltip becoming visible
-  const hoverEl = document.querySelector(".hover-over");
-  if (!hoverEl) {
+  // Confirms the tooltip container exists on this page at all.
+  const selectedHoverEl = document.querySelector(".hover-over");
+  if (!selectedHoverEl) {
     console.warn("[TF2Utils] Scrap.tf hover-over not found.");
     return;
   }
 
-  /* Get the item information */
-  document.addEventListener("mouseover", (e) => {
-    const item = e.target.closest(".item.hoverable");
-    if (!item) return;
-    pendingItemEl = item;
-  });
-
-  document.addEventListener("mouseout", (e) => {
-    if (e.target.closest(".item.hoverable")) pendingItemEl = null;
-  });
-
-  // Updates the modal when the user clicks with the mouse wheel on the item when hovering
+  // Updates the modal when the user middle-clicks or ctrl/cmd-clicks an
+  // item — nothing needs tracking between events, since the click
+  // itself lands on the item, unlike a separate hover-driven flow.
   document.addEventListener(
     "mousedown",
     (e) => {
-      //Verify if there is any pending item to be displayed
-      if (!pendingItemEl) return;
+      const item = e.target.closest(".item.hoverable");
+      if (!item) return;
 
       //Check eaither if is pressing the mouse wheel or the control
       //CtrlKey: Windows/linux, metaKey: Mac
@@ -143,15 +183,14 @@ export function ItemLinks() {
       //Verify if one of the 2 options were pressed in order to update the modal
       if (!isActivate) return;
 
-      const hoverEl = document.querySelector(".hover-over");
-      if (!hoverEl) return;
+      const selectedHoverEl = document.querySelector(".hover-over");
+      if (!selectedHoverEl) return;
 
       // tooltip must be visible (Scrap uses display:none)
-      if (hoverEl.style.display === "none") return;
+      if (selectedHoverEl.style.display === "none") return;
 
-      const titleSpan = hoverEl.querySelector(".hover-over-title span");
-      const titleDiv = hoverEl.querySelector(".hover-over-title");
-      const contentDiv = hoverEl.querySelector(".hover-over-content");
+      const titleSpan = selectedHoverEl.querySelector(".hover-over-title span");
+      const titleDiv = selectedHoverEl.querySelector(".hover-over-title");
 
       const rawName = (
         titleSpan?.textContent ||
@@ -159,26 +198,17 @@ export function ItemLinks() {
         ""
       ).trim();
       const name = SCRAP_TF_NAME_CORRECTIONS[rawName] || rawName;
-      const contentHtml = contentDiv?.innerHTML || "";
 
       if (!name) return;
 
-      // If you want quality class directly from tooltip:
-      const qualityClass = titleSpan
-        ? [...titleSpan.classList].find((c) => c.startsWith("quality"))
-        : null;
-      console.log({ name, qualityClass, contentHtml, pendingItemEl });
-
       // update modal
-      updateModal(name, pendingItemEl);
+      updateModal(name, item);
 
       // prevent auto-scroll(mouse wheel)  or redirection to new page(ctrl)
       e.preventDefault();
     },
     true
   );
-
-  console.log("[TF2Utils] Hover capture + wheel-click to update active.");
 }
 
 /* 
@@ -514,9 +544,9 @@ function getKillstreakInfo(itemEl) {
  * item's own name — see isFestivized() for why).
  */
 function getHoverContentEl() {
-  const hoverEl = document.querySelector(".hover-over");
-  if (!hoverEl || hoverEl.style.display === "none") return null;
-  return hoverEl.querySelector(".hover-over-content");
+  const selectedHoverEl = document.querySelector(".hover-over");
+  if (!selectedHoverEl || selectedHoverEl.style.display === "none") return null;
+  return selectedHoverEl.querySelector(".hover-over-content");
 }
 
 /**

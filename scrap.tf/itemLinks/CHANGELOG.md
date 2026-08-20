@@ -14,6 +14,7 @@
 - "Bp Stats" and "Next Bp Stats" are now a single "Bp Stats" button that follows the popup's new "Default bp.tf version" setting
 - Brought back a "Bp Classifieds" link (removed in this same version, above) — now also filters by killstreak sheen/killstreaker when the item has one, for a more specific comparison
 - Internal: utils/itemLinks.js builders now take (name, quality, options) instead of one combined object; crate/defindex data moved to utils/tf2ItemSchema.js
+* Added copy to clipboard function
 
 # Version 1.1.0
 
