@@ -34,7 +34,7 @@
 
 import { TF2_APPID, TF2_QUALITY_IDS } from "./constants/tf2Economy.js";
 import { ITEM_NAME_QUIRKS } from "./constants/itemNameQuirks.js";
-import { resolveDefindex } from "./tf2ItemSchema.js";
+import { resolveDefindex, CRATE_NUMBER_RE } from "./tf2ItemSchema.js";
 
 /**
  * Steam Market and mannco.store both key off the item's full descriptive
@@ -77,34 +77,43 @@ export function wikiUrl(name, quality) {
  *
  * The two sites use genuinely different URL shapes for this page —
  * classic backpack.tf is path-segment based; next.backpack.tf is
- * query-param based (and has no per-Unusual-effect filtering) —
- * confirmed against scrap.tf/ItemLinks's already-working next.backpack.tf
- * link, so `next: true` always builds that shape now. Neither variant
- * has a separate Festivized field or page at all — confirmed live: a
- * Festivized item's stats link should land on the plain item's page,
- * so `festivized` isn't read here even though `options` carries it for
- * other builders; bake killstreak tier into `name` for classic instead
- * (see that param's own doc) if it applies.
+ * query-param based. Confirmed against a real next.backpack.tf URL:
+ * "Bone-Chilling Bonanza Case" #142 ->
+ * https://next.backpack.tf/stats?item=Bone-Chilling+Bonanza+Case&quality=Unique&priceindex=142
+ * — `quality` is sent as its name, not the numeric id classic/classifieds
+ * use, crate/case series number DOES have an equivalent here after all
+ * (`priceindex`, sharing that one param with Unusual effect id the same
+ * way classic shares one trailing path segment for both), and every
+ * filter param is only included when it's not the "no filter" default —
+ * no `tradable` at all, `craftable` only when non-craftable (a literal
+ * boolean "false", not classic's -1/1), `killstreakTier` only when set.
+ * Neither variant has a separate
+ * Festivized field or page at all — confirmed live: a Festivized item's
+ * stats link should land on the plain item's page, so `festivized` isn't
+ * read here even though `options` carries it for other builders; bake
+ * killstreak tier into `name` for classic instead (see that param's own
+ * doc) if it applies.
  *
  * @param {string} name - base item name, no quality/Non-Craftable prefix. For classic backpack.tf (no `next`), bake any killstreak-tier prefix ("Killstreak ", "Specialized Killstreak ", "Professional Killstreak ") into this directly — the classic URL has no separate field for it.
  * @param {string} [quality="Unique"]
  * @param {object} [options]
  * @param {boolean} [options.craftable=true]
- * @param {string|number} [options.effectId] - Unusual effect id, appended as a trailing path segment (classic backpack.tf only — next.backpack.tf's stats query has no equivalent). Shares that same trailing segment with `crateNumber` below — pass whichever one actually applies to this item, never both.
- * @param {string|number} [options.crateNumber] - crate/case series number — same trailing path segment `effectId` uses on classic (an item is never both Unusual and a crate), ignored on next.backpack.tf (no equivalent field there)
- * @param {number} [options.ksTier] - killstreak tier (next.backpack.tf only; classic backpack.tf expects it baked into `name` instead)
- * @param {boolean} [options.australium] - next.backpack.tf only, and only ever sent when true (matches the confirmed-working link, which omits it otherwise)
+ * @param {string|number} [options.effectId] - Unusual effect id, appended as a trailing path segment on classic, `priceindex` on next. Shares that same slot with `crateNumber` below — pass whichever one actually applies to this item, never both.
+ * @param {string|number} [options.crateNumber] - crate/case series number — same slot `effectId` uses (an item is never both Unusual and a crate): trailing path segment on classic, `priceindex` on next
+ * @param {number} [options.ksTier] - killstreak tier. Classic backpack.tf expects it baked into `name` instead; on next, only appended to the query when truthy
+ * @param {boolean} [options.australium] - only ever sent when true (matches the confirmed-working link, which omits it otherwise)
  * @param {boolean} [options.next=false] - use next.backpack.tf instead of backpack.tf
  */
 export function backpackStatsUrl(name, quality = "Unique", options = {}) {
   const { craftable = true, effectId, crateNumber, ksTier, australium, next = false } = options;
-  const craftParam = craftable ? 1 : -1;
 
   if (next) {
-    const qualityId = TF2_QUALITY_IDS[quality] ?? TF2_QUALITY_IDS.Unique;
-    let url = `https://next.backpack.tf/stats?item=${encodeURIComponent(name)}&quality=${qualityId}&tradable=1&craftable=${craftParam}`;
+    let url = `https://next.backpack.tf/stats?item=${encodeURIComponent(name)}&quality=${encodeURIComponent(quality)}`;
+    if (!craftable) url += `&craftable=false`;
+    if (ksTier) url += `&killstreakTier=${ksTier}`;
     if (australium) url += `&australium=1`;
-    url += `&killstreakTier=${ksTier ?? 0}`;
+    const priceindex = effectId ?? crateNumber;
+    if (priceindex != null) url += `&priceindex=${priceindex}`;
     return url;
   }
 
@@ -184,27 +193,28 @@ export function backpackClassifiedsUrl(name, quality = "Unique", options = {}) {
  * `options` field for the rest.
  *
  * Spaces are encoded as "+" (not %20), colons as %3A, apostrophes as
- * %27 and "#" as %23 (unlike every other site here, stntrading.eu
- * keeps a crate's "Series #N"/"#N" suffix as part of the name itself —
- * it has a separate page per series/case number, not one per crate
- * type — so that character shows up for real and has to be escaped:
- * unescaped, it'd truncate the URL at the fragment) — that's the URL
- * shape stntrading.eu actually expects, reverse-engineered from the
- * site itself rather than documented anywhere.
+ * %27 and "#" as %23 — that's the URL shape stntrading.eu actually
+ * expects, reverse-engineered from the site itself rather than
+ * documented anywhere.
  *
- * Crate/case names known to span multiple series under one shared
- * display name (base "Mann Co. Supply Crate"/"Mann Co. Supply
- * Munition", ...) need the word "Series" in front of the number on
- * stntrading.eu regardless of whether the source site's own text
- * included it — confirmed: "Mann Co. Supply Munition #91" (no "Series"
- * word on backpack.tf) still needs
- * ".../Mann+Co.+Supply+Munition+Series+%2391" here, not
+ * Crate/case series number: dropped for almost every crate, same
+ * convention as mannco.store/skinport.com — a unique display name
+ * (most themed cases) is already enough on its own, and keeping a
+ * trailing "#N" that stntrading.eu doesn't expect breaks the link
+ * (confirmed: a Unique-name case like "Bone-Chilling Bonanza Case #58"
+ * needs ".../Bone-Chilling+Bonanza+Case", not
+ * ".../Bone-Chilling+Bonanza+Case+%2358"). Only crate/case names known
+ * to span multiple series under one shared display name (base "Mann
+ * Co. Supply Crate"/"Mann Co. Supply Munition", ...) need the number
+ * kept, and always with the word "Series" in front regardless of
+ * whether the source site's own text included it — confirmed: "Mann
+ * Co. Supply Munition #91" (no "Series" word on backpack.tf) still
+ * needs ".../Mann+Co.+Supply+Munition+Series+%2391" here, not
  * ".../Mann+Co.+Supply+Munition+%2391". Pass `isAmbiguousSeries: true`
- * (from isAmbiguousCrateName()) and a trailing "#N" with no "Series"
- * word gets one inserted; everything else (most crates, which are
- * already unambiguous by name alone) is left exactly as given.
+ * (from isAmbiguousCrateName()) for those; everything else has any
+ * trailing "#N"/"Series #N" stripped out entirely.
  *
- * @param {string} name - full item name (quality prefix included, as stntrading.eu shows it — keep any "Series #N"/"#N" crate suffix too, unlike mannco.store/marketplace.tf's separate crate handling)
+ * @param {string} name - full item name (quality prefix included, as stntrading.eu shows it), "Series #N"/"#N" crate suffix included or not — stripped/re-added here as needed, see doc above
  * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — only needed if `name` doesn't already include it
  * @param {object} [options]
  * @param {boolean} [options.craftable=true]
@@ -213,9 +223,12 @@ export function backpackClassifiedsUrl(name, quality = "Unique", options = {}) {
 export function stnTradingUrl(name, quality, options = {}) {
   const { craftable = true, isAmbiguousSeries = false } = options;
 
-  let workingName = ensureQualityPrefix(name, quality);
-  if (isAmbiguousSeries && !/Series\s+#\d+\s*$/i.test(workingName)) {
-    workingName = workingName.replace(/#(\d+)\s*$/i, "Series #$1");
+  const crateMatch = name.match(CRATE_NUMBER_RE);
+  const bareName = crateMatch ? name.slice(0, crateMatch.index) : name;
+
+  let workingName = ensureQualityPrefix(bareName, quality);
+  if (isAmbiguousSeries && crateMatch) {
+    workingName += ` Series #${crateMatch[1]}`;
   }
 
   const encoded = workingName
@@ -266,19 +279,28 @@ export function stnTradingUrl(name, quality, options = {}) {
  * "Salvaged Mann Co. Supply Crate" #30 -> ".../440-salvaged-mann-co-
  * supply-crate-series-30".
  *
- * @param {string} name - full item name, as Steam displays it (no effect name, no "Series #N"/"#N" suffix) — include "Non-Craftable " if applicable
+ * @param {string} name - full item name, as Steam displays it (no effect name, no "Series #N"/"#N" suffix) — include "Non-Craftable " if applicable, or pass `options.craftable: false` instead (whichever the caller already has on hand)
  * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
  * @param {object} [options]
+ * @param {boolean} [options.craftable=true] - prepends "Non-Craftable " when false, unless `name` already starts with it
  * @param {string} [options.effectName] - Unusual effect name, e.g. "Frostbite"
  * @param {number} [options.appId] - defaults to TF2
  * @param {string|number} [options.crateNumber] - only for crate/case names known to span multiple series under one display name — see doc above
  */
 export function mannCoStoreUrl(name, quality, options = {}) {
-  const { effectName, appId = TF2_APPID, crateNumber } = options;
+  const { craftable = true, effectName, appId = TF2_APPID, crateNumber } = options;
 
   const qualifiedName = ensureQualityPrefix(name, quality);
   const fullName = effectName ? `${effectName} ${qualifiedName}` : qualifiedName;
-  const slug = fullName
+  // Two ways in: baked into `name` itself (older convention, still
+  // supported below) or `options.craftable: false` (for callers whose
+  // source page exposes craftability as its own flag instead of name
+  // text) — the not-already-prefixed check avoids double-prepending if
+  // a caller ever passes both.
+  const craftPrefixedName = !craftable && !/^non-craftable\b/i.test(fullName)
+    ? `Non-Craftable ${fullName}`
+    : fullName;
+  const slug = craftPrefixedName
     .replace(/non-craftable/gi, "Uncraftable")
     .normalize("NFD").replace(/[̀-ͯ]/g, "") // fold accents to plain ASCII (ä -> a)
     .toLowerCase()
@@ -336,21 +358,26 @@ export function mannCoStoreUrl(name, quality, options = {}) {
  * before the "+uncraftable" suffix if both apply: confirmed "Salvaged
  * Mann Co. Supply Crate" #30 -> ".../salvaged-mann-co-supply-crate-series-30".
  *
- * @param {string} name - full item name (quality/killstreak/Non-Craftable prefixes included, as Steam displays them; no "Series #N"/"#N" suffix)
+ * @param {string} name - full item name (quality/killstreak prefixes included, as Steam displays them; no "Series #N"/"#N" suffix) — include "Non-Craftable " if applicable, or pass `options.craftable: false` instead (whichever the caller already has on hand)
  * @param {string} [quality] - if given (and not "Unique"/"Unusual"), ensures name starts with this quality word — same reasoning as steamMarketUrl()
  * @param {object} [options]
+ * @param {boolean} [options.craftable=true] - appends "+uncraftable" when false, same as a "Non-Craftable " prefix already baked into `name`
  * @param {string|number} [options.crateNumber] - only for crate/case names known to span multiple series under one display name — see doc above
  */
 export function skinportUrl(name, quality, options = {}) {
-  const { crateNumber } = options;
+  const { craftable = true, crateNumber } = options;
 
   // Non-Craftable is stripped before the quirk lookup below (not just
   // before slugifying) — ITEM_NAME_QUIRKS is keyed by the bare name, so
   // leaving "Non-Craftable " attached would make a Non-Craftable
   // Quäckenbirdt silently miss its "The " (confirmed: the correct link
   // is "the-qu-ckenbirdt+uncraftable", not "qu-ckenbirdt+uncraftable").
+  // Two ways in: baked into `name` itself (older convention, still
+  // supported) or `options.craftable: false` (for callers whose source
+  // page exposes craftability as its own flag instead of name text) —
+  // either sets the "+uncraftable" suffix below.
   const trimmed = name.trim();
-  const isNonCraftable = /^non-craftable\s+/i.test(trimmed);
+  const isNonCraftable = /^non-craftable\s+/i.test(trimmed) || !craftable;
   const withoutCraftability = trimmed.replace(/^non-craftable\s+/i, "");
 
   let fullName = ensureQualityPrefix(withoutCraftability, quality);

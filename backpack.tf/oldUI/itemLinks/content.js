@@ -186,15 +186,17 @@ async function processPopoverInner(popover) {
     .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
 
   // mannco.store/skinport.com both want the full descriptive name
-  // (quality/killstreak/Festivized/Non-Craftable text baked in) —
-  // exactly what the popover title already is. TODO: Unusual items
-  // need their effect name prepended (mannCoStoreUrl()'s `effectName`
-  // option) for a correct slug — this popover doesn't expose one yet,
-  // so for now Unusual items just link without it.
+  // (quality/killstreak/Festivized text baked in) — exactly what the
+  // popover title already is, minus "Non-Craftable " (bareName), which
+  // goes through `craftable` instead so this doesn't depend on that
+  // text being there. TODO: Unusual items need their effect name
+  // prepended (mannCoStoreUrl()'s `effectName` option) for a correct
+  // slug — this popover doesn't expose one yet, so for now Unusual
+  // items just link without it.
   const links = [
-    { label: "mannco.store", href: mannCoStoreUrl(fullDisplayName, qualityName, { crateNumber: ambiguousCrateNumber }) },
+    { label: "mannco.store", href: mannCoStoreUrl(bareName, qualityName, { craftable, crateNumber: ambiguousCrateNumber }) },
     { label: "stntrading.eu", href: stnTradingUrl(stnName, undefined, { craftable, isAmbiguousSeries: isAmbiguous }) },
-    { label: "skinport.com", href: skinportUrl(fullDisplayName, qualityName, { crateNumber: ambiguousCrateNumber }) },
+    { label: "skinport.com", href: skinportUrl(bareName, qualityName, { craftable, crateNumber: ambiguousCrateNumber }) },
   ].filter((link) => link.href);
 
   // websites dedicated pages to keys
