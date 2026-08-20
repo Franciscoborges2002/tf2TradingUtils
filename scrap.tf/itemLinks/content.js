@@ -18,7 +18,7 @@ import { COLOR_PANEL_BG, SITE_BRAND_COLORS } from "../../utils/constants/colors.
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 import { TF2_KS_SHEEN_IDS, TF2_KS_KILLSTREAKER_IDS } from "../../utils/constants/tf2Economy.js";
 import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, wikiUrl } from "../../utils/itemLinks.js";
-import { getKnownCrateNumber } from "../../utils/tf2ItemSchema.js";
+import { getKnownCrateNumber, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
 import { loadIconSvg } from "../../utils/icons.js";
 
@@ -400,6 +400,24 @@ async function makeLinks(name, itemEl) {
     return undefined;
   });
 
+  // crateTfUrl() itself has no "is this actually a crate" check — it
+  // trusts the caller. Without this gate, any non-craftable non-crate
+  // item (e.g. "Non-Craftable Duck Journal") would still resolve a real
+  // defindex and get a bogus ".../uncraftable" crate.tf link, since
+  // crateNumber == null but craftable is false either way — same bug
+  // already fixed in backpack.tf oldUI/newUI with this same check.
+  const looksLikeCrate = IS_CRATE_CASE_RE.test(classifiedsName) && !/\bkey\b/i.test(classifiedsName);
+
+  // Resolved as its own step (not inline in the array below) since it
+  // needs this extra gate check, not just craftable/crateNumber like
+  // the others — kept here, rather than pushed after the array, so the
+  // crate.tf button still lands in its usual spot in the row.
+  let crateTfHref = null;
+  if (looksLikeCrate && (crateNumber != null || isUncraft)) {
+    crateTfHref = await crateTfUrl(classifiedsName, undefined, { crateNumber, craftable: !isUncraft })
+      .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; });
+  }
+
   const links = [
     // Single "Bp Stats" button, following the popup's "Default bp.tf
     // version" setting — classic and next.backpack.tf need genuinely
@@ -428,8 +446,7 @@ async function makeLinks(name, itemEl) {
     { label: "marketplace.tf", href: await marketplaceTfUrl(classifiedsName, qualityName, {
         craftable: !isUncraft, ksTier, australium: isAustralium, festivized: isFestivizedItem,
       }).catch((err) => { console.warn("[TF2Utils] marketplace.tf link failed:", err); return null; }) },
-    { label: "crate.tf", href: await crateTfUrl(classifiedsName, undefined, { crateNumber, craftable: !isUncraft })
-        .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; }) },
+    { label: "crate.tf", href: crateTfHref },
     { label: "merchant.tf", href: merchantTfUrl(fullDisplayName, qualityName, { craftable: !isUncraft, crateNumber }) },
     { label: "gladiator.tf", href: gladiatorTfUrl(fullDisplayName, qualityName, { craftable: !isUncraft, crateNumber }) },
     { label: "pricedb.io", href: await pricedbUrl(classifiedsName, qualityName, {
