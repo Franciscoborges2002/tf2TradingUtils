@@ -92,14 +92,18 @@
     {
       "resources": ["utils/**"],
       "matches": ["https://*.backpack.tf/*", "https://scrap.tf/*", "https://stntrading.eu/*", "https://steamcommunity.com/*"]
+    },
+    {
+      "resources": ["public/icons/*.svg"],
+      "matches": ["https://*.backpack.tf/*", "https://scrap.tf/*", "https://stntrading.eu/*", "https://steamcommunity.com/*"]
     }
   ],
   "icons": {
-    "256": "public/icons/png/icon_256.png",
-    "128": "public/icons/png/icon_128.png",
-    "64": "public/icons/png/icon_64.png",
-    "48": "public/icons/png/icon_48.png",
-    "32": "public/icons/png/icon_32.png",
-    "16": "public/icons/png/icon_16.png"
+    "256": "public/logos/png/icon_256.png",
+    "128": "public/logos/png/icon_128.png",
+    "64": "public/logos/png/icon_64.png",
+    "48": "public/logos/png/icon_48.png",
+    "32": "public/logos/png/icon_32.png",
+    "16": "public/logos/png/icon_16.png"
   }
 }
