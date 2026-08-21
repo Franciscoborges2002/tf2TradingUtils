@@ -1,6 +1,6 @@
 // itemLinks.js
 import { COLOR_PANEL_BG, SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
-import { TF2_APPID, TF2_CONTEXTID } from "../../utils/constants/tf2Economy.js";
+import { TF2_APPID, TF2_CONTEXTID, TF2_QUALITY_NAMES } from "../../utils/constants/tf2Economy.js";
 import { isTf2InventoryActive, isOwnInventory } from "../../utils/steamInventory.js";
 import {
   steamMarketUrl,
@@ -12,13 +12,8 @@ import {
   crateTfUrl,
   backpackSellUrl,
 } from "../../utils/itemLinks.js";
-import { getKnownCrateNumber } from "../../utils/tf2ItemSchema.js";
+import { getKnownCrateNumber, isAmbiguousCrateName, resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
-
-const QUALITY_WORDS = [
-  "Normal", "Genuine", "Vintage", "Unusual", "Unique", "Community", "Valve",
-  "Self-Made", "Customized", "Strange", "Completed", "Haunted", "Collector's", "Decorated Weapon",
-];
 
 const LINK_ACCENTS = {
   "Market": SITE_BRAND_COLORS.steam,
@@ -61,7 +56,7 @@ function getTags(container) {
 
 /** Reads the quality word off the item's "Tags:" line, used instead of assuming every item is Unique quality. */
 function getQualityFromTags(tags) {
-  return tags ? QUALITY_WORDS.find((q) => tags.includes(q)) || null : null;
+  return tags ? TF2_QUALITY_NAMES.find((q) => tags.includes(q)) || null : null;
 }
 
 /**
@@ -189,7 +184,18 @@ export function showItemLinks() {
   }
 
   const tags = getTags(container);
-  const attrs = parseItemName(itemName, getQualityFromTags(tags));
+  // Crate/case series number ("Series #N"/"#N") trails at the very end,
+  // after everything else — turns out this page's item name DOES show
+  // it as literal text after all (e.g. "Mann Co. Supply Munition #103"),
+  // contrary to what this file used to assume. Stripped before
+  // parseItemName() so attrs.name ends up the true bare schema name
+  // ("Mann Co. Supply Munition"), not "<name> #103" — mannco.store/
+  // skinport.com want it gone from the name too (they take it as their
+  // own separate crateNumber option instead). stntrading.eu still gets
+  // the raw itemName below, since stnTradingUrl() re-derives the number
+  // from that text itself.
+  const bareDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
+  const attrs = parseItemName(bareDisplayName, getQualityFromTags(tags));
   const assetId = getAssetId(container);
 
   // Given its own standalone CTA button (not just another row entry
@@ -204,9 +210,6 @@ export function showItemLinks() {
   if (sellUrl) title.insertAdjacentElement("afterend", anchorEl);
 
   const marketUrl = steamMarketUrl(itemName);
-  const manncoUrl = attrs.quality === "Unusual" ? null : mannCoStoreUrl(itemName);
-  const skinportUrlHref = attrs.quality === "Unusual" ? null : skinportUrl(itemName);
-  const stnUrl = stnTradingUrl(itemName, undefined, { craftable: attrs.craftable });
 
   const links = document.createElement("div");
   links.className = "custom-market-links";
@@ -217,9 +220,6 @@ export function showItemLinks() {
 
   const linkList = [
     { label: "Market", href: marketUrl },
-    { label: "mannco.store", href: manncoUrl },
-    { label: "skinport.com", href: skinportUrlHref },
-    { label: "stntrading.eu", href: stnUrl },
   ].filter((link) => link.href);
 
   linkList.forEach((link) => links.appendChild(makeLinkBtn(link)));
@@ -227,25 +227,63 @@ export function showItemLinks() {
   anchorEl.insertAdjacentElement("afterend", links);
   container.dataset.injectedFor = itemName;
 
-  // bp.tf stats/history need the popup's Settings read, and
-  // marketplace.tf/crate.tf need a network fetch (defindex lookup, plus
-  // — for crates — the bundled series-number table, since this page
-  // never shows that number itself) — all appended separately
-  // afterward, since showItemLinks() itself isn't async, so they never
-  // block the synchronous links above; skipped if the user's clicked a
-  // different item (or this one's panel got re-rendered) by the time
-  // they resolve.
+  // mannco.store/skinport.com/stntrading.eu/bp.tf stats/history/
+  // marketplace.tf/crate.tf all need something async first (a settings
+  // read, a network fetch — defindex lookup — or the crate-series check
+  // below) — all appended separately afterward, since showItemLinks()
+  // itself isn't async, so they never block the Market link above;
+  // skipped if the user's clicked a different item (or this one's panel
+  // got re-rendered) by the time they resolve.
   (async () => {
     const settings = await getSettings();
+
+    // Confirmed: unlike what this file used to assume, this page's own
+    // item name DOES show a crate/case's series number as literal
+    // trailing text (e.g. "Mann Co. Supply Munition #103") — so
+    // resolveCrateSeries() (the same rawText/bareName extraction
+    // backpack.tf's popover/tooltip use) is the primary source here,
+    // with getKnownCrateNumber()'s bundled table only as a fallback for
+    // whatever genuinely doesn't show it (see that function's own doc).
+    let crateNumber = null;
+    let isAmbiguous = false;
+    const looksLikeCrate = IS_CRATE_CASE_RE.test(attrs.name) && !/\bkey\b/i.test(attrs.name);
+    if (looksLikeCrate) {
+      ({ crateNumber, isAmbiguous } = await resolveCrateSeries(itemName, attrs.name));
+      if (crateNumber == null) {
+        const fromTable = await getKnownCrateNumber(attrs.name);
+        if (fromTable != null) {
+          crateNumber = fromTable;
+          isAmbiguous = await isAmbiguousCrateName(attrs.name);
+        }
+      }
+    }
+
+    // mannco.store/skinport.com only want that series number for the
+    // ambiguous case (a name shared by several different series) — see
+    // mannCoStoreUrl()/skinportUrl()'s own docs.
+    if (attrs.quality !== "Unusual") {
+      const manncoHref = mannCoStoreUrl(bareDisplayName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined });
+      if (manncoHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "mannco.store", href: manncoHref }));
+
+      const skinportHref = skinportUrl(bareDisplayName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined });
+      if (skinportHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "skinport.com", href: skinportHref }));
+    }
+
+    // stntrading.eu keeps the "#N"/"Series #N" suffix as part of the
+    // name (it has a separate page per series/case number) — needs the
+    // raw itemName here, not bareDisplayName, so it can find that text
+    // itself and re-attach it correctly (see stnTradingUrl()'s own doc).
+    const stnUrl = stnTradingUrl(itemName, undefined, { craftable: attrs.craftable, isAmbiguousSeries: isAmbiguous });
+    if (stnUrl && links.isConnected) links.appendChild(makeLinkBtn({ label: "stntrading.eu", href: stnUrl }));
 
     // Single "bp.tf stats"/"bp.tf history" pair, following the popup's
     // "Default bp.tf version" setting.
     const bpStatsHref = settings.bpTfVersion === "next"
       ? backpackStatsUrl(attrs.name, attrs.quality, {
-          craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, next: true,
+          craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, crateNumber: crateNumber ?? undefined, next: true,
         })
       : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
-          craftable: attrs.craftable,
+          craftable: attrs.craftable, crateNumber: crateNumber ?? undefined,
         });
     if (links.isConnected) links.appendChild(makeLinkBtn({ label: "bp.tf stats", href: bpStatsHref }));
 
@@ -254,18 +292,26 @@ export function showItemLinks() {
       : null;
     if (bpHistoryHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "bp.tf history", href: bpHistoryHref }));
 
-    const crateNumber = await getKnownCrateNumber(attrs.name);
     const href = await marketplaceTfUrl(attrs.name, attrs.quality, {
       craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festive,
       crateNumber: crateNumber ?? undefined,
     });
     if (href && links.isConnected) links.appendChild(makeLinkBtn({ label: "marketplace.tf", href }));
 
-    // crate.tf only has pages for crates/cases — crateTfUrl() returns
-    // null with no crate number, so this naturally stays absent for
-    // every other item rather than needing its own type check here.
-    const crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber, craftable: attrs.craftable });
-    if (crateTfHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "crate.tf", href: crateTfHref }));
+    // crate.tf only has pages for crates/cases. crateTfUrl() itself has
+    // no "is this actually a crate" check — it trusts the caller: any
+    // non-craftable item at all (e.g. "Non-Craftable Duck Journal")
+    // would otherwise resolve a real defindex and get a bogus
+    // ".../uncraftable" crate.tf link, since crateNumber == null but
+    // craftable is false either way. crateNumber != null already
+    // implies looksLikeCrate (it's only ever set inside that branch
+    // above), so this only actually changes anything for the
+    // !craftable case — same fix already applied in backpack.tf
+    // oldUI/newUI and scrap.tf/itemLinks.
+    if (looksLikeCrate && (crateNumber != null || !attrs.craftable)) {
+      const crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber, craftable: attrs.craftable });
+      if (crateTfHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "crate.tf", href: crateTfHref }));
+    }
   })().catch((err) => console.warn("[TF2Utils] extra item link failed:", err));
 
   return true;
