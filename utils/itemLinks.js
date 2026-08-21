@@ -758,6 +758,19 @@ export function backpackSellUrl(assetId) {
   return `https://backpack.tf/classifieds/sell/${assetId}`;
 }
 
+/**
+ * backpack.tf (or next.backpack.tf) item history page for one specific
+ * item — same exception as backpackSellUrl() above: keyed by the Steam
+ * asset id alone, not name/quality/etc.
+ * @param {string|number} assetId
+ * @param {object} [options]
+ * @param {boolean} [options.next=false] - use next.backpack.tf instead of backpack.tf
+ */
+export function backpackHistoryUrl(assetId, options = {}) {
+  const { next = false } = options;
+  return `https://${next ? "next." : ""}backpack.tf/item/${assetId}`;
+}
+
 /** posts.tf's plain search results page — no query params, since it doesn't read search state from the URL. */
 export const POSTS_TF_SEARCH_RESULTS_URL = "https://posts.tf/posts/search/results";
 

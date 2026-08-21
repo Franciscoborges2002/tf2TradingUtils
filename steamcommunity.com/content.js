@@ -167,17 +167,17 @@ function loadInventoryCurrencyCounter() {
 function loadItemLinks() {
   (async () => {
     // Load module dynamically
-    const { showItemLinks } = await import(
+    const { addItemLinks } = await import(
       chrome.runtime.getURL("steamcommunity.com/itemLinks/content.js")
     );
 
-    runWithRetries(showItemLinks);
+    runWithRetries(addItemLinks);
 
     const target = document.querySelector("#iteminfo0") ||
                    document.querySelector("#iteminfo1") ||
                    document.body;
 
-    new MutationObserver(() => showItemLinks())
+    new MutationObserver(() => addItemLinks())
       .observe(target, { childList: true, subtree: true });
   })();
 }

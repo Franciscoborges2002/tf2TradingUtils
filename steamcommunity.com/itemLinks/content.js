@@ -11,10 +11,12 @@ import {
   skinportUrl,
   crateTfUrl,
   backpackSellUrl,
+  backpackHistoryUrl,
 } from "../../utils/itemLinks.js";
 import { getKnownCrateNumber, isAmbiguousCrateName, resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
 import { STEAMCOMMUNITY_CANT_GENERATE_ITEMLINKS } from "../../utils/constants/messages.js";
+import { loadIconSvg } from "../../utils/icons.js";
 
 const LINK_ACCENTS = {
   "Market": SITE_BRAND_COLORS.steam,
@@ -201,7 +203,7 @@ function ksPrefixFor(ksTier) {
   return "";
 }
 
-export function showItemLinks() {
+export function addItemLinks() {
   // A Steam account's inventory page lists every game it owns items
   // for, switchable via tabs — #iteminfo0/#iteminfo1 are shared across
   // all of them, so without this check, clicking an item on some other
@@ -230,21 +232,44 @@ export function showItemLinks() {
   // remove old injected content if item changed
   const prev = container.dataset.injectedFor || "";
   if (prev !== itemName) {
-    container.querySelectorAll(".custom-market-links, .custom-sell-btn, .custom-error-msg").forEach((n) => n.remove());
+    container.querySelectorAll(".custom-market-links, .custom-sell-btn, .custom-error-msg, .custom-copy-btn").forEach((n) => n.remove());
   }
 
-  // Prevent duplicate for the same item — but the item info panel is
-  // rendered by Steam's own framework and re-renders its content at
-  // least once (e.g. once price data streams in), wiping out anything
-  // we injected while leaving the container node (and its dataset)
-  // intact. So don't just trust the marker — confirm our own content is
-  // actually still there before skipping.
-  if (container.dataset.injectedFor === itemName && container.querySelector(".custom-market-links, .custom-error-msg")) {
+  // Prevent duplicate for the same item. Two different reasons the
+  // marker alone isn't enough:
+  // - the item info panel is rendered by Steam's own framework and
+  //   re-renders its content at least once (e.g. once price data
+  //   streams in), wiping out anything we injected while leaving the
+  //   container node (and its dataset) intact — so this also confirms
+  //   our own content is actually still there before trusting it.
+  // - buildLinkList() below is async, so there's a window between
+  //   committing to build (injectedFor set) and the links row actually
+  //   existing in the DOM — a retry (runWithRetries) or MutationObserver
+  //   firing again for the same item during that window would otherwise
+  //   see injectedFor match but find no rendered content yet, slip past,
+  //   and start a second, independent build. buildingFor closes that
+  //   window: it's set the instant a build starts and cleared once it
+  //   settles, so an in-flight build is recognized too, not just a
+  //   finished one.
+  if (
+    container.dataset.injectedFor === itemName &&
+    (container.dataset.buildingFor === itemName || container.querySelector(".custom-market-links, .custom-error-msg"))
+  ) {
     return true;
   }
 
   const tags = getTags(container);
   const assetId = getAssetId(container);
+
+  // Copies whatever name we currently have — itemName, the real one
+  // recovered via getMarketListingName() when available, same as every
+  // link below — so it stays useful even in the cannotIdentify case,
+  // just copying the (possibly wrong, name-tagged) fallback text then.
+  // Sits in the title's own row (right after the image/separator, level
+  // with the item name) rather than below everything else.
+  const titleRow = getOrCreateTitleRow(title);
+  const copyBtn = createCopyButton(itemName);
+  titleRow.appendChild(copyBtn);
 
   // Given its own standalone CTA button (not just another row entry
   // like everything else here) — this is the one action a user's
@@ -256,8 +281,8 @@ export function showItemLinks() {
   // the item's name/attributes, so it still works even when those
   // couldn't be identified below.
   const sellUrl = assetId && isTradable(tags) && isOwnInventory() ? backpackSellUrl(assetId) : null;
-  const anchorEl = sellUrl ? makeSellButton(sellUrl) : title;
-  if (sellUrl) title.insertAdjacentElement("afterend", anchorEl);
+  const anchorEl = sellUrl ? makeSellButton(sellUrl) : titleRow;
+  if (sellUrl) titleRow.insertAdjacentElement("afterend", anchorEl);
 
   if (cannotIdentify) {
     const errorEl = makeErrorMessage(STEAMCOMMUNITY_CANT_GENERATE_ITEMLINKS);
@@ -279,112 +304,191 @@ export function showItemLinks() {
   const bareDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
   const attrs = parseItemName(bareDisplayName, getQualityFromTags(tags));
 
-  const marketUrl = steamMarketUrl(itemName);
-
-  const links = document.createElement("div");
-  links.className = "custom-market-links";
-  links.style.marginTop = "8px";
-  links.style.display = "flex";
-  links.style.flexWrap = "wrap";
-  links.style.gap = "8px";
-
-  const linkList = [
-    { label: "Market", href: marketUrl },
-  ].filter((link) => link.href);
-
-  linkList.forEach((link) => links.appendChild(makeLinkBtn(link)));
-
-  anchorEl.insertAdjacentElement("afterend", links);
   container.dataset.injectedFor = itemName;
+  container.dataset.buildingFor = itemName;
 
-  // mannco.store/skinport.com/stntrading.eu/bp.tf stats/history/
-  // marketplace.tf/crate.tf all need something async first (a settings
-  // read, a network fetch — defindex lookup — or the crate-series check
-  // below) — all appended separately afterward, since showItemLinks()
-  // itself isn't async, so they never block the Market link above;
-  // skipped if the user's clicked a different item (or this one's panel
-  // got re-rendered) by the time they resolve.
-  (async () => {
-    const settings = await getSettings();
+  // One central array, same convention scrap.tf/itemLinks uses — every
+  // link (Market included) is resolved together in buildLinkList()
+  // before anything renders, instead of the Market link appearing
+  // immediately and the rest trickling in individually as each async
+  // lookup finishes.
+  buildLinkList(itemName, bareDisplayName, attrs, assetId)
+    .then((linkList) => {
+      // Skipped if the user's clicked a different item (or this one's
+      // panel got re-rendered) by the time everything above resolves.
+      if (container.dataset.injectedFor !== itemName || !anchorEl.isConnected || !linkList.length) return;
 
-    // Confirmed: unlike what this file used to assume, this page's own
-    // item name DOES show a crate/case's series number as literal
-    // trailing text (e.g. "Mann Co. Supply Munition #103") — so
-    // resolveCrateSeries() (the same rawText/bareName extraction
-    // backpack.tf's popover/tooltip use) is the primary source here,
-    // with getKnownCrateNumber()'s bundled table only as a fallback for
-    // whatever genuinely doesn't show it (see that function's own doc).
-    let crateNumber = null;
-    let isAmbiguous = false;
-    const looksLikeCrate = IS_CRATE_CASE_RE.test(attrs.name) && !/\bkey\b/i.test(attrs.name);
-    if (looksLikeCrate) {
-      ({ crateNumber, isAmbiguous } = await resolveCrateSeries(itemName, attrs.name));
-      if (crateNumber == null) {
-        const fromTable = await getKnownCrateNumber(attrs.name);
-        if (fromTable != null) {
-          crateNumber = fromTable;
-          isAmbiguous = await isAmbiguousCrateName(attrs.name);
-        }
+      const links = document.createElement("div");
+      links.className = "custom-market-links";
+      links.style.marginTop = "8px";
+      links.style.display = "flex";
+      links.style.flexWrap = "wrap";
+      links.style.gap = "8px";
+      linkList.forEach((link) => links.appendChild(makeLinkBtn(link)));
+
+      anchorEl.insertAdjacentElement("afterend", links);
+    })
+    .catch((err) => console.warn("[TF2Utils] Failed to build item links:", err))
+    .finally(() => {
+      if (container.dataset.buildingFor === itemName) delete container.dataset.buildingFor;
+    });
+
+  return true;
+}
+
+/**
+ * Builds every reference link for the item — Market alongside
+ * mannco.store/skinport.com/stntrading.eu/bp.tf stats/history/
+ * marketplace.tf/crate.tf, which each need something async first (a
+ * settings read, a network fetch — defindex lookup — or the
+ * crate-series check below) — as one array, all resolved together.
+ */
+async function buildLinkList(itemName, bareDisplayName, attrs, assetId) {
+  const settings = await getSettings();
+  const useNextBpTf = settings.bpTfVersion === "next";
+
+  // Confirmed: unlike what this file used to assume, this page's own
+  // item name DOES show a crate/case's series number as literal
+  // trailing text (e.g. "Mann Co. Supply Munition #103") — so
+  // resolveCrateSeries() (the same rawText/bareName extraction
+  // backpack.tf's popover/tooltip use) is the primary source here, with
+  // getKnownCrateNumber()'s bundled table only as a fallback for
+  // whatever genuinely doesn't show it (see that function's own doc).
+  let crateNumber = null;
+  let isAmbiguous = false;
+  const looksLikeCrate = IS_CRATE_CASE_RE.test(attrs.name) && !/\bkey\b/i.test(attrs.name);
+  if (looksLikeCrate) {
+    ({ crateNumber, isAmbiguous } = await resolveCrateSeries(itemName, attrs.name));
+    if (crateNumber == null) {
+      const fromTable = await getKnownCrateNumber(attrs.name);
+      if (fromTable != null) {
+        crateNumber = fromTable;
+        isAmbiguous = await isAmbiguousCrateName(attrs.name);
       }
     }
+  }
 
+  const linkList = [
+    { label: "Market", href: steamMarketUrl(itemName) },
     // mannco.store/skinport.com only want that series number for the
     // ambiguous case (a name shared by several different series) — see
     // mannCoStoreUrl()/skinportUrl()'s own docs.
-    if (attrs.quality !== "Unusual") {
-      const manncoHref = mannCoStoreUrl(bareDisplayName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined });
-      if (manncoHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "mannco.store", href: manncoHref }));
-
-      const skinportHref = skinportUrl(bareDisplayName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined });
-      if (skinportHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "skinport.com", href: skinportHref }));
-    }
-
+    { label: "mannco.store", href: mannCoStoreUrl(bareDisplayName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined }) },
+    { label: "skinport.com", href: skinportUrl(bareDisplayName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined }) },
     // stntrading.eu keeps the "#N"/"Series #N" suffix as part of the
     // name (it has a separate page per series/case number) — needs the
     // raw itemName here, not bareDisplayName, so it can find that text
     // itself and re-attach it correctly (see stnTradingUrl()'s own doc).
-    const stnUrl = stnTradingUrl(itemName, undefined, { craftable: attrs.craftable, isAmbiguousSeries: isAmbiguous });
-    if (stnUrl && links.isConnected) links.appendChild(makeLinkBtn({ label: "stntrading.eu", href: stnUrl }));
-
+    { label: "stntrading.eu", href: stnTradingUrl(itemName, undefined, { craftable: attrs.craftable, isAmbiguousSeries: isAmbiguous }) },
     // Single "bp.tf stats"/"bp.tf history" pair, following the popup's
     // "Default bp.tf version" setting.
-    const bpStatsHref = settings.bpTfVersion === "next"
-      ? backpackStatsUrl(attrs.name, attrs.quality, {
-          craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, crateNumber: crateNumber ?? undefined, next: true,
-        })
-      : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
-          craftable: attrs.craftable, crateNumber: crateNumber ?? undefined,
-        });
-    if (links.isConnected) links.appendChild(makeLinkBtn({ label: "bp.tf stats", href: bpStatsHref }));
+    {
+      label: "bp.tf stats",
+      href: useNextBpTf
+        ? backpackStatsUrl(attrs.name, attrs.quality, {
+            craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, crateNumber: crateNumber ?? undefined, next: true,
+          })
+        : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
+            craftable: attrs.craftable, crateNumber: crateNumber ?? undefined,
+          }),
+    },
+    {
+      label: "bp.tf history",
+      href: assetId ? backpackHistoryUrl(assetId, { next: useNextBpTf }) : null,
+    },
+    {
+      label: "marketplace.tf",
+      href: await marketplaceTfUrl(attrs.name, attrs.quality, {
+        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festive, crateNumber: crateNumber ?? undefined,
+      }).catch((err) => { console.warn("[TF2Utils] marketplace.tf link failed:", err); return null; }),
+    },
+  ].filter((link) => link.href);
 
-    const bpHistoryHref = assetId
-      ? `https://${settings.bpTfVersion === "next" ? "next." : ""}backpack.tf/item/${assetId}`
-      : null;
-    if (bpHistoryHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "bp.tf history", href: bpHistoryHref }));
+  // crate.tf only has pages for crates/cases. crateTfUrl() itself has no
+  // "is this actually a crate" check — it trusts the caller: any
+  // non-craftable item at all (e.g. "Non-Craftable Duck Journal") would
+  // otherwise resolve a real defindex and get a bogus ".../uncraftable"
+  // crate.tf link, since crateNumber == null but craftable is false
+  // either way. crateNumber != null already implies looksLikeCrate (it's
+  // only ever set inside that branch above), so this only actually
+  // changes anything for the !craftable case
+  if (looksLikeCrate && (crateNumber != null || !attrs.craftable)) {
+    const crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber, craftable: attrs.craftable })
+      .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; });
+    if (crateTfHref) linkList.push({ label: "crate.tf", href: crateTfHref });
+  }
 
-    const href = await marketplaceTfUrl(attrs.name, attrs.quality, {
-      craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festive,
-      crateNumber: crateNumber ?? undefined,
-    });
-    if (href && links.isConnected) links.appendChild(makeLinkBtn({ label: "marketplace.tf", href }));
+  return linkList;
+}
 
-    // crate.tf only has pages for crates/cases. crateTfUrl() itself has
-    // no "is this actually a crate" check — it trusts the caller: any
-    // non-craftable item at all (e.g. "Non-Craftable Duck Journal")
-    // would otherwise resolve a real defindex and get a bogus
-    // ".../uncraftable" crate.tf link, since crateNumber == null but
-    // craftable is false either way. crateNumber != null already
-    // implies looksLikeCrate (it's only ever set inside that branch
-    // above), so this only actually changes anything for the
-    // !craftable case — same fix already applied in backpack.tf
-    // oldUI/newUI and scrap.tf/itemLinks.
-    if (looksLikeCrate && (crateNumber != null || !attrs.craftable)) {
-      const crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber, craftable: attrs.craftable });
-      if (crateTfHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "crate.tf", href: crateTfHref }));
-    }
-  })().catch((err) => console.warn("[TF2Utils] extra item link failed:", err));
+/**
+ * Wraps the item's <h1> title in a flex row (creating it once, reusing
+ * it on a later call for the same title instead of nesting another
+ * wrapper around it) so the copy button can sit right beside the item
+ * name instead of on its own line below everything else — same
+ * non-invasive wrapping technique stntrading.eu/copyClipboard already
+ * uses. The title's own text/children are left untouched, so anything
+ * elsewhere reading title.textContent (e.g. this file's own itemName)
+ * is unaffected.
+ */
+function getOrCreateTitleRow(title) {
+  const parent = title.parentElement;
+  if (parent?.classList.contains("custom-title-row")) return parent;
 
-  return true;
+  const row = document.createElement("div");
+  row.className = "custom-title-row";
+  row.style.cssText = "display:flex;align-items:center;gap:8px;";
+  title.insertAdjacentElement("beforebegin", row);
+  row.appendChild(title);
+  return row;
+}
+
+/**
+ * Copies `text` to the clipboard, briefly swapping the button's own
+ * icon to a checkmark to confirm it worked — same copy/check icons and
+ * loadIconSvg() cache scrap.tf/itemLinks and stntrading.eu/copyClipboard
+ * already use, kept here as a small icon-only button rather than a
+ * labeled link like the rest of this row.
+ */
+function createCopyButton(text) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "custom-copy-btn";
+  btn.title = "Copy item name";
+  btn.setAttribute("aria-label", "Copy item name");
+  btn.style.cssText =
+    "display:inline-flex;align-items:center;justify-content:center;" +
+    "width:26px;height:26px;padding:0;flex-shrink:0;border-radius:6px;cursor:pointer;" +
+    `background:${COLOR_PANEL_BG};color:#ffffff;` +
+    "border:1px solid rgba(255,255,255,0.15);transition:0.15s ease;";
+
+  let copySvg = "";
+  let checkSvg = "";
+  Promise.all([loadIconSvg("copy"), loadIconSvg("check")])
+    .then(([copy, check]) => {
+      copySvg = copy;
+      checkSvg = check;
+      btn.innerHTML = copySvg;
+    })
+    .catch((err) => console.warn("[TF2Utils] Failed to load copy icon:", err));
+
+  btn.addEventListener("click", () => {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        btn.innerHTML = checkSvg;
+        btn.style.color = "#2e8b40";
+        setTimeout(() => {
+          btn.innerHTML = copySvg;
+          btn.style.color = "#ffffff";
+        }, 1200);
+      })
+      .catch((err) => console.warn("[TF2Utils] Failed to copy name:", err));
+  });
+
+  btn.addEventListener("mouseenter", () => { btn.style.filter = "brightness(1.15)"; });
+  btn.addEventListener("mouseleave", () => { btn.style.filter = "none"; });
+
+  return btn;
 }
 
 function makeLinkBtn({ label, href }) {

@@ -9,6 +9,8 @@
 - Internal: utils/itemLinks.js builders now take (name, quality, options) instead of one combined object; crate/defindex data moved to utils/tf2ItemSchema.js
 - Fixed crate/case series number ("#N") leaking raw into mannco.store/skinport.com links instead of being stripped, and stntrading.eu never re-attaching it for ambiguous multi-series names
 - Fixed (#116): a name-tagged item's real name/Australium is now read from its Market listing link instead of the (renamed) title; shows an error instead of wrong links when no listing exists
+- Added copy to clipboard item name functionality
+- Internal: all links now build together as one array instead of trickling in individually, fixing a race that could duplicate the whole row; bp.tf history moved into utils/itemLinks.js
 
 # Version 1.0.0
 
