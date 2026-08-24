@@ -6,6 +6,7 @@
 | ---------- | --------------------------------------------------------------------- | --------------------------- | -------------------------------------- |
 | acceptTradeOffers| Accept trade offers automatically. | [acceptTradeOffers](./acceptTradeOffers/)     | [changeLog](./acceptTradeOffers/CHANGELOG.md)     |
 | botRep     | Shows information if it's an registered bot, and the trustubility.    | [botRep](./botRep/)     | [changeLog](./botRep/CHANGELOG.md)     |
+| copyClipboard | Adds a copy icon beside the item name in the inventory item info panel, copying its real name to the clipboard. | [copyClipboard](./copyClipboard/) | [changeLog](./copyClipboard/CHANGELOG.md) |
 | groupTradeItems | Group the same items and show a counter. | [steamLinks](./groupTradeItems/) | [changeLog](./groupTradeItems/CHANGELOG.md) |
 | inventoryCurrencyCounter | Shows a live keys/metal/Earbuds count and total value for your TF2 inventory. | [inventoryCurrencyCounter](./inventoryCurrencyCounter/) | [changeLog](./inventoryCurrencyCounter/CHANGELOG.md) |
 | itemDescriptionToggle | Adds a button to hide/show an item's description text in the inventory item info panel. | [itemDescriptionToggle](./itemDescriptionToggle/) | [changeLog](./itemDescriptionToggle/CHANGELOG.md) |

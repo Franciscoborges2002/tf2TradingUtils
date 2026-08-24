@@ -9,6 +9,7 @@
 - profileLinks: added a liquid.tf store button (`https://liquid.tf/store/<steamid64>`), plus Steam/Rep.TF/bp.tf/posts.tf/liquid.tf quick-links for the trade partner on each entry of the offers inbox/sent and trade history pages
 - Added unusualEffectBackground — shows an Unusual item's own particle effect as its icon's background, in both the inventory item info panel and the inventory grid tiles
 - Added inventoryFetchBridge — observes the inventory page's own item-data requests so other scripts (unusualEffectBackground, inventoryCurrencyCounter) don't need to make their own
+- Added copyClipboard, a copy icon beside the item name in the inventory item info panel, split out of itemLinks
 
 # Version 1.0.3
 

@@ -1,7 +1,14 @@
 // itemLinks.js
 import { COLOR_PANEL_BG, COLOR_DANGER, SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { TF2_APPID, TF2_CONTEXTID, TF2_QUALITY_NAMES } from "../../utils/constants/tf2Economy.js";
-import { isTf2InventoryActive, isOwnInventory } from "../../utils/steamInventory.js";
+import {
+  isTf2InventoryActive,
+  isOwnInventory,
+  pickContainer,
+  getMarketListingName,
+  getRenamedOriginalName,
+  getOrCreateTitleRow,
+} from "../../utils/steamInventory.js";
 import {
   steamMarketUrl,
   backpackStatsUrl,
@@ -16,7 +23,6 @@ import {
 import { getKnownCrateNumber, isAmbiguousCrateName, resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
 import { STEAMCOMMUNITY_CANT_GENERATE_ITEMLINKS } from "../../utils/constants/messages.js";
-import { loadIconSvg } from "../../utils/icons.js";
 
 const LINK_ACCENTS = {
   "Market": SITE_BRAND_COLORS.steam,
@@ -28,19 +34,6 @@ const LINK_ACCENTS = {
   "bp.tf history": SITE_BRAND_COLORS.backpackTf,
   "stntrading.eu": SITE_BRAND_COLORS.stnTrading,
 };
-
-function pickContainer() {
-  const c0 = document.querySelector("#iteminfo0");
-  const c1 = document.querySelector("#iteminfo1");
-
-  const h0 = c0?.querySelector("h1");
-  if (h0) return { container: c0, title: h0 };
-
-  const h1 = c1?.querySelector("h1");
-  if (h1) return { container: c1, title: h1 };
-
-  return null;
-}
 
 /**
  * The item's "Tags:" line, split into individual words (e.g. "Tags:
@@ -60,54 +53,6 @@ function getTags(container) {
 /** Reads the quality word off the item's "Tags:" line, used instead of assuming every item is Unique quality. */
 function getQualityFromTags(tags) {
   return tags ? TF2_QUALITY_NAMES.find((q) => tags.includes(q)) || null : null;
-}
-
-/**
- * Steam shows a renamed item's custom name-tag text in its own <h1>
- * title, not the item's real name (e.g. an Australium Flame Thrower
- * nicknamed "'Smolder'n Skunk Spray'" shows that as its h1). The "This
- * item has been renamed. Original name: "X"" notice doesn't fully fix
- * this either — it only gives the bare weapon name ("Flame Thrower"),
- * with no quality/killstreak-tier/Australium/Festivized. Detected via
- * that notice's text content, not its CSS module classes, which look
- * auto-generated per Steam build and aren't safe to depend on. Used by
- * showItemLinks() only to decide whether the item is identifiable at
- * all (see `cannotIdentify` there) — getMarketListingName() below is
- * the real fix, recovering the true full name a different way, and is
- * tried first every time regardless of whether this notice is present.
- */
-function getRenamedOriginalName(container) {
-  const match = container.textContent.match(/This item has been renamed\.\s*Original name:\s*"([^"]+)"/);
-  return match ? match[1] : null;
-}
-
-/**
- * The item's real full descriptive name (quality/killstreak-tier/
- * Australium/Festivized/Non-Craftable all baked in, exactly as Steam
- * Market shows it) — read from the page's own "View in Community
- * Market" link href instead of the h1 title. Unlike the h1, that link's
- * market_hash_name is never overridden by a custom name tag: confirmed,
- * a renamed "'Smolder'n Skunk Spray'" (real item: Strange Australium
- * Flame Thrower) still links to
- * ".../market/listings/440/Strange%20Australium%20Flame%20Thrower"
- * here — the one place Australium survives at all once a name tag's
- * involved, since neither the h1 nor the "Original name" notice (see
- * getRenamedOriginalName() above) carry it.
- *
- * Only present for tradable + marketable items — null otherwise
- * (currency, e.g., has no Market listing at all), and explicitly
- * excludes our own injected "Market" button, which points to this same
- * URL pattern and would otherwise be matched right back.
- */
-function getMarketListingName(container) {
-  const marketLink = [...container.querySelectorAll(`a[href*="/market/listings/${TF2_APPID}/"]`)]
-    .find((a) => !a.classList.contains("custom-link-btn"));
-  if (!marketLink) return null;
-
-  const match = (marketLink.getAttribute("href") || "").match(
-    new RegExp(`/market/listings/${TF2_APPID}/(.+)$`)
-  );
-  return match ? decodeURIComponent(match[1]) : null;
 }
 
 /**
@@ -232,7 +177,7 @@ export function addItemLinks() {
   // remove old injected content if item changed
   const prev = container.dataset.injectedFor || "";
   if (prev !== itemName) {
-    container.querySelectorAll(".custom-market-links, .custom-sell-btn, .custom-error-msg, .custom-copy-btn").forEach((n) => n.remove());
+    container.querySelectorAll(".custom-market-links, .custom-sell-btn, .custom-error-msg").forEach((n) => n.remove());
   }
 
   // Prevent duplicate for the same item. Two different reasons the
@@ -261,15 +206,13 @@ export function addItemLinks() {
   const tags = getTags(container);
   const assetId = getAssetId(container);
 
-  // Copies whatever name we currently have — itemName, the real one
-  // recovered via getMarketListingName() when available, same as every
-  // link below — so it stays useful even in the cannotIdentify case,
-  // just copying the (possibly wrong, name-tagged) fallback text then.
-  // Sits in the title's own row (right after the image/separator, level
-  // with the item name) rather than below everything else.
+  // getOrCreateTitleRow() is shared with copyClipboard/content.js, which
+  // wraps the <h1> in this same row for its own copy icon — reusing it
+  // here (instead of anchoring off `title` directly) means this file's
+  // sell-button/links row/error message still land right after that
+  // whole row ("afterend"), not spliced in beside the title, regardless
+  // of whether copyClipboard has wrapped it yet or this runs first.
   const titleRow = getOrCreateTitleRow(title);
-  const copyBtn = createCopyButton(itemName);
-  titleRow.appendChild(copyBtn);
 
   // Given its own standalone CTA button (not just another row entry
   // like everything else here) — this is the one action a user's
@@ -280,6 +223,15 @@ export function addItemLinks() {
   // where there's nothing of yours to list. Only needs the asset id, not
   // the item's name/attributes, so it still works even when those
   // couldn't be identified below.
+  //
+  // Removed before (re-)creating rather than just appended — the dedup
+  // guard above only checks for .custom-market-links/.custom-error-msg,
+  // so if Steam's own re-render ever turns out to be partial (wiping
+  // those two but leaving the sell button alone for the same item,
+  // unlike the "wipes out everything" case the guard's own comment
+  // describes), this still stays a single button instead of stacking a
+  // second one on top of a surviving original.
+  container.querySelector(".custom-sell-btn")?.remove();
   const sellUrl = assetId && isTradable(tags) && isOwnInventory() ? backpackSellUrl(assetId) : null;
   const anchorEl = sellUrl ? makeSellButton(sellUrl) : titleRow;
   if (sellUrl) titleRow.insertAdjacentElement("afterend", anchorEl);
@@ -419,76 +371,6 @@ async function buildLinkList(itemName, bareDisplayName, attrs, assetId) {
   }
 
   return linkList;
-}
-
-/**
- * Wraps the item's <h1> title in a flex row (creating it once, reusing
- * it on a later call for the same title instead of nesting another
- * wrapper around it) so the copy button can sit right beside the item
- * name instead of on its own line below everything else — same
- * non-invasive wrapping technique stntrading.eu/copyClipboard already
- * uses. The title's own text/children are left untouched, so anything
- * elsewhere reading title.textContent (e.g. this file's own itemName)
- * is unaffected.
- */
-function getOrCreateTitleRow(title) {
-  const parent = title.parentElement;
-  if (parent?.classList.contains("custom-title-row")) return parent;
-
-  const row = document.createElement("div");
-  row.className = "custom-title-row";
-  row.style.cssText = "display:flex;align-items:center;gap:8px;";
-  title.insertAdjacentElement("beforebegin", row);
-  row.appendChild(title);
-  return row;
-}
-
-/**
- * Copies `text` to the clipboard, briefly swapping the button's own
- * icon to a checkmark to confirm it worked — same copy/check icons and
- * loadIconSvg() cache scrap.tf/itemLinks and stntrading.eu/copyClipboard
- * already use, kept here as a small icon-only button rather than a
- * labeled link like the rest of this row.
- */
-function createCopyButton(text) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "custom-copy-btn";
-  btn.title = "Copy item name";
-  btn.setAttribute("aria-label", "Copy item name");
-  btn.style.cssText =
-    "display:inline-flex;align-items:center;justify-content:center;" +
-    "width:26px;height:26px;padding:0;flex-shrink:0;border-radius:6px;cursor:pointer;" +
-    `background:${COLOR_PANEL_BG};color:#ffffff;` +
-    "border:1px solid rgba(255,255,255,0.15);transition:0.15s ease;";
-
-  let copySvg = "";
-  let checkSvg = "";
-  Promise.all([loadIconSvg("copy"), loadIconSvg("check")])
-    .then(([copy, check]) => {
-      copySvg = copy;
-      checkSvg = check;
-      btn.innerHTML = copySvg;
-    })
-    .catch((err) => console.warn("[TF2Utils] Failed to load copy icon:", err));
-
-  btn.addEventListener("click", () => {
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        btn.innerHTML = checkSvg;
-        btn.style.color = "#2e8b40";
-        setTimeout(() => {
-          btn.innerHTML = copySvg;
-          btn.style.color = "#ffffff";
-        }, 1200);
-      })
-      .catch((err) => console.warn("[TF2Utils] Failed to copy name:", err));
-  });
-
-  btn.addEventListener("mouseenter", () => { btn.style.filter = "brightness(1.15)"; });
-  btn.addEventListener("mouseleave", () => { btn.style.filter = "none"; });
-
-  return btn;
 }
 
 function makeLinkBtn({ label, href }) {
