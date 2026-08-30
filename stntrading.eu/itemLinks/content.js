@@ -15,13 +15,14 @@ import {
   getKnownCrateNumber,
   resolveCrateSeries,
   CRATE_NUMBER_RE,
+  IS_CRATE_CASE_RE,
 } from "../../utils/tf2ItemSchema.js";
+import { ksPrefixFor } from "../../utils/tf2ItemName.js";
+import { getEffectsData } from "../../utils/unusualEffects.js";
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 import { TF2_QUALITY_NAMES, TF2_CRAFTABILITY } from "../../utils/constants/tf2Economy.js";
 import { getSettings } from "../../utils/settings.js";
-
-let effectsDataPromise = null; //to get the utils effects ids
 
 // A distinct accent color per destination site, so the row reads as a
 // set of different places rather than one undifferentiated button mass.
@@ -42,7 +43,11 @@ const LINK_ACCENTS = {
 /**
  * Adds quick links (backpack.tf, mannco.store, marketplace.tf, Steam
  * Market, Wiki) for the item shown on an stntrading.eu item page.
- * Renamed from link2Backpack — same page, now covers more sites.
+ * Renamed from link2Backpack — same page, now covers more sites. Every
+ * destination link is built directly from utils/itemLinks.js's own
+ * builders right here — this file only ever does its own name parsing
+ * (parseShallow()/parseItemAttributes()/findUnusualEffect()), never a
+ * local wrapper standing in for one of those builders.
  */
 export async function showItemLinks() {
   // For a mistyped/unknown item (e.g. a stale link), stntrading.eu
@@ -60,19 +65,121 @@ export async function showItemLinks() {
   // Fetched once and reused — Bp Stats and mannco.store both need the
   // same Unusual effect for this item.
   const effect = isUnusual ? await findUnusualEffect(itemName) : null;
+  const isNonCraftable = itemName.includes(TF2_CRAFTABILITY[1]);
+
+  // "Shallow" parse (keeps killstreak/Australium/"Festive " baked into
+  // name) for merchant.tf/gladiator.tf/Wiki — crate/case series number
+  // stripped first, same convention parseShallow()'s own doc describes,
+  // so the Wiki link doesn't 404 on a per-series number its real
+  // article never had (confirmed: the article for "Mann Co. Supply
+  // Crate" covers every series under one shared page).
+  const crateMatch = itemName.match(CRATE_NUMBER_RE);
+  const nameWithoutSeries = crateMatch ? itemName.slice(0, crateMatch.index) : itemName;
+  const shallow = parseShallow(nameWithoutSeries);
+  const crateNumberFromText = crateMatch ? crateMatch[1] : undefined;
+
+  // Deeper parse (quality/killstreak/Australium/Non-Craftable all
+  // pulled out as separate fields) for bp.tf stats/marketplace.tf/
+  // pricedb.io/liquid.tf/crate.tf — bp.tf stats needs ksTier/australium
+  // as their own fields (not baked into text like shallow above) so the
+  // next.backpack.tf branch can pass ksTier as its own query param
+  // instead of silently dropping it.
+  const itemAttrs = await parseItemAttributes(itemName);
+  // Gates crate.tf below — crateTfUrl() itself has no "is this actually
+  // a crate" check, it trusts the caller.
+  const looksLikeCrate = itemAttrs != null && IS_CRATE_CASE_RE.test(itemAttrs.name) && !/\bkey\b/i.test(itemAttrs.name);
+
+  // bp.tf stats specifically also needs ITEM_NAME_QUIRKS' backpack.tf
+  // casing fix (e.g. Force-A-Nature) — keyed by the bare weapon name,
+  // "Festive " stripped just for that lookup then reattached (see
+  // ITEM_NAME_QUIRKS' own doc for why a Festive weapon still needs it).
+  const bpFestivePrefix = itemAttrs?.name.startsWith("Festive ") ? "Festive " : "";
+  const bpBaseForQuirk = itemAttrs ? (bpFestivePrefix ? itemAttrs.name.slice(bpFestivePrefix.length) : itemAttrs.name) : "";
+  const bpQuirkName = bpFestivePrefix + (ITEM_NAME_QUIRKS[bpBaseForQuirk]?.backpackName ?? bpBaseForQuirk);
+
+  // mannco.store/skinport.com only want the crate number for ambiguous
+  // multi-series names (see resolveCrateSeries()) — dropped for every
+  // other crate. Cheap sync check first — resolveCrateSeries() does the
+  // same CRATE_NUMBER_RE test internally before its own (async)
+  // ambiguity lookup, but doing it here too means most items (no crate
+  // number at all) never enter that async function in the first place.
+  const manncoSkinportName = itemName.replace(CRATE_NUMBER_RE, "");
+  const { crateNumber: seriesNumber, isAmbiguous } = CRATE_NUMBER_RE.test(itemName)
+    ? await resolveCrateSeries(itemName, manncoSkinportName)
+    : { crateNumber: null, isAmbiguous: false };
+  const ambiguousCrateNumber = isAmbiguous ? seriesNumber : undefined;
 
   const links = [
-    { label: "bp.tf stats", href: await createBpStatsLink(itemName, isUnusual, effect, settings.bpTfVersion === "next") },
-    { label: "mannco.store", href: await createManncoLink(itemName, isUnusual, effect) },
-    { label: "skinport.com", href: await createSkinportLink(itemName, isUnusual) },
-    { label: "marketplace.tf", href: await createMarketplaceLink(itemName) },
-    { label: "crate.tf", href: await createCrateTfLink(itemName) },
-    { label: "merchant.tf", href: createMerchantTfLink(itemName) },
-    { label: "gladiator.tf", href: createGladiatorTfLink(itemName) },
-    { label: "pricedb.io", href: await createPricedbLink(itemName) },
-    { label: "liquid.tf", href: await createLiquidTfLink(itemName) },
+    {
+      label: "bp.tf stats",
+      href: isUnusual
+        // Unusual — mannco.store's own effect-name-prepend convention
+        // has no equivalent field on bp.tf, it's just the effectId.
+        ? (effect
+            ? backpackStatsUrl(stripUnusualEffectName(itemName, effect.name), "Unusual", {
+                craftable: !isNonCraftable, effectId: effect.id, next: settings.bpTfVersion === "next",
+              })
+            : null) // no effect match — can't build a useful link
+        // Classic bp.tf has no separate killstreak-tier/Australium field
+        // at all — ksPrefixFor() + the "Australium " prefix have to be
+        // baked into the name directly (see backpackStatsUrl()'s own
+        // doc); next.backpack.tf is the opposite, it wants the bare name
+        // with ksTier/australium as their own query params instead.
+        : (itemAttrs
+            ? (settings.bpTfVersion === "next"
+                ? backpackStatsUrl(itemAttrs.name, itemAttrs.quality, {
+                    craftable: itemAttrs.craftable, ksTier: itemAttrs.ksTier, australium: itemAttrs.australium, next: true,
+                  })
+                : backpackStatsUrl(ksPrefixFor(itemAttrs.ksTier) + (itemAttrs.australium ? "Australium " : "") + bpQuirkName, itemAttrs.quality, {
+                    craftable: itemAttrs.craftable, effectId: itemAttrs.crateNumber,
+                  }))
+            : null),
+    },
+    {
+      label: "mannco.store",
+      href: isUnusual
+        // Unusual — mannco.store wants the effect name prepended, which
+        // Steam's own item name never includes.
+        ? (effect ? mannCoStoreUrl(`Unusual ${stripUnusualEffectName(itemName, effect.name)}`, undefined, { effectName: effect.name }) : "")
+        // "Non-Craftable " (if present) is kept as-is — mannCoStoreUrl()
+        // turns it into mannco.store's "uncraftable" slug word.
+        : mannCoStoreUrl(manncoSkinportName, undefined, { crateNumber: ambiguousCrateNumber }),
+    },
+    // No Unusual effect name is known to belong anywhere in
+    // skinport.com's slug (unconfirmed, unlike mannco.store's
+    // prepend-effect-name convention), so Unusuals are skipped rather
+    // than guessed wrong.
+    {
+      label: "skinport.com",
+      href: isUnusual ? null : skinportUrl(manncoSkinportName, undefined, { crateNumber: ambiguousCrateNumber }),
+    },
+    { label: "marketplace.tf", href: itemAttrs ? await marketplaceTfUrl(itemAttrs.name, itemAttrs.quality, itemAttrs) : null },
+    // crate.tf only has pages for crates/cases. crateTfUrl() itself has
+    // no "is this actually a crate" check — it trusts the caller: any
+    // non-craftable item at all (e.g. "Non-Craftable Duck Journal")
+    // would otherwise resolve a real defindex and get a bogus
+    // ".../uncraftable" crate.tf link, since itemAttrs.crateNumber would
+    // be undefined but itemAttrs.craftable is false either way — same
+    // fix already applied to every other itemLinks script.
+    {
+      label: "crate.tf",
+      href: (looksLikeCrate && (itemAttrs.crateNumber != null || !itemAttrs.craftable))
+        ? await crateTfUrl(itemAttrs.name, itemAttrs.quality, itemAttrs)
+        : null,
+    },
+    // Unlike marketplace.tf/crate.tf, merchant.tf/gladiator.tf need no
+    // schema/defindex lookup, so both stay sync — and unlike
+    // mannco.store/skinport.com, they want a crate's series number every
+    // time it has one, not just for ambiguous names.
+    { label: "merchant.tf", href: merchantTfUrl(shallow.name, shallow.quality, { craftable: shallow.craftable, crateNumber: crateNumberFromText }) },
+    { label: "gladiator.tf", href: gladiatorTfUrl(shallow.name, shallow.quality, { craftable: shallow.craftable, crateNumber: crateNumberFromText }) },
+    { label: "pricedb.io", href: itemAttrs ? await pricedbUrl(itemAttrs.name, itemAttrs.quality, itemAttrs) : null },
+    // Same defindex lookup as marketplace.tf/pricedb.io, plus the extra
+    // fields (effectName, isAmbiguousSeries) itemAttrs already carries
+    // for exactly this — see liquidTfUrl()'s own doc for what they're for.
+    { label: "liquid.tf", href: itemAttrs ? await liquidTfUrl(itemAttrs.name, itemAttrs.quality, itemAttrs) : null },
     { label: "Steam Market", href: steamMarketUrl(itemName.trim()) },
-    { label: "Wiki", href: wikiUrl(parseShallow(itemName).name) },
+    { label: "Wiki", href: wikiUrl(shallow.name) },
   ];
 
   injectLinkStyles();
@@ -132,7 +239,8 @@ function injectLinkStyles() {
  * separate item with its own defindex — e.g. Festive Eyelander is
  * defindex 1082, plain Eyelander is 132 — so backpack.tf has its own
  * distinct stats page for it too, one this must not collapse into.
- * Used for classic + next backpack.tf stats and Wiki.
+ * Used for classic + next backpack.tf stats, merchant.tf, gladiator.tf
+ * and Wiki.
  */
 function parseShallow(itemNameRaw) {
   let name = String(itemNameRaw || "").trim();
@@ -184,51 +292,16 @@ function stripUnusualEffectName(itemNameRaw, effectName) {
 }
 
 /**
- * Build a backpack.tf (or next.backpack.tf) stats URL for an item.
- *
- * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @param {boolean} isUnusual
- * @param {{name: string, id: string}|null} effect
- * @param {boolean} useNext - true → use next.backpack.tf, false → use backpack.tf
- * @returns {Promise<string|null>}
- */
-async function createBpStatsLink(itemNameRaw, isUnusual, effect, useNext) {
-  if (isUnusual) {
-    if (!effect) return null; // no effect match — can't build a useful link
-    const baseName = stripUnusualEffectName(itemNameRaw, effect.name);
-    return backpackStatsUrl(baseName, "Unusual", { craftable: true, effectId: effect.id, next: useNext });
-  }
-
-  const crateMatch = itemNameRaw.match(CRATE_NUMBER_RE);
-  const nameWithoutSeries = crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw;
-
-  const { name, quality, craftable } = parseShallow(nameWithoutSeries);
-
-  // ITEM_NAME_QUIRKS (e.g. Force-A-Nature's backpack.tf casing fix) is
-  // keyed by the bare weapon name — strip "Festive " just for that
-  // lookup, then reattach it, so the quirk still applies to a Festive
-  // weapon too instead of only ever matching the plain one.
-  const festivePrefix = name.startsWith("Festive ") ? "Festive " : "";
-  const baseForQuirk = festivePrefix ? name.slice(festivePrefix.length) : name;
-  const quirk = ITEM_NAME_QUIRKS[baseForQuirk];
-
-  return backpackStatsUrl(festivePrefix + (quirk?.backpackName ?? baseForQuirk), quality, {
-    craftable,
-    effectId: crateMatch ? crateMatch[1] : undefined,
-    next: useNext,
-  });
-}
-
-/**
  * Parses an item's full name down to the bare schema name (no quality,
  * no "The ", no killstreak/Australium/Non-Craftable text — all those
  * become separate fields) plus the attributes the query-param based
- * links (classifieds, marketplace.tf) need. "Festive " is deliberately
- * left in the name rather than pulled out as its own field — see
- * parseShallow() above for why (it's a distinct item/defindex, not a
- * modifier like killstreak tier or Australium): marketplace.tf's
- * schema lookup needs "Festive Eyelander" as the literal name to
- * resolve to its own defindex (1082), not "Eyelander" (132).
+ * links (marketplace.tf/pricedb.io/liquid.tf/crate.tf) need. "Festive "
+ * is deliberately left in the name rather than pulled out as its own
+ * field — see parseShallow() above for why (it's a distinct
+ * item/defindex, not a modifier like killstreak tier or Australium):
+ * marketplace.tf's schema lookup needs "Festive Eyelander" as the
+ * literal name to resolve to its own defindex (1082), not "Eyelander"
+ * (132).
  *
  * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
  * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier?: number, australium?: boolean, effectId?: string, effectName?: string, crateNumber?: string, isAmbiguousSeries?: boolean}|null>}
@@ -304,165 +377,4 @@ async function parseItemAttributes(itemNameRaw) {
   }
 
   return { name, quality: matchedQuality, craftable: !isNonCraftable, ksTier, australium, crateNumber, isAmbiguousSeries };
-}
-
-/**
- * Build a mannco.store item URL.
- *
- * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @param {boolean} isUnusual
- * @param {{name: string, id: string}|null} effect
- * @returns {Promise<string>}
- */
-async function createManncoLink(itemNameRaw, isUnusual, effect) {
-  const name = String(itemNameRaw || "").trim();
-
-  if (isUnusual) {
-    // Unusual — mannco.store wants the effect name prepended, which
-    // Steam's own item name never includes.
-    if (!effect) return "";
-    const baseName = stripUnusualEffectName(name, effect.name);
-    return mannCoStoreUrl(`Unusual ${baseName}`, undefined, { effectName: effect.name });
-  }
-
-  // mannco.store only wants the crate number for ambiguous multi-series
-  // names (see resolveCrateSeries()) — dropped for every other crate.
-  const manncoName = name.replace(CRATE_NUMBER_RE, "");
-  // Cheap sync check first — resolveCrateSeries() does the same
-  // CRATE_NUMBER_RE test internally before its own (async) ambiguity
-  // lookup, but doing it here too means most items (no crate number at
-  // all) never enter that async function in the first place.
-  const { crateNumber, isAmbiguous } = CRATE_NUMBER_RE.test(name)
-    ? await resolveCrateSeries(name, manncoName)
-    : { crateNumber: null, isAmbiguous: false };
-
-  // "Non-Craftable " (if present) is kept as-is — mannCoStoreUrl()
-  // turns it into mannco.store's "uncraftable" slug word.
-  return mannCoStoreUrl(manncoName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined });
-}
-
-/**
- * Build a skinport.com item URL. No Unusual effect name is known to
- * belong anywhere in skinport.com's slug (unconfirmed, unlike
- * mannco.store's prepend-effect-name convention), so Unusuals are
- * skipped rather than guessed wrong — same reasoning as createManncoLink().
- *
- * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @param {boolean} isUnusual
- * @returns {Promise<string|null>}
- */
-async function createSkinportLink(itemNameRaw, isUnusual) {
-  if (isUnusual) return null;
-
-  const name = String(itemNameRaw || "").trim();
-
-  // Same multi-series exception as createManncoLink() above.
-  const skinportName = name.replace(CRATE_NUMBER_RE, "");
-  // Cheap sync check first — see createManncoLink()'s own comment above.
-  const { crateNumber, isAmbiguous } = CRATE_NUMBER_RE.test(name)
-    ? await resolveCrateSeries(name, skinportName)
-    : { crateNumber: null, isAmbiguous: false };
-
-  return skinportUrl(skinportName, undefined, { crateNumber: isAmbiguous ? crateNumber : undefined });
-}
-
-/**
- * Build a marketplace.tf item URL.
- *
- * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {Promise<string|null>}
- */
-async function createMarketplaceLink(itemNameRaw) {
-  const attrs = await parseItemAttributes(itemNameRaw);
-  if (!attrs) return null;
-  return marketplaceTfUrl(attrs.name, attrs.quality, attrs);
-}
-
-/**
- * Build a pricedb.io item URL — same sku shape/defindex lookup as
- * marketplace.tf, see pricedbUrl()'s own doc.
- *
- * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {Promise<string|null>}
- */
-async function createPricedbLink(itemNameRaw) {
-  const attrs = await parseItemAttributes(itemNameRaw);
-  if (!attrs) return null;
-  return pricedbUrl(attrs.name, attrs.quality, attrs);
-}
-
-/**
- * Build a liquid.tf item-listing URL — same defindex lookup as
- * marketplace.tf/pricedb.io, plus the extra fields (effectName,
- * isAmbiguousSeries) parseItemAttributes() already carries for exactly
- * this — see liquidTfUrl()'s own doc for what they're for.
- *
- * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {Promise<string|null>}
- */
-async function createLiquidTfLink(itemNameRaw) {
-  const attrs = await parseItemAttributes(itemNameRaw);
-  if (!attrs) return null;
-  return liquidTfUrl(attrs.name, attrs.quality, attrs);
-}
-
-/**
- * Build a crate.tf item URL — crates/cases only. crateTfUrl() itself
- * returns null with no crate number, so this naturally resolves to
- * null for every non-crate item too, without needing its own item-type
- * check here.
- *
- * @param {string} itemNameRaw - e.g., "Mann Co. Supply Crate Series #34"
- * @returns {Promise<string|null>}
- */
-async function createCrateTfLink(itemNameRaw) {
-  const attrs = await parseItemAttributes(itemNameRaw);
-  if (!attrs) return null;
-  return crateTfUrl(attrs.name, attrs.quality, attrs);
-}
-
-/**
- * Build a merchant.tf trade-page URL. Unlike marketplace.tf/crate.tf,
- * merchant.tf needs no schema/defindex lookup, so this stays sync —
- * and unlike mannco.store/skinport.com, it wants a crate's series
- * number every time it has one, not just for ambiguous names, so this
- * reads CRATE_NUMBER_RE directly instead of going through
- * resolveCrateSeries()'s ambiguity check.
- *
- * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {string}
- */
-function createMerchantTfLink(itemNameRaw) {
-  const crateMatch = itemNameRaw.match(CRATE_NUMBER_RE);
-  const nameWithoutSeries = crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw;
-  const { name, quality, craftable } = parseShallow(nameWithoutSeries);
-
-  return merchantTfUrl(name, quality, { craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
-}
-
-/**
- * Build a gladiator.tf sales-page URL. Same composition merchant.tf's
- * needs (see gladiatorTfUrl()'s own doc) — parseShallow() already
- * keeps killstreak/Australium/"Festive " baked into `name`, exactly
- * what that function wants.
- *
- * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {string}
- */
-function createGladiatorTfLink(itemNameRaw) {
-  const crateMatch = itemNameRaw.match(CRATE_NUMBER_RE);
-  const nameWithoutSeries = crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw;
-  const { name, quality, craftable } = parseShallow(nameWithoutSeries);
-
-  return gladiatorTfUrl(name, quality, { craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
-}
-
-// Load and cache the JSON dynamically
-async function getEffectsData() {
-  if (!effectsDataPromise) {
-    effectsDataPromise = fetch(
-      chrome.runtime.getURL("utils/backpackUnusualsIds.json")
-    ).then((res) => res.json());
-  }
-  return effectsDataPromise;
 }
