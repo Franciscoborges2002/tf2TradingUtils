@@ -44,8 +44,10 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamTradeOffer
 */
 
 import { SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
+import { TF2_APPID, TF2_CONTEXTID, TF2_QUALITY_NAMES } from "../../utils/constants/tf2Economy.js";
 import {
   backpackStatsUrl,
+  backpackHistoryUrl,
   stnTradingUrl,
   mannCoStoreUrl,
   marketplaceTfUrl,
@@ -57,8 +59,10 @@ import {
   getKnownCrateNumber,
   resolveCrateSeries,
   CRATE_NUMBER_RE,
+  IS_CRATE_CASE_RE,
   getItemNameByDefindex,
 } from "../../utils/tf2ItemSchema.js";
+import { ksPrefixFor } from "../../utils/tf2ItemName.js";
 import { getSettings } from "../../utils/settings.js";
 
 const LINK_ACCENTS = {
@@ -74,12 +78,17 @@ const LINK_ACCENTS = {
 
 const GROUP_ID = "tf2utils-trade-action-links";
 
+// parseItemName()'s own quality-word check — Normal/Unusual/Unique
+// excluded, since those are handled separately there (Unusual has its
+// own check, Unique is the default, Normal isn't baked into names at
+// all here).
+const QUALITY_WORDS = TF2_QUALITY_NAMES.filter((q) => q !== "Normal" && q !== "Unusual" && q !== "Unique");
+
 export function addItemLinks() {
   const observer = new MutationObserver(() => processActionMenu());
   observer.observe(document.body, {
     attributes: true, attributeFilter: ["href"], childList: true, subtree: true,
   });
-  console.log("[TF2Utils] tradeOffer itemLinks: watching action menu");
 }
 
 let lastAssetId = null;
@@ -116,7 +125,9 @@ function removeInjectedGroups() {
 }
 
 function getAssetId(viewInventoryLink) {
-  const match = (viewInventoryLink.getAttribute("href") || "").match(/#440_2_(\d+)$/);
+  const match = (viewInventoryLink.getAttribute("href") || "").match(
+    new RegExp(`#${TF2_APPID}_${TF2_CONTEXTID}_(\\d+)$`)
+  );
   return match ? match[1] : null;
 }
 
@@ -172,7 +183,6 @@ function processActionMenu() {
       group.id = GROUP_ID;
       links.forEach(({ label, href }) => group.appendChild(makeMenuLink(label, href)));
       latest.staticActions.insertAdjacentElement("afterend", group);
-      console.log("[TF2Utils] tradeOffer itemLinks: injected links for", assetId, links);
     })
     .catch((err) => console.warn("[TF2Utils] tradeOffer itemLinks failed:", err));
 }
@@ -216,10 +226,6 @@ function parseItemName(rawName) {
     name = name.slice("Killstreak ".length);
   }
 
-  const QUALITY_WORDS = [
-    "Genuine", "Vintage", "Community", "Valve", "Self-Made", "Customized",
-    "Strange", "Completed", "Haunted", "Collector's", "Decorated Weapon",
-  ];
   let quality = "Unique";
   const matchedQuality = QUALITY_WORDS.find((q) => name.startsWith(`${q} `));
   if (matchedQuality) {
@@ -234,14 +240,6 @@ function parseItemName(rawName) {
   if (australium) name = name.slice("Australium ".length);
 
   return { name, quality, craftable: !isNonCraftable, ksTier, australium, festive };
-}
-
-/** Killstreak-tier prefix text, for classic backpack.tf's stats page (which needs it baked into the name, not passed as a separate field). */
-function ksPrefixFor(ksTier) {
-  if (ksTier === 3) return "Professional Killstreak ";
-  if (ksTier === 2) return "Specialized Killstreak ";
-  if (ksTier === 1) return "Killstreak ";
-  return "";
 }
 
 async function buildLinks(rawName, assetId) {
@@ -264,74 +262,90 @@ async function buildLinks(rawName, assetId) {
     ? await resolveCrateSeries(rawName, attrs.name)
     : { crateNumber: null, isAmbiguous: false };
 
+  // Gates crate.tf below — crateTfUrl() itself has no "is this actually
+  // a crate" check, it trusts the caller.
+  const looksLikeCrate = IS_CRATE_CASE_RE.test(attrs.name) && !/\bkey\b/i.test(attrs.name);
+
+  // The name itself already told us the crate number when present — the
+  // bundled table is only needed as a fallback for pages that don't
+  // expose it at all (see getKnownCrateNumber()'s own docs). bp.tf
+  // stats/marketplace.tf/crate.tf all want it whenever known, not just
+  // for ambiguous names, unlike mannco.store/skinport.com below.
+  const resolvedCrateNumber = crateNumber ?? await getKnownCrateNumber(attrs.name);
+
   // mannco.store/skinport.com only want the crate number for ambiguous
-  // multi-series names (see resolveCrateSeries()) — bp.tf stats/
-  // marketplace.tf below want it regardless.
+  // multi-series names (see resolveCrateSeries()).
   const manncoSkinportCrateNumber = isAmbiguous ? crateNumber : undefined;
 
-  const manncoHref = attrs.quality === "Unusual"
-    ? null // no reliable Unusual effect name available from this menu
-    : mannCoStoreUrl(nameWithoutCrate, attrs.quality, { crateNumber: manncoSkinportCrateNumber });
-
-  const skinportHref = attrs.quality === "Unusual"
-    ? null // same reasoning as mannco.store above
-    : skinportUrl(nameWithoutCrate, attrs.quality, { crateNumber: manncoSkinportCrateNumber });
+  // craftable goes through the `craftable` option everywhere in this
+  // file (bp.tf stats/stntrading.eu/marketplace.tf/crate.tf all already
+  // get it that way) — mannco.store/skinport.com are no exception:
+  // "Non-Craftable " is stripped from the name here so it's the
+  // `craftable` option alone signaling it, not text baked into the name.
+  const craftableAwareName = nameWithoutCrate.replace(/^Non-Craftable\s+/i, "");
 
   const stnName = rawName
     .replace(/^Non-Craftable\s+/i, "")
     .replace(/Festivized\s+/i, "")
     .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
 
-  // Single "bp.tf stats"/"bp.tf history" pair, following the popup's
-  // "Default bp.tf version" setting. The crate-number-as-trailing-
-  // path-segment trick (effectId below) only exists on classic
-  // backpack.tf's stats URL shape — next.backpack.tf's query-param one
-  // has no equivalent (see backpackStatsUrl()'s own doc), so the next
-  // variant is just less precise for crates, same gap as everywhere
-  // else next.backpack.tf is used.
-  const bpStatsHref = settings.bpTfVersion === "next"
-    ? backpackStatsUrl(attrs.name, attrs.quality, {
-        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, next: true,
-      })
-    : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
-        craftable: attrs.craftable,
-        effectId: crateNumber ?? undefined,
-      });
-  const bpHistoryHref = assetId
-    ? `https://${settings.bpTfVersion === "next" ? "next." : ""}backpack.tf/item/${assetId}`
+  // crate.tf only has pages for crates/cases. crateTfUrl() itself has no
+  // "is this actually a crate" check — it trusts the caller: any
+  // non-craftable item at all (e.g. "Non-Craftable Duck Journal") would
+  // otherwise resolve a real defindex and get a bogus ".../uncraftable"
+  // crate.tf link, since resolvedCrateNumber would be null but craftable
+  // is false either way.
+  const crateTfHref = looksLikeCrate && (resolvedCrateNumber != null || !attrs.craftable)
+    ? await crateTfUrl(attrs.name, undefined, { crateNumber: resolvedCrateNumber, craftable: attrs.craftable })
+        .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; })
     : null;
 
   const links = [
-    { label: "bp.tf stats", href: bpStatsHref },
-    { label: "bp.tf history", href: bpHistoryHref },
+    // Single "bp.tf stats"/"bp.tf history" pair, following the popup's
+    // "Default bp.tf version" setting. The crate-number-as-trailing-
+    // path-segment trick (effectId below) only exists on classic
+    // backpack.tf's stats URL shape — next.backpack.tf's query-param one
+    // has no equivalent (see backpackStatsUrl()'s own doc), so the next
+    // variant is just less precise for crates, same gap as everywhere
+    // else next.backpack.tf is used.
+    { label: "bp.tf stats", href: settings.bpTfVersion === "next"
+        ? backpackStatsUrl(attrs.name, attrs.quality, {
+            craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, next: true,
+          })
+        : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
+            craftable: attrs.craftable,
+            effectId: crateNumber ?? undefined,
+          }) },
+    {
+      label: "bp.tf history",
+      href: assetId ? backpackHistoryUrl(assetId, { next: settings.bpTfVersion === "next" }) : null,
+    },
     { label: "stntrading.eu", href: stnTradingUrl(stnName, undefined, { craftable: attrs.craftable, isAmbiguousSeries: isAmbiguous }) },
-    { label: "mannco.store", href: manncoHref },
-    { label: "skinport.com", href: skinportHref },
+    {
+      label: "mannco.store",
+      href: attrs.quality === "Unusual"
+        ? null // no reliable Unusual effect name available from this menu
+        : mannCoStoreUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: manncoSkinportCrateNumber }),
+    },
+    {
+      label: "skinport.com",
+      href: attrs.quality === "Unusual"
+        ? null // same reasoning as mannco.store above
+        : skinportUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: manncoSkinportCrateNumber }),
+    },
     // Only for names Steam's own (unescaped) Market link would mangle
     // — see the file header for why. Everything else already has a
     // working native link, so this would just be a redundant duplicate.
     crateNumber != null ? { label: "Steam Market", href: steamMarketUrl(rawName) } : null,
+    {
+      label: "marketplace.tf",
+      href: await marketplaceTfUrl(attrs.name, attrs.quality, {
+        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festive,
+        crateNumber: resolvedCrateNumber ?? undefined,
+      }).catch((err) => { console.warn("[TF2Utils] marketplace.tf link failed:", err); return null; }),
+    },
+    { label: "crate.tf", href: crateTfHref },
   ].filter((link) => link?.href);
-
-  try {
-    // The name itself already told us the crate number when present —
-    // the bundled table is only needed as a fallback for pages that
-    // don't expose it at all (see getKnownCrateNumber()'s own docs).
-    const resolvedCrateNumber = crateNumber ?? await getKnownCrateNumber(attrs.name);
-    const marketplaceHref = await marketplaceTfUrl(attrs.name, attrs.quality, {
-      craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festive,
-      crateNumber: resolvedCrateNumber ?? undefined,
-    });
-    if (marketplaceHref) links.push({ label: "marketplace.tf", href: marketplaceHref });
-
-    // crate.tf only has pages for crates/cases — crateTfUrl() itself
-    // returns null with no crate number, so this naturally stays absent
-    // for every other item rather than needing its own type check here.
-    const crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber: resolvedCrateNumber, craftable: attrs.craftable });
-    if (crateTfHref) links.push({ label: "crate.tf", href: crateTfHref });
-  } catch (err) {
-    console.warn("[TF2Utils] marketplace.tf/crate.tf link failed:", err);
-  }
 
   return links;
 }

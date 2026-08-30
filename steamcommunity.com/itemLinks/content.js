@@ -21,6 +21,7 @@ import {
   backpackHistoryUrl,
 } from "../../utils/itemLinks.js";
 import { getKnownCrateNumber, isAmbiguousCrateName, resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
+import { ksPrefixFor } from "../../utils/tf2ItemName.js";
 import { getSettings } from "../../utils/settings.js";
 import { STEAMCOMMUNITY_CANT_GENERATE_ITEMLINKS } from "../../utils/constants/messages.js";
 
@@ -138,14 +139,6 @@ function parseItemName(rawName, qualityFromTags) {
   if (australium) name = name.slice("Australium ".length);
 
   return { name, quality, craftable: !isNonCraftable, ksTier, australium, festive };
-}
-
-/** Killstreak-tier prefix text, for classic backpack.tf's stats page (which needs it baked into the name, not passed as a separate field). */
-function ksPrefixFor(ksTier) {
-  if (ksTier === 3) return "Professional Killstreak ";
-  if (ksTier === 2) return "Specialized Killstreak ";
-  if (ksTier === 1) return "Killstreak ";
-  return "";
 }
 
 export function addItemLinks() {
