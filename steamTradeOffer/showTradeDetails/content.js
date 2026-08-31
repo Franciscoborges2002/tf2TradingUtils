@@ -7,6 +7,7 @@
 
 import { COLOR_ACCENT, COLOR_DANGER, COLOR_INFO, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
+import { fromScrap, formatRefined } from "../../utils/tf2Currency.js";
 
 const PANEL_ID  = "tf2utils-denominations-panel";
 const STYLES_ID = "tf2utils-denom-styles";
@@ -267,13 +268,7 @@ function renderCompact(el, keys, scrap) {
   }
 
   if (scrap) {
-    // Convert to decimal ref: remainder/9 gives the fractional part
-    // TF2 convention: 1 scrap = .11, 1 rec = .33, 2 rec = .66, etc.
-    const ref     = Math.floor(scrap / 9);
-    const rem     = scrap % 9;
-    // Express remainder as hundredths: e.g. 4 scrap = 44, 3 scrap = 33
-    const decimal = String(Math.round((rem / 9) * 100)).padStart(2, "0");
-    parts.push({ label: `${ref}.${decimal} ref`, color: COLOR_METAL });
+    parts.push({ label: `${formatRefined(scrap)} ref`, color: COLOR_METAL });
   }
 
   parts.forEach((p, i) => {
@@ -294,10 +289,7 @@ function renderCompact(el, keys, scrap) {
 
 // "2 Keys + 5 Ref + 1 Rec + 1 Scrap"
 function renderDetailed(el, keys, scrap) {
-  const ref    = Math.floor(scrap / 9);
-  const rem    = scrap % 9;
-  const rec    = Math.floor(rem / 3);
-  const scraps = rem % 3;
+  const { ref, rec, scrap: scraps } = fromScrap(scrap);
 
   const parts = [];
   if (keys)   parts.push({ label: `${keys} Key${keys > 1 ? "s" : ""}`, color: COLOR_ACCENT });

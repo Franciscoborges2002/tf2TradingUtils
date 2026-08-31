@@ -43,6 +43,7 @@
 import { TF2_APPID, TF2_CONTEXTID, TF2_CURRENCY } from "../../utils/constants/tf2Economy.js";
 import { COLOR_ACCENT, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { getSettings } from "../../utils/settings.js";
+import { toScrap, formatRefined, parseRefined } from "../../utils/tf2Currency.js";
 
 const PANEL_ID  = "tf2utils-inv-currency-panel";
 const STYLES_ID = "tf2utils-inv-currency-styles";
@@ -273,18 +274,11 @@ async function fetchFullNameCounts(steamId64, totalCount) {
 // Formats a raw ref amount (possibly fractional) as decimal ref, same
 // convention used elsewhere (tradeOfferPanel/showTradeDetails).
 function formatRefValue(refValue) {
-  const totalScrap = Math.round(refValue * 9);
-  const wholeRef = Math.floor(totalScrap / 9);
-  const remScrap = totalScrap % 9;
-  const decimal  = String(Math.round((remScrap / 9) * 100)).padStart(2, "0");
-  return `${wholeRef}.${decimal} ref`;
+  return `${formatRefined(parseRefined(refValue))} ref`;
 }
 
 function formatTotalMetal(counts) {
-  const totalScrap = counts.ref * TF2_CURRENCY.ref.scrapValue
-    + counts.rec * TF2_CURRENCY.rec.scrapValue
-    + counts.scrap * TF2_CURRENCY.scrap.scrapValue;
-  return formatRefValue(totalScrap / 9);
+  return `${formatRefined(toScrap(counts))} ref`;
 }
 
 // Everything (keys, metal, tracked items) converted to a single ref
@@ -296,9 +290,7 @@ function computeTotalValueRef(counts, settings) {
   const { keyPriceRef, earbudsPriceKeys, earbudsPriceRef } = settings;
   if (!keyPriceRef || (!earbudsPriceKeys && !earbudsPriceRef)) return null;
 
-  const metalRef   = (counts.ref * TF2_CURRENCY.ref.scrapValue
-    + counts.rec * TF2_CURRENCY.rec.scrapValue
-    + counts.scrap * TF2_CURRENCY.scrap.scrapValue) / 9;
+  const metalRef   = toScrap(counts) / 9;
   const keysRef    = counts.keys * keyPriceRef;
   const earbudsRef = counts.earbuds * ((earbudsPriceKeys || 0) * keyPriceRef + (earbudsPriceRef || 0));
 

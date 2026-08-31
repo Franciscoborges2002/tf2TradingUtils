@@ -229,6 +229,11 @@ function ensurePartnerInventoryLoaded() {
 
 // Parses backpack.tf's listing price string, e.g. "2 keys, 5.33 ref",
 // "5.33 ref", or "2 keys", into a { keys, ref, rec, scrap } breakdown.
+// Same math as utils/tf2Currency.js's parseRefined()/fromScrap() —
+// duplicated by hand rather than imported since this file runs as a
+// classic (non-module) content script (see file header) and can't use
+// a static import; keep in sync if that file's rounding convention
+// ever changes.
 function parsePriceString(str) {
   const match = str.match(/^(?:(\d+)\s*keys?,?\s*)?(?:(\d+(?:\.\d+)?)\s*ref)?$/i);
   if (!match || (!match[1] && !match[2])) return null;

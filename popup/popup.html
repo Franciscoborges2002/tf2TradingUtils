@@ -39,6 +39,17 @@
 
     <button id="calc-mode-toggle" class="calc-mode-toggle" title="Switch input style">detailed</button>
 
+    <div id="calc-bulk-section">
+      <div class="calc-total-label">Bulk add (quantity × price/unit)</div>
+      <div id="calc-bulk-form" class="calc-entry-form">
+        <div class="calc-input-grid">
+          <label><span>Quantity</span><input type="number" id="calc-bulk-qty" min="1" step="1" value="1"></label>
+          <label><span>Price / unit</span><input type="text" id="calc-bulk-price" placeholder='e.g. "1.66 ref"'></label>
+        </div>
+        <button id="calc-bulk-add" class="calc-add-btn">Add</button>
+      </div>
+    </div>
+
     <div id="calc-entries-section">
       <div id="calc-empty-state">No entries yet.</div>
       <div id="calc-entries-list"></div>

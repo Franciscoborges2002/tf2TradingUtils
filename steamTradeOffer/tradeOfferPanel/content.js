@@ -17,6 +17,7 @@
 
 import { COLOR_ACCENT, COLOR_DANGER, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { TF2_APPID, TF2_CONTEXTID, TF2_CURRENCY, TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
+import { fromScrap, parseRefined } from "../../utils/tf2Currency.js";
 
 const PANEL_ID  = "tf2utils-tradepanel";
 const STYLES_ID = "tf2utils-tradepanel-styles";
@@ -633,12 +634,7 @@ function parseCompactInput(str) {
   // Metal: "N.NN ref/metal/refined" or just "N.NN"
   const metalMatch = str.match(/([\d]+(?:\.[\d]+)?)\s*(?:ref(?:ined)?|metal)?(?:\s|$)/i);
   if (metalMatch) {
-    const decimal = parseFloat(metalMatch[1]);
-    const totalScrap = Math.round(decimal * 9);
-    result.ref   = Math.floor(totalScrap / 9);
-    const rem    = totalScrap % 9;
-    result.rec   = Math.floor(rem / 3);
-    result.scrap = rem % 3;
+    Object.assign(result, fromScrap(parseRefined(metalMatch[1])));
   }
 
   return result;

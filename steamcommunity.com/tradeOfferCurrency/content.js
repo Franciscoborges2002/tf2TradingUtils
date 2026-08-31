@@ -40,6 +40,7 @@
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { TF2_CURRENCY, TF2_CURRENCY_BY_CLASSID, TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
+import { formatRefined } from "../../utils/tf2Currency.js";
 
 const STYLES_ID = "tf2utils-tradeoffer-currency-styles";
 const PROCESSED_ATTR = "data-tf2utils-currency-total";
@@ -55,14 +56,7 @@ function formatTotal({ keys, scrap }) {
 
   const parts = [];
   if (keys) parts.push(`${keys} key${keys !== 1 ? "s" : ""}`);
-  if (scrap) {
-    // Decimal ref: remainder/9 gives the fractional part (TF2 convention
-    // — 1 scrap = .11, 1 rec = .33, 2 rec = .66, etc.)
-    const ref     = Math.floor(scrap / 9);
-    const rem     = scrap % 9;
-    const decimal = String(Math.round((rem / 9) * 100)).padStart(2, "0");
-    parts.push(`${ref}.${decimal} ref`);
-  }
+  if (scrap) parts.push(`${formatRefined(scrap)} ref`);
   return parts.join(", ");
 }
 
