@@ -19,6 +19,8 @@ import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 import { TF2_KS_SHEEN_IDS, TF2_KS_KILLSTREAKER_IDS } from "../../utils/constants/tf2Economy.js";
 import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, wikiUrl } from "../../utils/itemLinks.js";
 import { getKnownCrateNumber, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
+import { ksPrefixFor } from "../../utils/tf2ItemName.js";
+import { getEffectsData } from "../../utils/unusualEffects.js";
 import { getSettings } from "../../utils/settings.js";
 import { loadIconSvg } from "../../utils/icons.js";
 
@@ -143,7 +145,7 @@ export function addItemLinks() {
     })
     .catch((err) => console.warn("[TF2Utils] Failed to load copy icon:", err));
 
-  function updateModal(name, itemEl) {
+  function updateModal(itemName, itemEl) {
     const nameText = modal.querySelector(".tf2utils-mini-modal-name-text");
     const classBtns = modal.querySelector(".tf2utils-mini-modal-btns");
 
@@ -153,7 +155,7 @@ export function addItemLinks() {
     // Festivized, then Killstreak tier, then the item name.
     const { prefix: ksPrefix } = getKillstreakInfo(itemEl);
     const isUncraftItem = itemEl.classList.contains("uncraft") || isUncraftable();
-    let displayName = name;
+    let displayName = itemName;
     if (ksPrefix && !displayName.includes(ksPrefix.trim())) displayName = ksPrefix + displayName;
     if (isFestivized() && !displayName.includes("Festivized")) displayName = "Festivized " + displayName;
     if (isUncraftItem && !displayName.includes("Non-Craftable") && !displayName.includes("Uncraftable")) {
@@ -164,7 +166,7 @@ export function addItemLinks() {
     copyBtn.onclick = () => copyNameToClipboard(displayName, copyBtn, copySvg, checkSvg);
     classBtns.innerHTML = "";
 
-    makeLinks(name, itemEl)
+    buildLinks(itemName, itemEl)
       .then((links) => {
         links.forEach(({ label, href }) => {
           const btn = document.createElement("a");
@@ -216,12 +218,12 @@ export function addItemLinks() {
         titleDiv?.textContent ||
         ""
       ).trim();
-      const name = SCRAP_TF_NAME_CORRECTIONS[rawName] || rawName;
+      const itemName = SCRAP_TF_NAME_CORRECTIONS[rawName] || rawName;
 
-      if (!name) return;
+      if (!itemName) return;
 
       // update modal
-      updateModal(name, item);
+      updateModal(itemName, item);
 
       // prevent auto-scroll(mouse wheel)  or redirection to new page(ctrl)
       e.preventDefault();
@@ -230,20 +232,34 @@ export function addItemLinks() {
   );
 }
 
-/* 
-Function to create the links to be displayed
-@args:
-  - name: Name of the item
-  - itemEl: HTML item element (get more information about the item, ks, paint, unu effect)
-*/
-async function makeLinks(name, itemEl) {
-  const settings = await getSettings();
-
-  // --- QUALITY DETECTION ---
-  // Default: Unique
-  let qualityName = "Unique";
-  let unusualEffectName = null;
-
+/**
+ * Reads the item's full set of attributes off both its CSS classes
+ * (quality/killstreak tier/craftability — this page's DOM signal for
+ * those, unlike every other itemLinks script here, which reads them out
+ * of the name text alone) and the hover tooltip's own content text
+ * (Festivized/Uncraftable/Effect/Sheen/Killstreaker — none of those are
+ * part of the item's own name here either — see isFestivized()'s own
+ * doc). `itemName` itself is only ever the tooltip title's raw text —
+ * used here just to detect Australium/Strange Part (the two signals
+ * that ARE baked into it) and as the base string every prefix below
+ * gets stripped from.
+ *
+ * Every field is always present on the returned object — one this page
+ * genuinely can't determine (there's no crate/case series number shown
+ * here as literal text at all, only through the bundled fallback table
+ * — see getKnownCrateNumber()'s own doc for why that means
+ * isAmbiguousSeries is always false here) is `null` rather than
+ * omitted. `festivized`/`ksSheen`/`ksKillstreaker` are extra fields
+ * beyond the shared shape — this file's own Specific Bp Classifieds
+ * link needs the sheen/killstreaker ids, and marketplace.tf/pricedb.io
+ * need festivized as their own sku modifier, unlike every other
+ * destination this file builds.
+ *
+ * @param {string} itemName - the hover tooltip's own title text
+ * @param {Element} itemEl - the hovered/clicked item element (CSS classes)
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean, effectId: string|null, effectName: string|null, crateNumber: number|null, isAmbiguousSeries: boolean, festivized: boolean, ksSheen: string|null, ksKillstreaker: string|null}>}
+ */
+async function parseItemAttributes(itemName, itemEl) {
   // A switch needs one case per class — which also fixes two bugs the
   // old if-chain had from duplicated conditions: quality0 was checked
   // twice ("Normal" then unconditionally overwritten to "Self Made",
@@ -251,66 +267,59 @@ async function makeLinks(name, itemEl) {
   // quality id 9 not 0, were never detected), and quality14 likewise
   // ("Haunted" then overwritten to "Collector's" — Haunted is quality
   // id 13, not 14, so it was never actually reachable either way).
+  let quality = "Unique";
+  let effectName = null;
   const qualityClass = [...itemEl.classList].find((c) => c.startsWith("quality"));
   switch (qualityClass) {
     case "quality0":
-      qualityName = "Normal";
+      quality = "Normal";
       break;
     case "quality1":
-      qualityName = "Genuine";
+      quality = "Genuine";
       break;
     case "quality3":
-      qualityName = "Vintage";
+      quality = "Vintage";
       break;
     case "quality5":
-      qualityName = "Unusual";
-      unusualEffectName = getUnusualEffectName(itemEl);
+      quality = "Unusual";
+      effectName = getUnusualEffectName();
       break;
     case "quality6":
-      qualityName = "Unique";
+      quality = "Unique";
       break;
     case "quality9":
-      qualityName = "Self-Made";
+      quality = "Self-Made";
       break;
     case "quality11":
-      qualityName = "Strange";
+      quality = "Strange";
       break;
     case "quality13":
-      qualityName = "Haunted";
+      quality = "Haunted";
       break;
     case "quality14":
-      qualityName = "Collector's";
+      quality = "Collector's";
       break;
   }
 
-  // --- KILLSTREAK DETECTION ---
-  const { prefix: ksPrefix, tier: ksTier } = getKillstreakInfo(itemEl);
+  const { tier: ksTier } = getKillstreakInfo(itemEl);
+  const ksSheen = getSheenName();
+  const ksKillstreaker = getKillstreakerName();
+  const craftable = !(itemEl.classList.contains("uncraft") || isUncraftable());
 
-  // --- SHEEN / KILLSTREAKER DETECTION ---
-  const sheenName = getSheenName();
-  const killstreakerName = getKillstreakerName();
-
-  // --- CRAFTABILITY DETECTION ---
-  const isUncraft = itemEl.classList.contains("uncraft") || isUncraftable();
-
-  // --- AUSTRALIUM DETECTION ---
   const dataTitle = itemEl.getAttribute("data-title") || "";
-  const isAustralium =
-    name.includes("Australium") || dataTitle.includes("Australium");
+  const australium = itemName.includes("Australium") || dataTitle.includes("Australium");
 
-  // --- FESTIVIZED DETECTION --- (same text-match approach as Australium)
-  const isFestivizedItem = isFestivized();
-  const festivizedPrefix = isFestivizedItem ? "Festivized " : "";
+  const festivized = isFestivized();
 
   // === STRANGE PART SAFEGUARD ===
-  const isStrangePart = /^Strange Part:/i.test(name);
+  const isStrangePart = /^Strange Part:/i.test(itemName);
 
   // --- CLEAN NAME LOGIC ---
   // Strip Festivized/killstreak-tier/quality prefixes from the front,
   // repeatedly — items can stack more than one (e.g. "Collector's
   // Festivized Professional Killstreak Beggar's Bazooka"), and a single
   // one-shot regex only ever catches whichever one happens to be first.
-  let baseName = name;
+  let baseName = itemName;
 
   if (!isStrangePart) {
     const PREFIX_PATTERNS = [
@@ -323,8 +332,8 @@ async function makeLinks(name, itemEl) {
     // their real TF2 quality is Unique. Blindly stripping any
     // "Strange"/"Vintage"/"Collector's" text regardless of the item's
     // real quality would wrongly cut real name text off those.
-    if (qualityName === "Strange" || qualityName === "Vintage" || qualityName === "Collector's") {
-      const escaped = qualityName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (quality === "Strange" || quality === "Vintage" || quality === "Collector's") {
+      const escaped = quality.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       PREFIX_PATTERNS.push(new RegExp(`^${escaped}\\s+`, "i"));
     }
     let stripped = true;
@@ -340,25 +349,93 @@ async function makeLinks(name, itemEl) {
     }
   }
 
-  // Remove "Australium " — not part of the bare schema name the
-  // query-param-based links (next.backpack.tf stats, marketplace.tf) expect
-  const classifiedsName = baseName.replace(/^Australium /i, "");
+  // Bare schema name — Australium also removed, not part of it the way
+  // the query-param-based links (next.backpack.tf stats, marketplace.tf,
+  // pricedb.io, liquid.tf, crate.tf) expect. buildLinks() below
+  // reconstructs baseName (Australium kept) separately for the
+  // destinations that want it baked back in as text (classic Bp Stats,
+  // merchant.tf/gladiator.tf, Steam Market, mannco.store, Wiki).
+  const name = baseName.replace(/^Australium /i, "");
 
-  // Full descriptive name (Festivized + killstreak tier + item name) —
-  // Steam's own order is Festivized, then killstreak tier, then the item
-  // name. Used for classic Bp Stats, which takes craftability as its own
-  // separate URL field (craftable: !isUncraft below) — Non-Craftable
-  // must NOT be baked into this one, or Bp Stats would end up saying it
-  // twice.
-  const fullDisplayName = festivizedPrefix + ksPrefix + baseName;
+  // scrap.tf's tooltip title never shows a crate/case's series number as
+  // literal text the way backpack.tf's does, so this always goes through
+  // the bundled fallback table — same reasoning steamcommunity.com/
+  // itemLinks falls back to it for. Only ever resolves a name mapped to
+  // exactly one known series (see getKnownCrateNumber()'s own doc), so
+  // there's no way to tell a genuinely ambiguous multi-series name apart
+  // from an unmapped one from this page alone — isAmbiguousSeries is
+  // always false here.
+  const crateNumber = await getKnownCrateNumber(name).catch((err) => {
+    console.warn("[TF2Utils] crate series number lookup failed:", err);
+    return null;
+  }) ?? null;
+
+  // The tooltip's "Effect: <name>" line already gives the exact effect
+  // name reliably (unlike stntrading.eu/itemLinks, which has to guess it
+  // by scanning the item's whole display name for a substring match) —
+  // an exact-match reverse lookup against the same bundled effect data
+  // is enough to also resolve its numeric id, which liquid.tf's own slug
+  // wants (see liquidTfUrl()'s own doc).
+  const effectId = effectName ? await getUnusualEffectId(effectName) : null;
+
+  return {
+    name, quality, craftable, ksTier, australium, effectId, effectName,
+    crateNumber, isAmbiguousSeries: false, festivized, ksSheen, ksKillstreaker,
+  };
+}
+
+/**
+ * Reverse-looks-up an Unusual effect's numeric id from its exact name,
+ * against the same bundled effect data stntrading.eu/itemLinks's
+ * findUnusualEffect() uses (utils/unusualEffects.js) — an exact match is
+ * enough here since parseItemAttributes() already has the precise
+ * effect name off the tooltip's own "Effect: X" line, unlike
+ * stntrading.eu's own substring-scan (it has no such line to read).
+ * @param {string} effectName
+ * @returns {Promise<string|null>}
+ */
+async function getUnusualEffectId(effectName) {
+  const effectData = await getEffectsData();
+  const match = Object.values(effectData).find((e) => e.name.toLowerCase() === effectName.toLowerCase());
+  return match?.id ?? null;
+}
+
+/**
+ * Builds every reference link for the item — Bp Stats/Specific Bp
+ * Classifieds/mannco.store/skinport.com/marketplace.tf/crate.tf/
+ * merchant.tf/gladiator.tf/pricedb.io/liquid.tf/Steam Market/Wiki — as
+ * one array, all resolved together before anything renders.
+ * @param {string} itemName - the hover tooltip's own title text
+ * @param {Element} itemEl - the hovered/clicked item element
+ */
+async function buildLinks(itemName, itemEl) {
+  const settings = await getSettings();
+  const attrs = await parseItemAttributes(itemName, itemEl);
+
+  const ksPrefix = ksPrefixFor(attrs.ksTier);
+  const festivizedPrefix = attrs.festivized ? "Festivized " : "";
 
   // Steam Market and mannco.store don't have a separate craftability
   // field — like Festivized/killstreak, "Non-Craftable" doesn't show up
   // as literal text in the tooltip name at all (confirmed: Duck Journal's
-  // title is just "Duck Journal"), so it's added here from isUncraft.
+  // title is just "Duck Journal"), so it's added here from attrs.craftable.
   // mannCoStoreUrl() converts "Non-Craftable" text into "uncraftable" in
   // the slug itself.
-  const craftabilityPrefix = isUncraft ? "Non-Craftable " : "";
+  const craftabilityPrefix = attrs.craftable ? "" : "Non-Craftable ";
+
+  // baseName: attrs.name with Australium re-added as text — needed for
+  // the destinations that want it baked in (classic Bp Stats,
+  // merchant.tf/gladiator.tf, Steam Market, mannco.store, Wiki), unlike
+  // the query-param-based ones, which take attrs.australium separately.
+  const baseName = attrs.australium ? `Australium ${attrs.name}` : attrs.name;
+
+  // Full descriptive name (Festivized + killstreak tier + item name) —
+  // Steam's own order is Festivized, then killstreak tier, then the item
+  // name. Used for classic Bp Stats, which takes craftability as its own
+  // separate URL field (craftable: attrs.craftable below) — Non-Craftable
+  // must NOT be baked into this one, or Bp Stats would end up saying it
+  // twice.
+  const fullDisplayName = festivizedPrefix + ksPrefix + baseName;
   const craftableAwareDisplayName = craftabilityPrefix + fullDisplayName;
 
   // A handful of items have confirmed, non-derivable naming quirks per
@@ -382,39 +459,21 @@ async function makeLinks(name, itemEl) {
     ? craftabilityPrefix + festivizedPrefix + `The ${manncoBaseName}`
     : craftabilityPrefix + festivizedPrefix + ksPrefix + manncoBaseName;
 
-  // marketplace.tf/pricedb.io/liquid.tf/crate.tf all need a network
-  // fetch (defindex schema lookup) — each isolates its own failure
-  // (offline, blocked request, etc.) with .catch() so one destination
-  // going down never takes the others with it.
-  //
-  // crateNumber specifically is resolved once up front (not just inside
-  // crate.tf's own entry below), since merchant.tf/gladiator.tf/
-  // pricedb.io/liquid.tf all want it too. scrap.tf's tooltip title never
-  // shows the series/case number as literal text the way backpack.tf's
-  // does, so this always goes through the bundled series-number table —
-  // same fallback steamcommunity.com/itemLinks uses for the same reason
-  // — which only resolves names with exactly one known series (see
-  // getKnownCrateNumber()'s own docs).
-  const crateNumber = await getKnownCrateNumber(classifiedsName).catch((err) => {
-    console.warn("[TF2Utils] crate series number lookup failed:", err);
-    return undefined;
-  });
-
   // crateTfUrl() itself has no "is this actually a crate" check — it
   // trusts the caller. Without this gate, any non-craftable non-crate
   // item (e.g. "Non-Craftable Duck Journal") would still resolve a real
   // defindex and get a bogus ".../uncraftable" crate.tf link, since
-  // crateNumber == null but craftable is false either way — same bug
-  // already fixed in backpack.tf oldUI/newUI with this same check.
-  const looksLikeCrate = IS_CRATE_CASE_RE.test(classifiedsName) && !/\bkey\b/i.test(classifiedsName);
+  // attrs.crateNumber == null but craftable is false either way — same
+  // bug already fixed in backpack.tf oldUI/newUI with this same check.
+  const looksLikeCrate = IS_CRATE_CASE_RE.test(attrs.name) && !/\bkey\b/i.test(attrs.name);
 
   // Resolved as its own step (not inline in the array below) since it
   // needs this extra gate check, not just craftable/crateNumber like
   // the others — kept here, rather than pushed after the array, so the
   // crate.tf button still lands in its usual spot in the row.
   let crateTfHref = null;
-  if (looksLikeCrate && (crateNumber != null || isUncraft)) {
-    crateTfHref = await crateTfUrl(classifiedsName, undefined, { crateNumber, craftable: !isUncraft })
+  if (looksLikeCrate && (attrs.crateNumber != null || !attrs.craftable)) {
+    crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber: attrs.crateNumber, craftable: attrs.craftable })
       .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; });
   }
 
@@ -424,45 +483,47 @@ async function makeLinks(name, itemEl) {
     // different fields (see backpackStatsUrl()'s own doc), so both are
     // still built, just only one is ever shown.
     { label: "Bp Stats", href: settings.bpTfVersion === "next"
-        ? backpackStatsUrl(classifiedsName, qualityName, { craftable: !isUncraft, ksTier, australium: isAustralium, next: true })
-        : backpackStatsUrl(fullDisplayName, qualityName, { craftable: !isUncraft }) },
+        ? backpackStatsUrl(attrs.name, attrs.quality, { craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, next: true })
+        : backpackStatsUrl(fullDisplayName, attrs.quality, { craftable: attrs.craftable }) },
     // The one destination here with sheen/killstreaker search filters,
     // so it's the only place those are worth resolving to their numeric
     // ids at all.
-    { label: "Specific Bp Classifieds", href: backpackClassifiedsUrl(classifiedsName, qualityName, {
-        craftable: !isUncraft,
-        australium: isAustralium,
-        ksTier,
-        ksSheen: sheenName ? TF2_KS_SHEEN_IDS[sheenName] : undefined,
-        ksKillstreaker: killstreakerName ? TF2_KS_KILLSTREAKER_IDS[killstreakerName] : undefined,
+    { label: "Specific Bp Classifieds", href: backpackClassifiedsUrl(attrs.name, attrs.quality, {
+        craftable: attrs.craftable,
+        australium: attrs.australium,
+        ksTier: attrs.ksTier,
+        ksSheen: attrs.ksSheen ? TF2_KS_SHEEN_IDS[attrs.ksSheen] : undefined,
+        ksKillstreaker: attrs.ksKillstreaker ? TF2_KS_KILLSTREAKER_IDS[attrs.ksKillstreaker] : undefined,
         next: settings.bpTfVersion === "next",
       }) },
-    { label: "mannco.store", href: qualityName === "Unusual"
-        ? (unusualEffectName ? mannCoStoreUrl(baseName, undefined, { effectName: unusualEffectName }) : null)
-        : mannCoStoreUrl(manncoDisplayName, qualityName) },
-    { label: "skinport.com", href: qualityName === "Unusual"
+    { label: "mannco.store", href: attrs.quality === "Unusual"
+        ? (attrs.effectName ? mannCoStoreUrl(baseName, undefined, { effectName: attrs.effectName }) : null)
+        : mannCoStoreUrl(manncoDisplayName, attrs.quality) },
+    { label: "skinport.com", href: attrs.quality === "Unusual"
         ? null
-        : skinportUrl(craftabilityPrefix + festivizedPrefix + ksPrefix + baseName, qualityName) },
-    { label: "marketplace.tf", href: await marketplaceTfUrl(classifiedsName, qualityName, {
-        craftable: !isUncraft, ksTier, australium: isAustralium, festivized: isFestivizedItem,
+        : skinportUrl(craftabilityPrefix + festivizedPrefix + ksPrefix + baseName, attrs.quality) },
+    { label: "marketplace.tf", href: await marketplaceTfUrl(attrs.name, attrs.quality, {
+        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festivized,
       }).catch((err) => { console.warn("[TF2Utils] marketplace.tf link failed:", err); return null; }) },
     { label: "crate.tf", href: crateTfHref },
-    { label: "merchant.tf", href: merchantTfUrl(fullDisplayName, qualityName, { craftable: !isUncraft, crateNumber }) },
-    { label: "gladiator.tf", href: gladiatorTfUrl(fullDisplayName, qualityName, { craftable: !isUncraft, crateNumber }) },
-    { label: "pricedb.io", href: await pricedbUrl(classifiedsName, qualityName, {
-        craftable: !isUncraft, ksTier, australium: isAustralium, festivized: isFestivizedItem, crateNumber,
+    { label: "merchant.tf", href: merchantTfUrl(fullDisplayName, attrs.quality, { craftable: attrs.craftable, crateNumber: attrs.crateNumber ?? undefined }) },
+    { label: "gladiator.tf", href: gladiatorTfUrl(fullDisplayName, attrs.quality, { craftable: attrs.craftable, crateNumber: attrs.crateNumber ?? undefined }) },
+    { label: "pricedb.io", href: await pricedbUrl(attrs.name, attrs.quality, {
+        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festivized, crateNumber: attrs.crateNumber ?? undefined,
       }).catch((err) => { console.warn("[TF2Utils] pricedb.io link failed:", err); return null; }) },
-    { label: "liquid.tf", href: await liquidTfUrl(classifiedsName, qualityName, {
-        craftable: !isUncraft, ksTier, australium: isAustralium, effectName: unusualEffectName, crateNumber, isAmbiguousSeries: false,
+    { label: "liquid.tf", href: await liquidTfUrl(attrs.name, attrs.quality, {
+        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium,
+        effectId: attrs.effectId ?? undefined, effectName: attrs.effectName ?? undefined,
+        crateNumber: attrs.crateNumber ?? undefined, isAmbiguousSeries: attrs.isAmbiguousSeries,
       }).catch((err) => { console.warn("[TF2Utils] liquid.tf link failed:", err); return null; }) },
-    { label: "Steam Market", href: steamMarketUrl(steamMarketName, qualityName) },
+    { label: "Steam Market", href: steamMarketUrl(steamMarketName, attrs.quality) },
     { label: "Wiki", href: wikiUrl(baseName) },
   ].filter((link) => link.href);
 
   return links;
 }
 
-/** Killstreak tier prefix + numeric tier from an item's CSS classes — shared by updateModal() (display name) and makeLinks() (URL building). */
+/** Killstreak tier prefix + numeric tier from an item's CSS classes — shared by updateModal() (display name) and parseItemAttributes() (URL building). */
 function getKillstreakInfo(itemEl) {
   if (itemEl.classList.contains("killstreak3")) return { prefix: "Professional Killstreak ", tier: 3 };
   if (itemEl.classList.contains("killstreak2")) return { prefix: "Specialized Killstreak ", tier: 2 };

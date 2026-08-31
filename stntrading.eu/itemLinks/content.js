@@ -43,23 +43,50 @@ const LINK_ACCENTS = {
 /**
  * Adds quick links (backpack.tf, mannco.store, marketplace.tf, Steam
  * Market, Wiki) for the item shown on an stntrading.eu item page.
- * Renamed from link2Backpack — same page, now covers more sites. Every
- * destination link is built directly from utils/itemLinks.js's own
- * builders right here — this file only ever does its own name parsing
- * (parseShallow()/parseItemAttributes()/findUnusualEffect()), never a
- * local wrapper standing in for one of those builders.
+ * Renamed from link2Backpack — same page, now covers more sites.
  */
-export async function showItemLinks() {
+export async function addItemLinks() {
   // For a mistyped/unknown item (e.g. a stale link), stntrading.eu
   // renders a ".error-box" page instead — there's no <h1> at all here,
   // so grabbing it directly below would throw.
-  const settings = await getSettings();
-
   if (document.querySelector(".error-box")) return;
 
   const itemName = document.querySelector("h1").innerHTML; //Get the name of the item
   const placeAddLink = document.getElementsByClassName("card-body")[1]; //place for were i want to add the links in the actual page
   if (!placeAddLink) return;
+
+  const links = await buildLinks(itemName);
+
+  injectLinkStyles();
+
+  const row = document.createElement("div");
+  row.className = "tf2utils-links-row";
+  placeAddLink.appendChild(row);
+
+  for (const { label, href } of links) {
+    if (!href) continue;
+    const a = document.createElement("a");
+    a.textContent = label;
+    a.href = href;
+    a.target = "_blank";
+    a.classList.add("btn", "btn-secondary", "tf2utils-link-btn");
+    a.style.setProperty("--tf2utils-accent", LINK_ACCENTS[label] || "#999");
+    row.appendChild(a);
+  }
+}
+
+/**
+ * Builds every reference link for the item — backpack.tf/mannco.store/
+ * skinport.com/marketplace.tf/crate.tf/merchant.tf/gladiator.tf/
+ * pricedb.io/liquid.tf/Steam Market/Wiki — as one array, all resolved
+ * together before anything renders. Every destination link is built
+ * directly from utils/itemLinks.js's own builders right here — this
+ * file only ever does its own name parsing (parseShallow()/
+ * parseItemAttributes()/findUnusualEffect()), never a local wrapper
+ * standing in for one of those builders.
+ */
+async function buildLinks(itemName) {
+  const settings = await getSettings();
 
   const isUnusual = itemName.includes("Unusual");
   // Fetched once and reused — Bp Stats and mannco.store both need the
@@ -72,7 +99,12 @@ export async function showItemLinks() {
   // stripped first, same convention parseShallow()'s own doc describes,
   // so the Wiki link doesn't 404 on a per-series number its real
   // article never had (confirmed: the article for "Mann Co. Supply
-  // Crate" covers every series under one shared page).
+  // Crate" covers every series under one shared page). Deliberately kept
+  // separate from parseItemAttributes() below rather than derived from
+  // it — parseItemAttributes() returns null outright when an Unusual's
+  // effect can't be matched (see its own doc), and merchant.tf/
+  // gladiator.tf/Wiki must keep working even then, unlike the
+  // itemAttrs-gated destinations below.
   const crateMatch = itemName.match(CRATE_NUMBER_RE);
   const nameWithoutSeries = crateMatch ? itemName.slice(0, crateMatch.index) : itemName;
   const shallow = parseShallow(nameWithoutSeries);
@@ -182,22 +214,7 @@ export async function showItemLinks() {
     { label: "Wiki", href: wikiUrl(shallow.name) },
   ];
 
-  injectLinkStyles();
-
-  const row = document.createElement("div");
-  row.className = "tf2utils-links-row";
-  placeAddLink.appendChild(row);
-
-  for (const { label, href } of links) {
-    if (!href) continue;
-    const a = document.createElement("a");
-    a.textContent = label;
-    a.href = href;
-    a.target = "_blank";
-    a.classList.add("btn", "btn-secondary", "tf2utils-link-btn");
-    a.style.setProperty("--tf2utils-accent", LINK_ACCENTS[label] || "#999");
-    row.appendChild(a);
-  }
+  return links;
 }
 
 function injectLinkStyles() {
@@ -303,8 +320,13 @@ function stripUnusualEffectName(itemNameRaw, effectName) {
  * literal name to resolve to its own defindex (1082), not "Eyelander"
  * (132).
  *
+ * Every field is always present on the returned object — one a given
+ * name genuinely can't determine (e.g. an Unusual's crate number) is
+ * `null` rather than omitted, so callers/other scripts can tell "no
+ * value" apart from "field not implemented here" at a glance.
+ *
  * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier?: number, australium?: boolean, effectId?: string, effectName?: string, crateNumber?: string, isAmbiguousSeries?: boolean}|null>}
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean|null, effectId: string|null, effectName: string|null, crateNumber: string|null, isAmbiguousSeries: boolean|null}|null>}
  */
 async function parseItemAttributes(itemNameRaw) {
   // Crate series/case number always trails at the very end, after
@@ -316,7 +338,7 @@ async function parseItemAttributes(itemNameRaw) {
   // fallback for those, resolved once the bare name's known below (same
   // fallback steamcommunity.com/itemLinks uses for the same reason).
   const crateMatch = String(itemNameRaw || "").match(CRATE_NUMBER_RE);
-  let crateNumber = crateMatch ? crateMatch[1] : undefined;
+  let crateNumber = crateMatch ? crateMatch[1] : null;
   let name = String(crateMatch ? itemNameRaw.slice(0, crateMatch.index) : itemNameRaw || "").trim();
 
   // detect + strip craftability
@@ -342,14 +364,22 @@ async function parseItemAttributes(itemNameRaw) {
     const effect = await findUnusualEffect(itemNameRaw);
     if (!effect) return null;
     const baseName = stripUnusualEffectName(name, effect.name);
-    return { name: baseName, quality: "Unusual", craftable: !isNonCraftable, effectId: effect.id, effectName: effect.name };
+    // ksTier/australium/crateNumber/isAmbiguousSeries: stntrading.eu
+    // Unusuals are cosmetics/hats, which never carry a killstreak tier,
+    // Australium, or crate number — null rather than detected false/0,
+    // since this branch never even checks for them.
+    return {
+      name: baseName, quality: "Unusual", craftable: !isNonCraftable,
+      ksTier: null, australium: null, effectId: effect.id, effectName: effect.name,
+      crateNumber: null, isAmbiguousSeries: null,
+    };
   }
 
   // detect + strip killstreak tier — stntrading.eu item names don't
   // carry this at all (killstreak variants are shown as a separate
   // count on the item's page, not a name prefix), but keep the check
   // in case that ever changes.
-  let ksTier;
+  let ksTier = null;
   if (name.startsWith("Professional Killstreak ")) {
     ksTier = 3;
     name = name.slice("Professional Killstreak ".length);
@@ -372,9 +402,9 @@ async function parseItemAttributes(itemNameRaw) {
   // what liquidTfUrl's `isAmbiguousSeries` decides whether to echo in
   // its slug (see that function's own doc for why).
   const isAmbiguousSeries = crateMatch != null;
-  if (crateNumber === undefined) {
-    crateNumber = (await getKnownCrateNumber(name)) ?? undefined;
+  if (crateNumber === null) {
+    crateNumber = (await getKnownCrateNumber(name)) ?? null;
   }
 
-  return { name, quality: matchedQuality, craftable: !isNonCraftable, ksTier, australium, crateNumber, isAmbiguousSeries };
+  return { name, quality: matchedQuality, craftable: !isNonCraftable, ksTier, australium, effectId: null, effectName: null, crateNumber, isAmbiguousSeries };
 }

@@ -58,11 +58,11 @@ function loadCopyClipboard() {
 function loadItemLinks() {
   (async () => {
     // Load module dynamically
-    const { showItemLinks } = await import(
+    const { addItemLinks } = await import(
       chrome.runtime.getURL("stntrading.eu/itemLinks/content.js")
     );
 
-    showItemLinks();
+    addItemLinks();
   })();
 }
 

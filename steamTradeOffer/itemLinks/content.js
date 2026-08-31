@@ -78,7 +78,7 @@ const LINK_ACCENTS = {
 
 const GROUP_ID = "tf2utils-trade-action-links";
 
-// parseItemName()'s own quality-word check — Normal/Unusual/Unique
+// parseItemAttributes()'s own quality-word check — Normal/Unusual/Unique
 // excluded, since those are handled separately there (Unusual has its
 // own check, Unique is the default, Normal isn't baked into names at
 // all here).
@@ -167,7 +167,7 @@ function processActionMenu() {
   removeInjectedGroups();
 
   resolveItemName(viewMarketLink, wikiLink)
-    .then((rawName) => (rawName ? buildLinks(rawName, assetId) : []))
+    .then((itemName) => (itemName ? buildLinks(itemName, assetId) : []))
     .then((links) => {
       if (!links.length) return;
 
@@ -181,13 +181,13 @@ function processActionMenu() {
       removeInjectedGroups();
       const group = document.createElement("div");
       group.id = GROUP_ID;
-      links.forEach(({ label, href }) => group.appendChild(makeMenuLink(label, href)));
+      links.forEach((link) => group.appendChild(makeLinkBtn(link)));
       latest.staticActions.insertAdjacentElement("afterend", group);
     })
     .catch((err) => console.warn("[TF2Utils] tradeOffer itemLinks failed:", err));
 }
 
-function makeMenuLink(label, href) {
+function makeLinkBtn({ label, href }) {
   const a = document.createElement("a");
   a.className = "popup_menu_item";
   a.textContent = label;
@@ -203,18 +203,30 @@ function makeMenuLink(label, href) {
  * attributes the query-param-based links need. Steam bakes Non-
  * Craftable/Festivized/killstreak-tier/quality/Australium text
  * directly into it, in that order — same approach as
- * steamcommunity.com/itemLinks's parseItemName().
+ * steamcommunity.com/itemLinks's parseItemAttributes().
+ *
+ * Every field is always present on the returned object — one this menu
+ * genuinely can't determine (there's no Unusual effect name exposed
+ * here at all) is `null` rather than omitted, so callers/other scripts
+ * can tell "no value" apart from "field not implemented here" at a
+ * glance. `festivized` is an extra field beyond the shared shape:
+ * marketplace.tf's sku needs it as its own modifier (buildTf2Sku() in
+ * utils/itemLinks.js), unlike every other destination this file builds.
+ *
+ * @param {string} itemName
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean, effectId: null, effectName: null, crateNumber: string|null, isAmbiguousSeries: boolean, festivized: boolean}>}
  */
-function parseItemName(rawName) {
-  let name = rawName.trim();
+async function parseItemAttributes(itemName) {
+  const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
+  let name = fullDisplayName.trim();
 
   const isNonCraftable = name.startsWith("Non-Craftable ");
   if (isNonCraftable) name = name.slice("Non-Craftable ".length);
 
-  const festive = name.startsWith("Festivized ");
-  if (festive) name = name.slice("Festivized ".length);
+  const festivized = name.startsWith("Festivized ");
+  if (festivized) name = name.slice("Festivized ".length);
 
-  let ksTier = 0;
+  let ksTier = null;
   if (name.startsWith("Professional Killstreak ")) {
     ksTier = 3;
     name = name.slice("Professional Killstreak ".length);
@@ -239,52 +251,53 @@ function parseItemName(rawName) {
   const australium = name.startsWith("Australium ");
   if (australium) name = name.slice("Australium ".length);
 
-  return { name, quality, craftable: !isNonCraftable, ksTier, australium, festive };
+  // crateNumber: whichever number the name's own text shows
+  // (isAmbiguousSeries true, matching stntrading.eu/itemLinks's
+  // parseItemAttributes() convention — see that function's own doc for
+  // why this isn't the same "ambiguous" resolveCrateSeries() checks
+  // for), else the bundled fallback table's single-series match if it
+  // has one. bp.tf stats/marketplace.tf/crate.tf all want it whenever
+  // known, not just for ambiguous names — mannco.store/skinport.com are
+  // the exception, resolved separately in buildLinks() below.
+  const crateMatch = itemName.match(CRATE_NUMBER_RE);
+  const isAmbiguousSeries = crateMatch != null;
+  const crateNumber = crateMatch ? crateMatch[1] : (await getKnownCrateNumber(name)) ?? null;
+
+  return { name, quality, craftable: !isNonCraftable, ksTier, australium, effectId: null, effectName: null, crateNumber, isAmbiguousSeries, festivized };
 }
 
-async function buildLinks(rawName, assetId) {
+async function buildLinks(itemName, assetId) {
   const settings = await getSettings();
 
-  // Strip the crate number up front for mannco.store/bp.tf stats/
-  // marketplace.tf — none of those distinguish crates by it as literal
-  // name text the way backpack.tf's own name does — then reattach it
-  // only where wanted: bp.tf stats as a trailing path segment,
-  // marketplace.tf as a "c<N>" sku modifier. stntrading.eu is the
-  // opposite (a separate page per series/case number), so stnName below
-  // is built from rawName instead, keeping it.
-  const nameWithoutCrate = rawName.replace(CRATE_NUMBER_RE, "");
-  const attrs = parseItemName(nameWithoutCrate);
-  // Cheap sync check first — resolveCrateSeries() does the same
-  // CRATE_NUMBER_RE test internally before its own (async) ambiguity
-  // lookup, but doing it here too means most items (no crate number at
-  // all) never enter that async function in the first place.
-  const { crateNumber, isAmbiguous } = CRATE_NUMBER_RE.test(rawName)
-    ? await resolveCrateSeries(rawName, attrs.name)
+  const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
+  const attrs = await parseItemAttributes(itemName);
+
+  // mannco.store/skinport.com only want the crate number for ambiguous
+  // multi-series names — a different, stricter check than
+  // attrs.isAmbiguousSeries above (whether the page's text showed a
+  // number at all), so resolved separately here, same as
+  // stntrading.eu/itemLinks does. Cheap sync check first —
+  // resolveCrateSeries() does the same CRATE_NUMBER_RE test internally
+  // before its own (async) ambiguity lookup, but doing it here too
+  // means most items (no crate number at all) never enter that async
+  // function in the first place.
+  const { crateNumber: crateNumberFromText, isAmbiguous } = CRATE_NUMBER_RE.test(itemName)
+    ? await resolveCrateSeries(itemName, attrs.name)
     : { crateNumber: null, isAmbiguous: false };
+  const ambiguousCrateNumber = isAmbiguous ? crateNumberFromText : undefined;
 
   // Gates crate.tf below — crateTfUrl() itself has no "is this actually
   // a crate" check, it trusts the caller.
   const looksLikeCrate = IS_CRATE_CASE_RE.test(attrs.name) && !/\bkey\b/i.test(attrs.name);
-
-  // The name itself already told us the crate number when present — the
-  // bundled table is only needed as a fallback for pages that don't
-  // expose it at all (see getKnownCrateNumber()'s own docs). bp.tf
-  // stats/marketplace.tf/crate.tf all want it whenever known, not just
-  // for ambiguous names, unlike mannco.store/skinport.com below.
-  const resolvedCrateNumber = crateNumber ?? await getKnownCrateNumber(attrs.name);
-
-  // mannco.store/skinport.com only want the crate number for ambiguous
-  // multi-series names (see resolveCrateSeries()).
-  const manncoSkinportCrateNumber = isAmbiguous ? crateNumber : undefined;
 
   // craftable goes through the `craftable` option everywhere in this
   // file (bp.tf stats/stntrading.eu/marketplace.tf/crate.tf all already
   // get it that way) — mannco.store/skinport.com are no exception:
   // "Non-Craftable " is stripped from the name here so it's the
   // `craftable` option alone signaling it, not text baked into the name.
-  const craftableAwareName = nameWithoutCrate.replace(/^Non-Craftable\s+/i, "");
+  const craftableAwareName = fullDisplayName.replace(/^Non-Craftable\s+/i, "");
 
-  const stnName = rawName
+  const stnName = itemName
     .replace(/^Non-Craftable\s+/i, "")
     .replace(/Festivized\s+/i, "")
     .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
@@ -293,10 +306,10 @@ async function buildLinks(rawName, assetId) {
   // "is this actually a crate" check — it trusts the caller: any
   // non-craftable item at all (e.g. "Non-Craftable Duck Journal") would
   // otherwise resolve a real defindex and get a bogus ".../uncraftable"
-  // crate.tf link, since resolvedCrateNumber would be null but craftable
+  // crate.tf link, since attrs.crateNumber would be null but craftable
   // is false either way.
-  const crateTfHref = looksLikeCrate && (resolvedCrateNumber != null || !attrs.craftable)
-    ? await crateTfUrl(attrs.name, undefined, { crateNumber: resolvedCrateNumber, craftable: attrs.craftable })
+  const crateTfHref = looksLikeCrate && (attrs.crateNumber != null || !attrs.craftable)
+    ? await crateTfUrl(attrs.name, undefined, { crateNumber: attrs.crateNumber, craftable: attrs.craftable })
         .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; })
     : null;
 
@@ -314,7 +327,7 @@ async function buildLinks(rawName, assetId) {
           })
         : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
             craftable: attrs.craftable,
-            effectId: crateNumber ?? undefined,
+            effectId: attrs.crateNumber ?? undefined,
           }) },
     {
       label: "bp.tf history",
@@ -325,23 +338,23 @@ async function buildLinks(rawName, assetId) {
       label: "mannco.store",
       href: attrs.quality === "Unusual"
         ? null // no reliable Unusual effect name available from this menu
-        : mannCoStoreUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: manncoSkinportCrateNumber }),
+        : mannCoStoreUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: ambiguousCrateNumber }),
     },
     {
       label: "skinport.com",
       href: attrs.quality === "Unusual"
         ? null // same reasoning as mannco.store above
-        : skinportUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: manncoSkinportCrateNumber }),
+        : skinportUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: ambiguousCrateNumber }),
     },
     // Only for names Steam's own (unescaped) Market link would mangle
     // — see the file header for why. Everything else already has a
     // working native link, so this would just be a redundant duplicate.
-    crateNumber != null ? { label: "Steam Market", href: steamMarketUrl(rawName) } : null,
+    attrs.isAmbiguousSeries ? { label: "Steam Market", href: steamMarketUrl(itemName) } : null,
     {
       label: "marketplace.tf",
       href: await marketplaceTfUrl(attrs.name, attrs.quality, {
-        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festive,
-        crateNumber: resolvedCrateNumber ?? undefined,
+        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festivized,
+        crateNumber: attrs.crateNumber ?? undefined,
       }).catch((err) => { console.warn("[TF2Utils] marketplace.tf link failed:", err); return null; }),
     },
     { label: "crate.tf", href: crateTfHref },
