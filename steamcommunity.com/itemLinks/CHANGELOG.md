@@ -6,6 +6,11 @@
 - Quality/craftable/killstreak-tier/Australium/Festivized are now parsed off the item's full name and its "Tags:" line, instead of assuming every item is Unique quality and craftable — needed for marketplace.tf and next.bp.tf stats to resolve correctly for non-Unique items
 - Added a "List on backpack.tf" button, styled as its own standalone CTA rather than another entry in the link row (skipped for Non-Tradable items and for someone else's inventory) — its asset id, along with the History links', is now read primarily from the inventory grid's own tile id rather than the "Inspect in Game" link, which several items don't have at all
 - Fixed all links showing up for other games' items too (CS2, etc.) on the shared multi-game inventory page — even on first load, before Steam's own URL hash reflects which game tab is actually active
+- Internal: utils/itemLinks.js builders now take (name, quality, options) instead of one combined object; crate/defindex data moved to utils/tf2ItemSchema.js
+- Fixed crate/case series number ("#N") leaking raw into mannco.store/skinport.com links instead of being stripped, and stntrading.eu never re-attaching it for ambiguous multi-series names
+- Fixed (#116): a name-tagged item's real name/Australium is now read from its Market listing link instead of the (renamed) title; shows an error instead of wrong links when no listing exists
+- Internal: all links now build together as one array instead of trickling in individually, fixing a race that could duplicate the whole row; bp.tf history moved into utils/itemLinks.js
+- Moved the copy-to-clipboard item name button into its own steamcommunity.com/copyClipboard script; shared panel-lookup helpers (pickContainer, getMarketListingName, getRenamedOriginalName, getOrCreateTitleRow) moved to utils/steamInventory.js
 
 # Version 1.0.0
 

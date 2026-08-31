@@ -23,6 +23,12 @@ async function scriptRouter() {
       "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/itemLinks",
     ]);
 
+    loadCopyClipboard();
+    EXT_SCRIPT_INFO.scripts.push([
+      "copyClipboard",
+      "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/copyClipboard",
+    ]);
+
     loadInventoryCurrencyCounter();
     EXT_SCRIPT_INFO.scripts.push([
       "inventoryCurrencyCounter",
@@ -167,17 +173,34 @@ function loadInventoryCurrencyCounter() {
 function loadItemLinks() {
   (async () => {
     // Load module dynamically
-    const { showItemLinks } = await import(
+    const { addItemLinks } = await import(
       chrome.runtime.getURL("steamcommunity.com/itemLinks/content.js")
     );
 
-    runWithRetries(showItemLinks);
+    runWithRetries(addItemLinks);
 
     const target = document.querySelector("#iteminfo0") ||
                    document.querySelector("#iteminfo1") ||
                    document.body;
 
-    new MutationObserver(() => showItemLinks())
+    new MutationObserver(() => addItemLinks())
+      .observe(target, { childList: true, subtree: true });
+  })();
+}
+
+function loadCopyClipboard() {
+  (async () => {
+    const { addItemNameCopyButton } = await import(
+      chrome.runtime.getURL("steamcommunity.com/copyClipboard/content.js")
+    );
+
+    runWithRetries(addItemNameCopyButton);
+
+    const target = document.querySelector("#iteminfo0") ||
+                   document.querySelector("#iteminfo1") ||
+                   document.body;
+
+    new MutationObserver(() => addItemNameCopyButton())
       .observe(target, { childList: true, subtree: true });
   })();
 }

@@ -1,7 +1,14 @@
 // itemLinks.js
-import { COLOR_PANEL_BG, SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
-import { TF2_APPID, TF2_CONTEXTID } from "../../utils/constants/tf2Economy.js";
-import { isTf2InventoryActive, isOwnInventory } from "../../utils/steamInventory.js";
+import { COLOR_PANEL_BG, COLOR_DANGER, SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
+import { TF2_APPID, TF2_CONTEXTID, TF2_QUALITY_NAMES } from "../../utils/constants/tf2Economy.js";
+import {
+  isTf2InventoryActive,
+  isOwnInventory,
+  pickContainer,
+  getMarketListingName,
+  getRenamedOriginalName,
+  getOrCreateTitleRow,
+} from "../../utils/steamInventory.js";
 import {
   steamMarketUrl,
   backpackStatsUrl,
@@ -11,14 +18,12 @@ import {
   skinportUrl,
   crateTfUrl,
   backpackSellUrl,
-  getKnownCrateNumber,
+  backpackHistoryUrl,
 } from "../../utils/itemLinks.js";
+import { getKnownCrateNumber, isAmbiguousCrateName, resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
+import { ksPrefixFor } from "../../utils/tf2ItemName.js";
 import { getSettings } from "../../utils/settings.js";
-
-const QUALITY_WORDS = [
-  "Normal", "Genuine", "Vintage", "Unusual", "Unique", "Community", "Valve",
-  "Self-Made", "Customized", "Strange", "Completed", "Haunted", "Collector's", "Decorated Weapon",
-];
+import { STEAMCOMMUNITY_CANT_GENERATE_ITEMLINKS } from "../../utils/constants/messages.js";
 
 const LINK_ACCENTS = {
   "Market": SITE_BRAND_COLORS.steam,
@@ -30,19 +35,6 @@ const LINK_ACCENTS = {
   "bp.tf history": SITE_BRAND_COLORS.backpackTf,
   "stntrading.eu": SITE_BRAND_COLORS.stnTrading,
 };
-
-function pickContainer() {
-  const c0 = document.querySelector("#iteminfo0");
-  const c1 = document.querySelector("#iteminfo1");
-
-  const h0 = c0?.querySelector("h1");
-  if (h0) return { container: c0, title: h0 };
-
-  const h1 = c1?.querySelector("h1");
-  if (h1) return { container: c1, title: h1 };
-
-  return null;
-}
 
 /**
  * The item's "Tags:" line, split into individual words (e.g. "Tags:
@@ -61,7 +53,7 @@ function getTags(container) {
 
 /** Reads the quality word off the item's "Tags:" line, used instead of assuming every item is Unique quality. */
 function getQualityFromTags(tags) {
-  return tags ? QUALITY_WORDS.find((q) => tags.includes(q)) || null : null;
+  return tags ? TF2_QUALITY_NAMES.find((q) => tags.includes(q)) || null : null;
 }
 
 /**
@@ -108,25 +100,35 @@ function getAssetId(container) {
 /**
  * Parses the item's full display name down to the bare schema name,
  * plus the attributes the query-param-based links (next Bp Stats,
- * marketplace.tf) need. Unlike backpack.tf's hover popover, Steam's own
- * name literally includes Non-Craftable/Festivized/killstreak-tier/
- * quality/Australium text — so, similar to stntrading.eu/itemLinks,
- * it's all parsed straight out of the name, in the order Steam shows
- * them.
+ * marketplace.tf, crate.tf) need. Unlike backpack.tf's hover popover,
+ * Steam's own name literally includes Non-Craftable/Festivized/
+ * killstreak-tier/quality/Australium/crate-number text — so, similar to
+ * stntrading.eu/itemLinks, it's all parsed straight out of the name, in
+ * the order Steam shows them.
  *
- * @param {string} rawName
+ * Every field is always present on the returned object — one this page
+ * genuinely can't determine (there's no Unusual effect name exposed
+ * here at all) is `null` rather than omitted, so callers/other scripts
+ * can tell "no value" apart from "field not implemented here" at a
+ * glance. `festivized` is an extra field beyond the shared shape:
+ * marketplace.tf's sku needs it as its own modifier (buildTf2Sku() in
+ * utils/itemLinks.js), unlike every other destination this file builds.
+ *
+ * @param {string} itemName
  * @param {string|null} qualityFromTags - from getQualityFromTags(); "Unique" assumed if not found
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean, effectId: null, effectName: null, crateNumber: string|null, isAmbiguousSeries: boolean, festivized: boolean}>}
  */
-function parseItemName(rawName, qualityFromTags) {
-  let name = rawName.trim();
+async function parseItemAttributes(itemName, qualityFromTags) {
+  const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
+  let name = fullDisplayName.trim();
 
   const isNonCraftable = name.startsWith("Non-Craftable ");
   if (isNonCraftable) name = name.slice("Non-Craftable ".length);
 
-  const festive = name.startsWith("Festivized ");
-  if (festive) name = name.slice("Festivized ".length);
+  const festivized = name.startsWith("Festivized ");
+  if (festivized) name = name.slice("Festivized ".length);
 
-  let ksTier = 0;
+  let ksTier = null;
   if (name.startsWith("Professional Killstreak ")) {
     ksTier = 3;
     name = name.slice("Professional Killstreak ".length);
@@ -146,18 +148,31 @@ function parseItemName(rawName, qualityFromTags) {
   const australium = name.startsWith("Australium ");
   if (australium) name = name.slice("Australium ".length);
 
-  return { name, quality, craftable: !isNonCraftable, ksTier, australium, festive };
+  // crateNumber/isAmbiguousSeries: this page's own item name DOES show
+  // a crate/case's series number as literal trailing text (e.g. "Mann
+  // Co. Supply Munition #103") — resolveCrateSeries() (the same
+  // rawText/bareName extraction backpack.tf's popover/tooltip use) is
+  // the primary source here, with getKnownCrateNumber()'s bundled table
+  // only as a fallback for whatever genuinely doesn't show it (see that
+  // function's own doc).
+  let crateNumber = null;
+  let isAmbiguousSeries = false;
+  const looksLikeCrate = IS_CRATE_CASE_RE.test(name) && !/\bkey\b/i.test(name);
+  if (looksLikeCrate) {
+    ({ crateNumber, isAmbiguous: isAmbiguousSeries } = await resolveCrateSeries(itemName, name));
+    if (crateNumber == null) {
+      const fromTable = await getKnownCrateNumber(name);
+      if (fromTable != null) {
+        crateNumber = fromTable;
+        isAmbiguousSeries = await isAmbiguousCrateName(name);
+      }
+    }
+  }
+
+  return { name, quality, craftable: !isNonCraftable, ksTier, australium, effectId: null, effectName: null, crateNumber, isAmbiguousSeries, festivized };
 }
 
-/** Killstreak-tier prefix text, for classic backpack.tf's stats page (which needs it baked into the name, not passed as a separate field). */
-function ksPrefixFor(ksTier) {
-  if (ksTier === 3) return "Professional Killstreak ";
-  if (ksTier === 2) return "Specialized Killstreak ";
-  if (ksTier === 1) return "Killstreak ";
-  return "";
-}
-
-export function showItemLinks() {
+export function addItemLinks() {
   // A Steam account's inventory page lists every game it owns items
   // for, switchable via tabs — #iteminfo0/#iteminfo1 are shared across
   // all of them, so without this check, clicking an item on some other
@@ -169,28 +184,59 @@ export function showItemLinks() {
   if (!picked) return false;
 
   const { container, title } = picked;
-  const itemName = title.textContent.trim();
+
+  // #116: a name-tagged item's h1 shows the custom name, not the real
+  // one — getMarketListingName() recovers the true name (Australium
+  // included) from the page's own Market link instead, which a name
+  // tag never overrides. Only items with no Market listing at all
+  // (non-marketable) have no way to recover it — for a renamed one of
+  // those, cannotIdentify below skips the links entirely rather than
+  // building them wrong.
+  const marketListingName = getMarketListingName(container);
+  const itemName = marketListingName || title.textContent.trim();
   if (!itemName) return false;
 
-  // remove old injected links if item changed
+  const cannotIdentify = !marketListingName && !!getRenamedOriginalName(container);
+
+  // remove old injected content if item changed
   const prev = container.dataset.injectedFor || "";
   if (prev !== itemName) {
-    container.querySelectorAll(".custom-market-links, .custom-sell-btn").forEach((n) => n.remove());
+    container.querySelectorAll(".custom-market-links, .custom-sell-btn, .custom-error-msg").forEach((n) => n.remove());
   }
 
-  // Prevent duplicate for the same item — but the item info panel is
-  // rendered by Steam's own framework and re-renders its content at
-  // least once (e.g. once price data streams in), wiping out anything
-  // we injected while leaving the container node (and its dataset)
-  // intact. So don't just trust the marker — confirm the links are
-  // actually still there before skipping.
-  if (container.dataset.injectedFor === itemName && container.querySelector(".custom-market-links")) {
+  // Prevent duplicate for the same item. Two different reasons the
+  // marker alone isn't enough:
+  // - the item info panel is rendered by Steam's own framework and
+  //   re-renders its content at least once (e.g. once price data
+  //   streams in), wiping out anything we injected while leaving the
+  //   container node (and its dataset) intact — so this also confirms
+  //   our own content is actually still there before trusting it.
+  // - buildLinks() below is async, so there's a window between
+  //   committing to build (injectedFor set) and the links row actually
+  //   existing in the DOM — a retry (runWithRetries) or MutationObserver
+  //   firing again for the same item during that window would otherwise
+  //   see injectedFor match but find no rendered content yet, slip past,
+  //   and start a second, independent build. buildingFor closes that
+  //   window: it's set the instant a build starts and cleared once it
+  //   settles, so an in-flight build is recognized too, not just a
+  //   finished one.
+  if (
+    container.dataset.injectedFor === itemName &&
+    (container.dataset.buildingFor === itemName || container.querySelector(".custom-market-links, .custom-error-msg"))
+  ) {
     return true;
   }
 
   const tags = getTags(container);
-  const attrs = parseItemName(itemName, getQualityFromTags(tags));
   const assetId = getAssetId(container);
+
+  // getOrCreateTitleRow() is shared with copyClipboard/content.js, which
+  // wraps the <h1> in this same row for its own copy icon — reusing it
+  // here (instead of anchoring off `title` directly) means this file's
+  // sell-button/links row/error message still land right after that
+  // whole row ("afterend"), not spliced in beside the title, regardless
+  // of whether copyClipboard has wrapped it yet or this runs first.
+  const titleRow = getOrCreateTitleRow(title);
 
   // Given its own standalone CTA button (not just another row entry
   // like everything else here) — this is the one action a user's
@@ -198,81 +244,138 @@ export function showItemLinks() {
   // rest of these links, which are just reference/price-check lookups.
   // Skipped for Non-Tradable items (gifted/trade-locked, etc.) — they
   // can't be listed for sale at all — and for someone else's inventory,
-  // where there's nothing of yours to list.
+  // where there's nothing of yours to list. Only needs the asset id, not
+  // the item's name/attributes, so it still works even when those
+  // couldn't be identified below.
+  //
+  // Removed before (re-)creating rather than just appended — the dedup
+  // guard above only checks for .custom-market-links/.custom-error-msg,
+  // so if Steam's own re-render ever turns out to be partial (wiping
+  // those two but leaving the sell button alone for the same item,
+  // unlike the "wipes out everything" case the guard's own comment
+  // describes), this still stays a single button instead of stacking a
+  // second one on top of a surviving original.
+  container.querySelector(".custom-sell-btn")?.remove();
   const sellUrl = assetId && isTradable(tags) && isOwnInventory() ? backpackSellUrl(assetId) : null;
-  const anchorEl = sellUrl ? makeSellButton(sellUrl) : title;
-  if (sellUrl) title.insertAdjacentElement("afterend", anchorEl);
+  const anchorEl = sellUrl ? makeSellButton(sellUrl) : titleRow;
+  if (sellUrl) titleRow.insertAdjacentElement("afterend", anchorEl);
 
-  const marketUrl = steamMarketUrl(itemName);
-  const manncoUrl = attrs.quality === "Unusual" ? null : mannCoStoreUrl({ name: itemName });
-  const skinportUrlHref = attrs.quality === "Unusual" ? null : skinportUrl({ name: itemName });
-  const stnUrl = stnTradingUrl({ name: itemName, craftable: attrs.craftable });
+  if (cannotIdentify) {
+    const errorEl = makeErrorMessage(STEAMCOMMUNITY_CANT_GENERATE_ITEMLINKS);
+    anchorEl.insertAdjacentElement("afterend", errorEl);
+    container.dataset.injectedFor = itemName;
+    return true;
+  }
 
-  const links = document.createElement("div");
-  links.className = "custom-market-links";
-  links.style.marginTop = "8px";
-  links.style.display = "flex";
-  links.style.flexWrap = "wrap";
-  links.style.gap = "8px";
+  // Crate/case series number ("Series #N"/"#N") trails at the very end,
+  // after everything else — turns out this page's item name DOES show
+  // it as literal text after all (e.g. "Mann Co. Supply Munition #103"),
+  // contrary to what this file used to assume. Stripped before
+  // parseItemAttributes() so attrs.name ends up the true bare schema
+  // name ("Mann Co. Supply Munition"), not "<name> #103" — mannco.store/
+  // skinport.com want it gone from the name too (they take it as their
+  // own separate crateNumber option instead). stntrading.eu still gets
+  // the raw itemName below, since stnTradingUrl() re-derives the number
+  // from that text itself.
+  const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
+  const qualityFromTags = getQualityFromTags(tags);
 
-  const linkList = [
-    { label: "Market", href: marketUrl },
-    { label: "mannco.store", href: manncoUrl },
-    { label: "skinport.com", href: skinportUrlHref },
-    { label: "stntrading.eu", href: stnUrl },
-  ].filter((link) => link.href);
-
-  linkList.forEach((link) => links.appendChild(makeLinkBtn(link)));
-
-  anchorEl.insertAdjacentElement("afterend", links);
   container.dataset.injectedFor = itemName;
+  container.dataset.buildingFor = itemName;
 
-  // bp.tf stats/history need the popup's Settings read, and
-  // marketplace.tf/crate.tf need a network fetch (defindex lookup, plus
-  // — for crates — the bundled series-number table, since this page
-  // never shows that number itself) — all appended separately
-  // afterward, since showItemLinks() itself isn't async, so they never
-  // block the synchronous links above; skipped if the user's clicked a
-  // different item (or this one's panel got re-rendered) by the time
-  // they resolve.
-  (async () => {
-    const settings = await getSettings();
+  // One central array, same convention scrap.tf/itemLinks uses — every
+  // link (Market included) is resolved together in buildLinks() before
+  // anything renders, instead of the Market link appearing immediately
+  // and the rest trickling in individually as each async lookup finishes.
+  buildLinks(itemName, fullDisplayName, qualityFromTags, assetId)
+    .then((links) => {
+      // Skipped if the user's clicked a different item (or this one's
+      // panel got re-rendered) by the time everything above resolves.
+      if (container.dataset.injectedFor !== itemName || !anchorEl.isConnected || !links.length) return;
 
-    // Single "bp.tf stats"/"bp.tf history" pair, following the popup's
-    // "Default bp.tf version" setting.
-    const bpStatsHref = settings.bpTfVersion === "next"
-      ? backpackStatsUrl({
-          name: attrs.name, quality: attrs.quality, craftable: attrs.craftable,
-          ksTier: attrs.ksTier, australium: attrs.australium, next: true,
-        })
-      : backpackStatsUrl({
-          name: ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name,
-          quality: attrs.quality,
-          craftable: attrs.craftable,
-        });
-    if (links.isConnected) links.appendChild(makeLinkBtn({ label: "bp.tf stats", href: bpStatsHref }));
+      const linksRow = document.createElement("div");
+      linksRow.className = "custom-market-links";
+      linksRow.style.marginTop = "8px";
+      linksRow.style.display = "flex";
+      linksRow.style.flexWrap = "wrap";
+      linksRow.style.gap = "8px";
+      links.forEach((link) => linksRow.appendChild(makeLinkBtn(link)));
 
-    const bpHistoryHref = assetId
-      ? `https://${settings.bpTfVersion === "next" ? "next." : ""}backpack.tf/item/${assetId}`
-      : null;
-    if (bpHistoryHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "bp.tf history", href: bpHistoryHref }));
-
-    const crateNumber = await getKnownCrateNumber(attrs.name);
-    const href = await marketplaceTfUrl({
-      name: attrs.name, quality: attrs.quality, craftable: attrs.craftable,
-      ksTier: attrs.ksTier, australium: attrs.australium, festive: attrs.festive,
-      crateNumber: crateNumber ?? undefined,
+      anchorEl.insertAdjacentElement("afterend", linksRow);
+    })
+    .catch((err) => console.warn("[TF2Utils] Failed to build item links:", err))
+    .finally(() => {
+      if (container.dataset.buildingFor === itemName) delete container.dataset.buildingFor;
     });
-    if (href && links.isConnected) links.appendChild(makeLinkBtn({ label: "marketplace.tf", href }));
-
-    // crate.tf only has pages for crates/cases — crateTfUrl() returns
-    // null with no crate number, so this naturally stays absent for
-    // every other item rather than needing its own type check here.
-    const crateTfHref = await crateTfUrl({ name: attrs.name, crateNumber, craftable: attrs.craftable });
-    if (crateTfHref && links.isConnected) links.appendChild(makeLinkBtn({ label: "crate.tf", href: crateTfHref }));
-  })().catch((err) => console.warn("[TF2Utils] extra item link failed:", err));
 
   return true;
+}
+
+/**
+ * Builds every reference link for the item — Market alongside
+ * mannco.store/skinport.com/stntrading.eu/bp.tf stats/history/
+ * marketplace.tf/crate.tf, which each need something async first (a
+ * settings read, a network fetch — defindex lookup — or
+ * parseItemAttributes()'s own crate-series check) — as one array, all
+ * resolved together.
+ */
+async function buildLinks(itemName, fullDisplayName, qualityFromTags, assetId) {
+  const settings = await getSettings();
+  const useNextBpTf = settings.bpTfVersion === "next";
+  const attrs = await parseItemAttributes(itemName, qualityFromTags);
+
+  // mannco.store/skinport.com only want that series number for the
+  // ambiguous case (a name shared by several different series) — see
+  // mannCoStoreUrl()/skinportUrl()'s own docs.
+  const ambiguousCrateNumber = attrs.isAmbiguousSeries ? attrs.crateNumber : undefined;
+
+  const links = [
+    { label: "Market", href: steamMarketUrl(itemName) },
+    { label: "mannco.store", href: mannCoStoreUrl(fullDisplayName, undefined, { crateNumber: ambiguousCrateNumber }) },
+    { label: "skinport.com", href: skinportUrl(fullDisplayName, undefined, { crateNumber: ambiguousCrateNumber }) },
+    // stntrading.eu keeps the "#N"/"Series #N" suffix as part of the
+    // name (it has a separate page per series/case number) — needs the
+    // raw itemName here, not fullDisplayName, so it can find that text
+    // itself and re-attach it correctly (see stnTradingUrl()'s own doc).
+    { label: "stntrading.eu", href: stnTradingUrl(itemName, undefined, { craftable: attrs.craftable, isAmbiguousSeries: attrs.isAmbiguousSeries }) },
+    // Single "bp.tf stats"/"bp.tf history" pair, following the popup's
+    // "Default bp.tf version" setting.
+    {
+      label: "bp.tf stats",
+      href: useNextBpTf
+        ? backpackStatsUrl(attrs.name, attrs.quality, {
+            craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, crateNumber: attrs.crateNumber ?? undefined, next: true,
+          })
+        : backpackStatsUrl(ksPrefixFor(attrs.ksTier) + (attrs.australium ? "Australium " : "") + attrs.name, attrs.quality, {
+            craftable: attrs.craftable, crateNumber: attrs.crateNumber ?? undefined,
+          }),
+    },
+    {
+      label: "bp.tf history",
+      href: assetId ? backpackHistoryUrl(assetId, { next: useNextBpTf }) : null,
+    },
+    {
+      label: "marketplace.tf",
+      href: await marketplaceTfUrl(attrs.name, attrs.quality, {
+        craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, festivized: attrs.festivized, crateNumber: attrs.crateNumber ?? undefined,
+      }).catch((err) => { console.warn("[TF2Utils] marketplace.tf link failed:", err); return null; }),
+    },
+  ].filter((link) => link.href);
+
+  // crate.tf only has pages for crates/cases. crateTfUrl() itself has no
+  // "is this actually a crate" check — it trusts the caller: any
+  // non-craftable item at all (e.g. "Non-Craftable Duck Journal") would
+  // otherwise resolve a real defindex and get a bogus ".../uncraftable"
+  // crate.tf link, since attrs.crateNumber == null but craftable is
+  // false either way.
+  const looksLikeCrate = IS_CRATE_CASE_RE.test(attrs.name) && !/\bkey\b/i.test(attrs.name);
+  if (looksLikeCrate && (attrs.crateNumber != null || !attrs.craftable)) {
+    const crateTfHref = await crateTfUrl(attrs.name, undefined, { crateNumber: attrs.crateNumber, craftable: attrs.craftable })
+      .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; });
+    if (crateTfHref) links.push({ label: "crate.tf", href: crateTfHref });
+  }
+
+  return links;
 }
 
 function makeLinkBtn({ label, href }) {
@@ -318,4 +421,22 @@ function makeSellButton(href) {
   a.addEventListener("mouseleave", () => { a.style.filter = "none"; a.style.transform = "none"; });
 
   return a;
+}
+
+/**
+ * Shown in place of the reference-links row (see showItemLinks()'s
+ * `cannotIdentify` branch) — a renamed item with no Market listing to
+ * recover its real name from, so there's nothing reliable left to build
+ * those links out of.
+ */
+function makeErrorMessage(text) {
+  const div = document.createElement("div");
+  div.className = "custom-error-msg";
+  div.textContent = text;
+  div.style.cssText =
+    "margin-top:8px;padding:8px 12px;border-radius:6px;" +
+    `background:${COLOR_DANGER}26;color:#e8b4b3;font-size:12px;` +
+    `border:1px solid ${COLOR_DANGER}66;`;
+
+  return div;
 }

@@ -45,3 +45,93 @@ export function isTf2InventoryActive() {
 export function isOwnInventory() {
   return !!document.querySelector(".inventory_links .inventory_rightnav .new_trade_offer_btn");
 }
+
+/**
+ * Finds the item detail panel currently shown for a selected item, plus
+ * its <h1> title — shared by any script that reacts to which item is
+ * selected (itemLinks, copyClipboard). #iteminfo0/#iteminfo1 are two
+ * alternating panels Steam swaps between; whichever one actually has an
+ * <h1> right now is the one in use.
+ */
+export function pickContainer() {
+  const c0 = document.querySelector("#iteminfo0");
+  const c1 = document.querySelector("#iteminfo1");
+
+  const h0 = c0?.querySelector("h1");
+  if (h0) return { container: c0, title: h0 };
+
+  const h1 = c1?.querySelector("h1");
+  if (h1) return { container: c1, title: h1 };
+
+  return null;
+}
+
+/**
+ * The item's real full descriptive name (quality/killstreak-tier/
+ * Australium/Festivized/Non-Craftable all baked in, exactly as Steam
+ * Market shows it) — read from the page's own "View in Community
+ * Market" link href instead of the h1 title. Unlike the h1, that link's
+ * market_hash_name is never overridden by a custom name tag: confirmed,
+ * a renamed "'Smolder'n Skunk Spray'" (real item: Strange Australium
+ * Flame Thrower) still links to
+ * ".../market/listings/440/Strange%20Australium%20Flame%20Thrower"
+ * here — the one place Australium survives at all once a name tag's
+ * involved, since neither the h1 nor the "Original name" notice (see
+ * getRenamedOriginalName() below) carry it.
+ *
+ * Only present for tradable + marketable items — null otherwise
+ * (currency, e.g., has no Market listing at all), and explicitly
+ * excludes itemLinks' own injected "Market" button, which points to
+ * this same URL pattern and would otherwise be matched right back.
+ */
+export function getMarketListingName(container) {
+  const marketLink = [...container.querySelectorAll(`a[href*="/market/listings/${TF2_APPID}/"]`)]
+    .find((a) => !a.classList.contains("custom-link-btn"));
+  if (!marketLink) return null;
+
+  const match = (marketLink.getAttribute("href") || "").match(
+    new RegExp(`/market/listings/${TF2_APPID}/(.+)$`)
+  );
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * Steam shows a renamed item's custom name-tag text in its own <h1>
+ * title, not the item's real name (e.g. an Australium Flame Thrower
+ * nicknamed "'Smolder'n Skunk Spray'" shows that as its h1). The "This
+ * item has been renamed. Original name: "X"" notice doesn't fully fix
+ * this either — it only gives the bare weapon name ("Flame Thrower"),
+ * with no quality/killstreak-tier/Australium/Festivized. Detected via
+ * that notice's text content, not its CSS module classes, which look
+ * auto-generated per Steam build and aren't safe to depend on. Meant
+ * only to decide whether an item is identifiable at all when
+ * getMarketListingName() above comes back empty — that one's the real
+ * fix, recovering the true full name a different way, and should always
+ * be tried first regardless of whether this notice is present.
+ */
+export function getRenamedOriginalName(container) {
+  const match = container.textContent.match(/This item has been renamed\.\s*Original name:\s*"([^"]+)"/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Wraps the item's <h1> title in a flex row (creating it once, reusing
+ * it on a later call for the same title instead of nesting another
+ * wrapper around it) so anything meant to sit right beside the item
+ * name (e.g. copyClipboard's copy icon) can, while itemLinks' own
+ * sell-button/links row/error message still anchor off the row as a
+ * whole ("afterend") regardless of which script wrapped it first. The
+ * title's own text/children are left untouched, so anything reading
+ * title.textContent elsewhere is unaffected.
+ */
+export function getOrCreateTitleRow(title) {
+  const parent = title.parentElement;
+  if (parent?.classList.contains("custom-title-row")) return parent;
+
+  const row = document.createElement("div");
+  row.className = "custom-title-row";
+  row.style.cssText = "display:flex;align-items:center;gap:8px;";
+  title.insertAdjacentElement("beforebegin", row);
+  row.appendChild(title);
+  return row;
+}

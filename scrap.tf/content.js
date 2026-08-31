@@ -32,7 +32,7 @@ function scriptRouter() {
   /* Start all pages script */
   loadItemLinks();
   EXT_SCRIPT_INFO.scripts.push([
-    "Hover Item Links",
+    "Item Links",
     "https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/itemLinks"
   ]);
 }
@@ -60,11 +60,11 @@ Utility funtions to load scripts
 function loadItemLinks() {
   (async () => {
     // Load module dynamically
-    const { ItemLinks } = await import(
+    const { addItemLinks } = await import(
       chrome.runtime.getURL("scrap.tf/itemLinks/content.js")
     );
 
-    ItemLinks();
+    addItemLinks();
   })();
 }
 

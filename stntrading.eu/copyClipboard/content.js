@@ -1,9 +1,11 @@
+import { loadIconSvg } from "../../utils/icons.js";
+
 /**
  * Adds a small copy icon right after the item's <h1> title (instead of
  * a separate "Copy to Clipboard" button down with the other links) —
  * clicking it copies the cleaned item name to the clipboard.
  */
-export function copyNameClipboard() {
+export async function copyNameClipboard() {
   // Anchored to the same container itemLinks/content.js uses (not just
   // "the page's first <h1>") — the page renders a second, hidden
   // mobile-layout copy of this same card (Bootstrap's "d-none d-sm-block"
@@ -19,12 +21,14 @@ export function copyNameClipboard() {
 
   injectStyles();
 
+  const [copySvg, checkSvg] = await Promise.all([loadIconSvg("copy"), loadIconSvg("check")]);
+
   const icon = document.createElement("button");
   icon.type = "button";
   icon.className = "tf2utils-copy-icon";
   icon.title = "Copy item name";
   icon.setAttribute("aria-label", "Copy item name");
-  icon.innerHTML = COPY_SVG;
+  icon.innerHTML = copySvg;
 
   // Capture the clean name up front — the h1's own text, before the
   // icon is anywhere near it.
@@ -32,7 +36,7 @@ export function copyNameClipboard() {
 
   icon.addEventListener("click", () => {
     navigator.clipboard.writeText(itemName);
-    flashCopied(icon);
+    flashCopied(icon, copySvg, checkSvg);
   });
 
   // The icon must never become a child of the <h1> — itemLinks/content.js
@@ -47,24 +51,11 @@ export function copyNameClipboard() {
   wrapper.appendChild(icon);
 }
 
-const COPY_SVG = `
-  <svg width="16" height="16" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-    <rect x="7" y="7" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"></rect>
-    <path d="M4.5 13.5H3.5A1.5 1.5 0 0 1 2 12V3.5A1.5 1.5 0 0 1 3.5 2H12a1.5 1.5 0 0 1 1.5 1.5v1" fill="none" stroke="currentColor" stroke-width="1.6"></path>
-  </svg>
-`;
-
-const CHECK_SVG = `
-  <svg width="16" height="16" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-    <path d="M3 10.5l4.5 4.5L17 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-  </svg>
-`;
-
-function flashCopied(icon) {
-  icon.innerHTML = CHECK_SVG;
+function flashCopied(icon, copySvg, checkSvg) {
+  icon.innerHTML = checkSvg;
   icon.classList.add("tf2utils-copy-icon--done");
   setTimeout(() => {
-    icon.innerHTML = COPY_SVG;
+    icon.innerHTML = copySvg;
     icon.classList.remove("tf2utils-copy-icon--done");
   }, 1200);
 }

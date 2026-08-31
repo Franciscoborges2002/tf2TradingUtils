@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       link.title  = "View on GitHub";
 
       const icon = document.createElement("img");
-      icon.src       = "../public/logos/github.svg";
+      icon.src       = "../public/icons/github.svg";
       icon.alt       = "GitHub";
       icon.className = "gh-icon";
 

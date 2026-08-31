@@ -7,3 +7,6 @@
 * Added a skinport.com link, using the same full display name mannco.store does
 * Added a crate.tf link, crates/cases only
 * Fixed mannco.store/skinport.com links for crate/case names that span multiple series under one shared display name (e.g. "Mann Co. Supply Crate", "Salvaged Mann Co. Supply Crate")
+* Crate/case detection now uses the shared utils/tf2ItemSchema.js name check (covers Munition/Cooler/Reel too, not just Crate/Case, and excludes Keys)
+* mannco.store/skinport.com no longer skip Unusual items; fixed the crate.tf link firing for any non-craftable item instead of just crates
+* mannco.store/skinport.com now get craftability via the shared `craftable` option instead of relying on "Non-Craftable" text baked into the name

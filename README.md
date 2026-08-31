@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Franciscoborges2002/tf2TradingUtils/refs/heads/main/public/icons/svg/icon_64.svg" alt="TF2 Trading Utils Logo" width="128" height="128">
+  <img src="https://raw.githubusercontent.com/Franciscoborges2002/tf2TradingUtils/refs/heads/main/public/logos/svg/icon_64.svg" alt="TF2 Trading Utils Logo" width="128" height="128">
 </p>
 
 <h1 align="center">TF2TradingUtils</h1>

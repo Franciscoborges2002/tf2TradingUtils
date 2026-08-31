@@ -7,7 +7,8 @@ quick links for each item to external trading sites.
 Link:
 https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapItemsTableLinks
 */
-import { backpackStatsUrl, stnTradingUrl, merchantTfUrl, gladiatorTfUrl, CRATE_NUMBER_RE } from "../../utils/itemLinks.js";
+import { backpackStatsUrl, stnTradingUrl, merchantTfUrl, gladiatorTfUrl } from "../../utils/itemLinks.js";
+import { CRATE_NUMBER_RE } from "../../utils/tf2ItemSchema.js";
 import { getSettings } from "../../utils/settings.js";
 
 var table = document.getElementById("itembanking-list"); //Get the table in the website
@@ -270,7 +271,7 @@ function getLinkSTN(itemName) {
     itemName.includes("Festivizer") ||
     itemName.includes("Duck Journal");
 
-  url = stnTradingUrl({ name: itemName, craftable: !isNonCraftable });
+  url = stnTradingUrl(itemName, undefined, { craftable: !isNonCraftable });
 
   if (itemName.includes("Collectors")) {
     //stntrading doesnt have collectors items
@@ -308,7 +309,7 @@ function getLinkBackpack(itemName, settings) {
   const isTaunt = itemName.includes("Taunt:");
   const name = isTaunt ? itemName : itemName.replace("The ", "");
 
-  return backpackStatsUrl({ name, quality, craftable: true, next: settings.bpTfVersion === "next" });
+  return backpackStatsUrl(name, quality, { craftable: true, next: settings.bpTfVersion === "next" });
 }
 
 /**
@@ -340,7 +341,7 @@ function getLinkMerchant(itemName) {
     name = name.replace("Collectors ", "");
   }
 
-  return merchantTfUrl({ name, quality, craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
+  return merchantTfUrl(name, quality, { craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
 }
 
 /**
@@ -370,5 +371,5 @@ function getLinkGladiator(itemName) {
     name = name.replace("Collectors ", "");
   }
 
-  return gladiatorTfUrl({ name, quality, craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
+  return gladiatorTfUrl(name, quality, { craftable, crateNumber: crateMatch ? crateMatch[1] : undefined });
 }

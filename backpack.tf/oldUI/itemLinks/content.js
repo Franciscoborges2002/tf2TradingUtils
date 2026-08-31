@@ -18,8 +18,9 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/old
 */
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
-import { TF2_QUALITY_IDS } from "../../../utils/constants/tf2Economy.js";
-import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl, resolveCrateSeries, CRATE_NUMBER_RE } from "../../../utils/itemLinks.js";
+import { TF2_QUALITY_IDS, TF2_QUALITY_NAMES, TF2_CURRENCY } from "../../../utils/constants/tf2Economy.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
+import { resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../../utils/tf2ItemSchema.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])
@@ -33,8 +34,6 @@ const LINK_ACCENTS = {
   "crate.tf": SITE_BRAND_COLORS.crateTf,
 };
 
-const KEY_NAME_RE = /Mann Co\. Supply Crate Key/i;
-
 // backpack.tf's own stats page for one specific crate series (e.g.
 // /stats/Unique/Salvaged%20Mann%20Co.%20Supply%20Crate/Tradable/Craftable/30)
 // doesn't repeat that series number as literal text in the item's own
@@ -46,7 +45,10 @@ const KEY_NAME_RE = /Mann Co\. Supply Crate Key/i;
 // viewed from the popover text alone — the page's own URL is the only
 // place left carrying it, so this reads it from there, but only when
 // the popover being processed is actually for this exact item (not
-// some other item's popover elsewhere on the same stats page).
+// some other item's popover elsewhere on the same stats page). Only
+// ever called for items IS_CRATE_CASE_RE already flagged as a
+// crate/case, so it doesn't need its own separate "is this even a
+// crate" guard.
 function getCrateNumberFromStatsUrl(fullDisplayName) {
   const match = location.pathname.match(/^\/stats\/[^/]+\/([^/]+)\/[^/]+\/[^/]+\/(\d+)\/?$/);
   if (!match) return null;
@@ -123,115 +125,164 @@ async function processPopoverInner(popover) {
   // unrelated tooltip that happens to share the id shape).
   if (!content.querySelector("dl.item-popover")) return;
 
-  // stntrading.eu keeps a crate's case/series number as part of the
-  // name (see rawTitle/stnName below); mannco.store/skinport.com only
-  // want it for ambiguous multi-series names (see resolveCrateSeries()).
-  const rawTitle = titleEl.textContent.trim();
-  const fullDisplayName = rawTitle.replace(CRATE_NUMBER_RE, "");
-  const bareName = fullDisplayName.replace(/^Non-Craftable\s+/i, "");
+  const itemName = titleEl.textContent.trim();
+  if (!itemName) return;
 
-  let { crateNumber, isAmbiguous } = await resolveCrateSeries(rawTitle, bareName);
-  if (crateNumber == null) {
-    // Stats-page fallback (see getCrateNumberFromStatsUrl's own doc) —
-    // only ever fires for ambiguous multi-series families.
-    const fromUrl = getCrateNumberFromStatsUrl(fullDisplayName);
-    if (fromUrl != null) { crateNumber = fromUrl; isAmbiguous = true; }
-  }
-  const manncoSkinportCrateNumber = isAmbiguous ? crateNumber : undefined;
+  const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
 
-  // Non-Tradable items (gifted/trade-locked, etc.) can't be sold on any
-  // of these sites — skip the row entirely rather than link to a
-  // trading site for an item that can't actually be traded.
+  // Non-Tradable items (gifted/trade-locked, etc.) can't be sold on any website
   if (/Non-Tradable/i.test(fullDisplayName)) return;
 
-  // The Classifieds link is the reliable source for quality/craftable
-  // (backpack.tf already parsed them server-side) — but currency items
-  // (Scrap/Reclaimed/Refined Metal) can't be listed on Classifieds at
-  // all, so their popover has no such link. Fall back to defaults that
-  // hold for every item that lacks one: Unique quality, and craftable
-  // read off the title text itself (the one signal still available).
-  const searchLink = content.querySelector('#popover-search-links a[href*="/classifieds?"]');
-  let qualityName = "Unique";
-  let craftable = !/^Non-Craftable\b/i.test(fullDisplayName);
-  if (searchLink) {
-    const params = new URL(searchLink.href).searchParams;
-    const qualityId = Number(params.get("quality"));
-    qualityName = QUALITY_NAMES_BY_ID[qualityId] || "Unique";
-    craftable = params.get("craftable") !== "-1";
-  }
-
-  // mannco.store wants the full descriptive name (quality/killstreak/
-  // Festivized/Non-Craftable text baked in) — exactly what the popover
-  // title already is. No Unusual effect name is reliably available from
-  // this popover, so skip mannco.store for Unusual items rather than
-  // link somewhere wrong.
-  const manncoHref = qualityName === "Unusual"
-    ? null
-    : mannCoStoreUrl({ name: fullDisplayName, quality: qualityName, crateNumber: manncoSkinportCrateNumber });
-
-  // skinport.com wants the same full descriptive name mannco.store does
-  // (quality/killstreak/Festivized/Non-Craftable text baked in) — no
-  // Unusual effect name is reliably available from this popover either,
-  // so skip skinport.com for Unusual items for the same reason.
-  const skinportHref = qualityName === "Unusual"
-    ? null
-    : skinportUrl({ name: fullDisplayName, quality: qualityName, crateNumber: manncoSkinportCrateNumber });
-
-  // stntrading.eu bakes craftability into its own name/prefix — strip
-  // "Non-Craftable " back out of the title so it isn't duplicated. It
-  // also has no separate item page per Festivized variant or killstreak
-  // tier — a weapon's page lists every killstreak tier together, and
-  // Festivized items are just listed under the base item's page — so
-  // both are stripped too. Neither is anchored to the start: "Festivized"
-  // and the killstreak-tier words don't always lead (e.g. "Vintage
-  // Festivized Professional Killstreak Kritzkrieg" — quality word
-  // first), unlike Non-Craftable, which always does. The killstreak
-  // alternatives are ordered longest-first so "Professional Killstreak"
-  // doesn't get half-matched by the plain "Killstreak" alternative.
-  // Built from rawTitle, not fullDisplayName — unlike mannco.store,
-  // stntrading.eu keeps a crate's case/series number as part of the name.
-  const stnName = rawTitle
-    .replace(/^Non-Craftable\s+/i, "")
-    .replace(/Festivized\s+/i, "")
-    .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
-
-  const links = [
-    { label: "mannco.store", href: manncoHref },
-    { label: "stntrading.eu", href: stnTradingUrl({ name: stnName, craftable, isAmbiguousSeries: isAmbiguous }) },
-    { label: "skinport.com", href: skinportHref },
-  ].filter((link) => link.href);
-
-  // scrap.tf has no per-item page — its keys market page is the one
-  // static exception worth linking to directly.
-  if (KEY_NAME_RE.test(fullDisplayName)) {
-    links.push({ label: "scrap.tf", href: "https://scrap.tf/keys" });
-  }
-
+  const links = await buildLinks(itemName, content);
   if (!links.length) return;
 
   const dd = document.createElement("dd");
   dd.className = "popover-btns";
   dd.id = EXTRA_LINKS_ID;
-  links.forEach((link) => appendLink(dd, link));
+  links.forEach((link) => dd.appendChild(makeLinkBtn(link)));
   content.appendChild(dd);
-
-  // crate.tf needs a network fetch (defindex lookup) and only has pages
-  // for crates/cases — appended separately afterward so it never blocks
-  // the synchronous links above, and skipped if this popover's gone by
-  // the time it resolves. crateTfUrl() wants the bare schema name (no
-  // "Non-Craftable " prefix — unlike mannco.store/skinport.com, it
-  // takes craftability as its own separate field instead), so that's
-  // stripped back out here even though fullDisplayName keeps it.
-  if (crateNumber != null || !craftable) {
-    crateTfUrl({ name: fullDisplayName.replace(/^Non-Craftable\s+/i, ""), crateNumber, craftable })
-      .then((href) => {
-        if (href && dd.isConnected) appendLink(dd, { label: "crate.tf", href });
-      })
-      .catch((err) => console.warn("[TF2Utils] crate.tf link failed:", err));
-  }
 }
 
-function appendLink(dd, { label, href }) {
+/**
+ * Parses the popover title down to the bare schema name (no quality,
+ * killstreak tier, Australium, Non-Craftable, or crate number — all
+ * those become separate fields).
+ *
+ * The Classifieds link (when present) is the reliable source for
+ * quality/craftable/killstreak tier — backpack.tf already parsed them
+ * server-side there — read off its own query params instead of
+ * re-deriving them from text. Currency items (Scrap/Reclaimed/Refined
+ * Metal) can't be listed on Classifieds at all though, so their popover
+ * has no such link; those fall back to text-based detection, the one
+ * signal still available.
+ *
+ * Every field is always present on the returned object — one this
+ * popover genuinely can't determine (there's no Unusual effect name
+ * exposed here at all) is `null` rather than omitted, so callers/other
+ * scripts can tell "no value" apart from "field not implemented here"
+ * at a glance.
+ *
+ * @param {string} itemName
+ * @param {Element} content - the popover's ".popover-content" element
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean, effectId: null, effectName: null, crateNumber: string|null, isAmbiguousSeries: boolean}>}
+ */
+async function parseItemAttributes(itemName, content) {
+  const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
+
+  const searchLink = content.querySelector('#popover-search-links a[href*="/classifieds?"]');
+  let quality = "Unique";
+  let craftable = !/^Non-Craftable\b/i.test(fullDisplayName);
+  let ksTier = /\bProfessional Killstreak\b/i.test(fullDisplayName) ? 3
+    : /\bSpecialized Killstreak\b/i.test(fullDisplayName) ? 2
+    : /\bKillstreak\b/i.test(fullDisplayName) ? 1
+    : null;
+  if (searchLink) {
+    const params = new URL(searchLink.href).searchParams;
+    const qualityId = Number(params.get("quality"));
+    quality = QUALITY_NAMES_BY_ID[qualityId] || "Unique";
+    craftable = params.get("craftable") !== "-1";
+    if (params.has("killstreak_tier")) {
+      const tier = Number(params.get("killstreak_tier"));
+      ksTier = tier || null;
+    }
+  }
+
+  const australium = /\bAustralium\b/i.test(fullDisplayName);
+
+  // crateNumber/isAmbiguousSeries: crateTfUrl() itself has no "is this
+  // actually a crate" check — it trusts the caller — so this is only
+  // ever resolved for names IS_CRATE_CASE_RE already flags, same gate
+  // buildLinks() below uses before calling crateTfUrl().
+  let crateNumber = null;
+  let isAmbiguousSeries = false;
+  const looksLikeCrate = IS_CRATE_CASE_RE.test(fullDisplayName) && !/\bkey\b/i.test(fullDisplayName);
+  if (looksLikeCrate) {
+    const bareName = fullDisplayName.replace(/^Non-Craftable\s+/i, "");
+    ({ crateNumber, isAmbiguous: isAmbiguousSeries } = await resolveCrateSeries(itemName, bareName));
+    if (crateNumber == null) {
+      // Stats-page fallback — only ever fires for ambiguous multi-series
+      // families whose own stats page doesn't repeat the number in the title.
+      const fromUrl = getCrateNumberFromStatsUrl(fullDisplayName);
+      if (fromUrl != null) { crateNumber = fromUrl; isAmbiguousSeries = true; }
+    }
+  }
+
+  // Reduce down to the bare schema name — strip Non-Craftable/
+  // Festivized/killstreak/Australium text, then the quality word itself
+  // (only shown as text for non-Unique/non-Unusual qualities, matching
+  // Steam's own display convention). Unusual items keep the effect name
+  // baked in here — this popover doesn't expose one to strip separately.
+  let name = fullDisplayName
+    .replace(/^Non-Craftable\s+/i, "")
+    .replace(/Festivized\s+/i, "")
+    .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "")
+    .replace(/\bAustralium\s+/i, "");
+  if (quality !== "Unique" && quality !== "Unusual") {
+    for (const q of TF2_QUALITY_NAMES) {
+      if (name.startsWith(q + " ")) { name = name.slice((q + " ").length); break; }
+    }
+  }
+
+  return { name, quality, craftable, ksTier, australium, effectId: null, effectName: null, crateNumber, isAmbiguousSeries };
+}
+
+/**
+ * Builds every reference link for the item — mannco.store/stntrading.eu/
+ * skinport.com/crate.tf (crates/cases only) — as one array, all resolved
+ * together before anything renders.
+ */
+async function buildLinks(itemName, content) {
+  const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
+  const attrs = await parseItemAttributes(itemName, content);
+  const ambiguousCrateNumber = attrs.isAmbiguousSeries ? attrs.crateNumber : undefined;
+
+  // mannco.store/skinport.com both want the full descriptive name
+  // (quality/killstreak/Festivized text baked in) — exactly what the
+  // popover title already is, minus "Non-Craftable " (craftableAwareName),
+  // which goes through `craftable` instead so this doesn't depend on
+  // that text being there. TODO: Unusual items need their effect name
+  // prepended (mannCoStoreUrl()'s `effectName` option) for a correct
+  // slug — this popover doesn't expose one yet, so for now Unusual
+  // items just link without it.
+  const craftableAwareName = fullDisplayName.replace(/^Non-Craftable\s+/i, "");
+
+  // crate.tf needs a network fetch (defindex lookup) and only has pages
+  // for crates/cases — resolved as its own step (not inline in the array
+  // below) since it needs this extra gate check, not just
+  // crateNumber/craftable like the others.
+  const looksLikeCrate = IS_CRATE_CASE_RE.test(fullDisplayName) && !/\bkey\b/i.test(fullDisplayName);
+  const crateTfHref = (looksLikeCrate && (attrs.crateNumber != null || !attrs.craftable))
+    ? await crateTfUrl(attrs.name, undefined, { crateNumber: attrs.crateNumber, craftable: attrs.craftable })
+        .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; })
+    : null;
+
+  // stntrading.eu keeps a crate's case/series number as part of the
+  // name (unlike mannco.store/skinport.com, which only want it for
+  // ambiguous multi-series names — see resolveCrateSeries()) and has no
+  // separate item page per Festivized variant or killstreak tier, so
+  // both stay stripped from its own name too.
+  const stnName = itemName
+    .replace(/^Non-Craftable\s+/i, "")
+    .replace(/Festivized\s+/i, "")
+    .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
+
+  const links = [
+    { label: "mannco.store", href: mannCoStoreUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: ambiguousCrateNumber }) },
+    { label: "stntrading.eu", href: stnTradingUrl(stnName, undefined, { craftable: attrs.craftable, isAmbiguousSeries: attrs.isAmbiguousSeries }) },
+    { label: "skinport.com", href: skinportUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: ambiguousCrateNumber }) },
+    { label: "crate.tf", href: crateTfHref },
+  ].filter((link) => link.href);
+
+  // scrap.tf has no per-item page — its keys market page is the one
+  // static exception worth linking to directly.
+  if (TF2_CURRENCY.keys.nameRe.test(fullDisplayName)) {
+    links.push({ label: "scrap.tf", href: "https://scrap.tf/keys" });
+  }
+
+  return links;
+}
+
+function makeLinkBtn({ label, href }) {
   const a = document.createElement("a");
   a.className = "btn btn-default btn-xs";
   a.href = href;
@@ -239,5 +290,5 @@ function appendLink(dd, { label, href }) {
   a.rel = "noreferrer";
   a.textContent = label;
   a.style.borderLeft = `3px solid ${LINK_ACCENTS[label] || "#999"}`;
-  dd.appendChild(a);
+  return a;
 }
