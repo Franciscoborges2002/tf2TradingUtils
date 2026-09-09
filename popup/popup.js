@@ -1,5 +1,5 @@
-import { TF2_CURRENCY } from "../utils/constants/tf2Economy.js";
 import { getSettings, updateSettings } from "../utils/settings.js";
+import { TF2_CURRENCY, toHalfScrap, fromHalfScrap, parseRefined } from "../utils/tf2Currency.js";
 
 // Shared with the settings and calculator views below — the key price
 // (in ref) from chrome.storage.local, kept in sync across both without
@@ -208,12 +208,16 @@ document.addEventListener("DOMContentLoaded", () => {
     refInput:     document.getElementById("calc-input-ref"),
     recInput:     document.getElementById("calc-input-rec"),
     scrapInput:   document.getElementById("calc-input-scrap"),
+    weaponsInput: document.getElementById("calc-input-weapons"),
     compactInput: document.getElementById("calc-input-compact"),
     addDetailedBtn: document.getElementById("calc-add-detailed"),
     addCompactBtn:  document.getElementById("calc-add-compact"),
     modeToggle:     document.getElementById("calc-mode-toggle"),
     detailedForm:   document.getElementById("calc-detailed-form"),
     compactForm:    document.getElementById("calc-compact-form"),
+    bulkQtyInput:   document.getElementById("calc-bulk-qty"),
+    bulkPriceInput: document.getElementById("calc-bulk-price"),
+    addBulkBtn:     document.getElementById("calc-bulk-add"),
     entriesList:  document.getElementById("calc-entries-list"),
     emptyState:   document.getElementById("calc-empty-state"),
     totalDetailed:   document.getElementById("calc-total-detailed"),
@@ -237,36 +241,33 @@ document.addEventListener("DOMContentLoaded", () => {
     return { keys, extraRef: frac * keyPriceRef, error: null };
   }
 
-  // Parses "2.5 keys", "2 keys, 55 refs", "5.33 ref", or "2 keys"
-  // into a { keys, ref, rec, scrap } breakdown. Returns { amounts,
+  // Parses "2.5 keys", "2 keys, 55 refs", "5.33 ref", "2 keys", or
+  // "2 weapons" (any combination, keys/ref/weapons in that order) into
+  // a { keys, ref, rec, scrap, weapons } breakdown. Returns { amounts,
   // error }: amounts is null if the string couldn't be parsed at all,
   // error is set only when it parsed but fractional keys couldn't be
   // resolved (no key price set).
   function parseCompactInput(str, keyPriceRef) {
-    const match = str.trim().match(/^(?:(\d+(?:\.\d+)?)\s*keys?,?\s*)?(?:(\d+(?:\.\d+)?)\s*refs?)?$/i);
-    if (!match || (!match[1] && !match[2])) return { amounts: null, error: null };
+    const match = str.trim().match(/^(?:(\d+(?:\.\d+)?)\s*keys?,?\s*)?(?:(\d+(?:\.\d+)?)\s*refs?,?\s*)?(?:(\d+)\s*weapons?)?$/i);
+    if (!match || (!match[1] && !match[2] && !match[3])) return { amounts: null, error: null };
 
     const rawKeys = match[1] ? parseFloat(match[1]) : 0;
     const { keys, extraRef, error } = splitFractionalKeys(rawKeys, keyPriceRef);
     if (error) return { amounts: null, error };
 
-    const metal = (match[2] ? parseFloat(match[2]) : 0) + extraRef;
+    const metal   = (match[2] ? parseFloat(match[2]) : 0) + extraRef;
+    const weapons = match[3] ? parseInt(match[3]) : 0;
 
-    const totalScrap = Math.round(metal * 9);
-    const ref   = Math.floor(totalScrap / 9);
-    const rem   = totalScrap % 9;
-    const rec   = Math.floor(rem / 3);
-    const scrap = rem % 3;
-
-    return { amounts: { keys, ref, rec, scrap }, error: null };
+    return { amounts: { keys, ...fromHalfScrap(parseRefined(metal) * 2 + weapons) }, error: null };
   }
 
-  function formatDetailed({ keys, ref, rec, scrap }) {
+  function formatDetailed({ keys, ref, rec, scrap, weapons }) {
     const parts = [];
-    if (keys)  parts.push(`${keys} ${TF2_CURRENCY.keys.short}`);
-    if (ref)   parts.push(`${ref} ${TF2_CURRENCY.ref.short}`);
-    if (rec)   parts.push(`${rec} ${TF2_CURRENCY.rec.short}`);
-    if (scrap) parts.push(`${scrap} ${TF2_CURRENCY.scrap.short}`);
+    if (keys)    parts.push(`${keys} ${TF2_CURRENCY.keys.short}`);
+    if (ref)     parts.push(`${ref} ${TF2_CURRENCY.ref.short}`);
+    if (rec)     parts.push(`${rec} ${TF2_CURRENCY.rec.short}`);
+    if (scrap)   parts.push(`${scrap} ${TF2_CURRENCY.scrap.short}`);
+    if (weapons) parts.push(`${weapons} Weapon${weapons !== 1 ? "s" : ""}`);
     return parts.length ? parts.join(" + ") : "Nothing";
   }
 
@@ -275,19 +276,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // No cross-conversion between keys and metal.
   function computeTotal() {
     const raw = entries.reduce((acc, e) => ({
-      keys:  acc.keys  + (e.keys  || 0),
-      ref:   acc.ref   + (e.ref   || 0),
-      rec:   acc.rec   + (e.rec   || 0),
-      scrap: acc.scrap + (e.scrap || 0),
-    }), { keys: 0, ref: 0, rec: 0, scrap: 0 });
+      keys:    acc.keys    + (e.keys    || 0),
+      ref:     acc.ref     + (e.ref     || 0),
+      rec:     acc.rec     + (e.rec     || 0),
+      scrap:   acc.scrap   + (e.scrap   || 0),
+      weapons: acc.weapons + (e.weapons || 0),
+    }), { keys: 0, ref: 0, rec: 0, scrap: 0, weapons: 0 });
 
-    const totalScrap = raw.ref * 9 + raw.rec * 3 + raw.scrap;
-    return {
-      keys:  raw.keys,
-      ref:   Math.floor(totalScrap / 9),
-      rec:   Math.floor((totalScrap % 9) / 3),
-      scrap: totalScrap % 3,
-    };
+    return { keys: raw.keys, ...fromHalfScrap(toHalfScrap(raw)) };
   }
 
   // Same total, but if the leftover metal is worth enough (at the
@@ -297,24 +293,19 @@ document.addEventListener("DOMContentLoaded", () => {
   function computeKeyedTotal(normalTotal, keyPriceRef) {
     if (!keyPriceRef) return null;
 
-    const keyPriceScrap = Math.round(keyPriceRef * 9);
-    if (keyPriceScrap <= 0) return null;
+    const keyPriceHalfScrap = parseRefined(keyPriceRef) * 2;
+    if (keyPriceHalfScrap <= 0) return null;
 
-    const totalScrap = normalTotal.ref * 9 + normalTotal.rec * 3 + normalTotal.scrap;
-    const extraKeys   = Math.floor(totalScrap / keyPriceScrap);
+    const totalHalfScrap = toHalfScrap(normalTotal);
+    const extraKeys       = Math.floor(totalHalfScrap / keyPriceHalfScrap);
     if (!extraKeys) return normalTotal;
 
-    const remainderScrap = totalScrap - extraKeys * keyPriceScrap;
-    return {
-      keys:  normalTotal.keys + extraKeys,
-      ref:   Math.floor(remainderScrap / 9),
-      rec:   Math.floor((remainderScrap % 9) / 3),
-      scrap: remainderScrap % 3,
-    };
+    const remainderHalfScrap = totalHalfScrap - extraKeys * keyPriceHalfScrap;
+    return { keys: normalTotal.keys + extraKeys, ...fromHalfScrap(remainderHalfScrap) };
   }
 
   function addEntry(amounts) {
-    if (!amounts.keys && !amounts.ref && !amounts.rec && !amounts.scrap) return;
+    if (!amounts.keys && !amounts.ref && !amounts.rec && !amounts.scrap && !amounts.weapons) return;
     entries.push(amounts);
     render();
   }
@@ -380,23 +371,20 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const totalScrap = (parseInt(els.refInput.value)   || 0) * 9
-                      + (parseInt(els.recInput.value)   || 0) * 3
-                      + (parseInt(els.scrapInput.value) || 0)
-                      + Math.round(extraRef * 9);
+    const totalHalfScrap = toHalfScrap({
+      ref:     parseInt(els.refInput.value)     || 0,
+      rec:     parseInt(els.recInput.value)     || 0,
+      scrap:   parseInt(els.scrapInput.value)   || 0,
+      weapons: parseInt(els.weaponsInput.value) || 0,
+    }) + parseRefined(extraRef) * 2;
 
-    addEntry({
-      keys,
-      ref:   Math.floor(totalScrap / 9),
-      rec:   Math.floor((totalScrap % 9) / 3),
-      scrap: totalScrap % 3,
-    });
+    addEntry({ keys, ...fromHalfScrap(totalHalfScrap) });
     els.keysInput.value = "0";
-    [els.refInput, els.recInput, els.scrapInput].forEach((el) => { el.value = "0"; });
+    [els.refInput, els.recInput, els.scrapInput, els.weaponsInput].forEach((el) => { el.value = "0"; });
     els.keysInput.focus();
   }
   els.addDetailedBtn.addEventListener("click", addFromDetailed);
-  [els.keysInput, els.refInput, els.recInput, els.scrapInput].forEach((el) => {
+  [els.keysInput, els.refInput, els.recInput, els.scrapInput, els.weaponsInput].forEach((el) => {
     el.addEventListener("keydown", (e) => { if (e.key === "Enter") addFromDetailed(); });
   });
 
@@ -418,6 +406,45 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   els.addCompactBtn.addEventListener("click", addFromCompact);
   els.compactInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addFromCompact(); });
+
+  // ── Bulk add: quantity × price/unit (e.g. buying 100 of an item at
+  // 1.66 ref each) — the price/unit field reuses the same compact
+  // parser as the field above, then keys/metal are each multiplied by
+  // quantity in integer (scrap/whole-key) space before being folded
+  // into one entry, so a large quantity never drifts off the real TF2
+  // currency grid the way repeated float multiplication on a decimal
+  // ref value would.
+  function addFromBulk() {
+    const quantity = Math.trunc(parseFloat(els.bulkQtyInput.value)) || 0;
+    if (quantity <= 0) {
+      els.bulkQtyInput.classList.add("calc-input-error");
+      setTimeout(() => els.bulkQtyInput.classList.remove("calc-input-error"), 400);
+      return;
+    }
+
+    const { amounts, error } = parseCompactInput(els.bulkPriceInput.value, currentKeyPriceRef);
+    if (error) {
+      window.alert(error);
+      return;
+    }
+    if (!amounts) {
+      els.bulkPriceInput.classList.add("calc-input-error");
+      setTimeout(() => els.bulkPriceInput.classList.remove("calc-input-error"), 400);
+      return;
+    }
+
+    addEntry({
+      keys: amounts.keys * quantity,
+      ...fromHalfScrap(toHalfScrap(amounts) * quantity),
+    });
+    els.bulkQtyInput.value = "1";
+    els.bulkPriceInput.value = "";
+    els.bulkPriceInput.focus();
+  }
+  els.addBulkBtn.addEventListener("click", addFromBulk);
+  [els.bulkQtyInput, els.bulkPriceInput].forEach((el) => {
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") addFromBulk(); });
+  });
 
   // ── Clear ──
   els.clearBtn.addEventListener("click", () => {

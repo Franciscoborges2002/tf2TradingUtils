@@ -23,7 +23,7 @@
     <button class="back-btn" data-back>← Back</button>
 
     <div id="calc-compact-form" class="calc-entry-form">
-      <input type="text" id="calc-input-compact" placeholder='e.g. &quot;2.5 keys&quot; or &quot;2 keys, 55 refs&quot;'>
+      <input type="text" id="calc-input-compact" placeholder='e.g. &quot;2.5 keys&quot; or &quot;2 keys, 55 refs&quot; or &quot;3 weapons&quot;'>
       <button id="calc-add-compact" class="calc-add-btn">Add</button>
     </div>
 
@@ -33,11 +33,23 @@
         <label><span>Ref</span><input type="number" id="calc-input-ref" min="0" value="0"></label>
         <label><span>Rec</span><input type="number" id="calc-input-rec" min="0" value="0"></label>
         <label><span>Scrap</span><input type="number" id="calc-input-scrap" min="0" value="0"></label>
+        <label><span>Weapon</span><input type="number" id="calc-input-weapons" min="0" value="0"></label>
       </div>
       <button id="calc-add-detailed" class="calc-add-btn">Add</button>
     </div>
 
     <button id="calc-mode-toggle" class="calc-mode-toggle" title="Switch input style">detailed</button>
+
+    <div id="calc-bulk-section">
+      <div class="calc-total-label">Bulk add (quantity × price/unit)</div>
+      <div id="calc-bulk-form" class="calc-entry-form">
+        <div class="calc-input-grid">
+          <label><span>Quantity</span><input type="number" id="calc-bulk-qty" min="1" step="1" value="1"></label>
+          <label><span>Price / unit</span><input type="text" id="calc-bulk-price" placeholder='e.g. "1.66 ref" or "3 weapons"'></label>
+        </div>
+        <button id="calc-bulk-add" class="calc-add-btn">Add</button>
+      </div>
+    </div>
 
     <div id="calc-entries-section">
       <div id="calc-empty-state">No entries yet.</div>

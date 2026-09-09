@@ -16,7 +16,8 @@
  */
 
 import { COLOR_ACCENT, COLOR_DANGER, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
-import { TF2_APPID, TF2_CONTEXTID, TF2_CURRENCY, TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
+import { TF2_APPID, TF2_CONTEXTID } from "../../utils/constants/tf2Economy.js";
+import { TF2_CURRENCY, TF2_CURRENCY_BY_NAME, WEAPONS, fromScrap, parseRefined } from "../../utils/tf2Currency.js";
 
 const PANEL_ID  = "tf2utils-tradepanel";
 const STYLES_ID = "tf2utils-tradepanel-styles";
@@ -30,6 +31,13 @@ const DENOMS = ["keys", "ref", "rec", "scrap"].map((key) => ({
   label: TF2_CURRENCY[key].short,
   color: key === "keys" ? COLOR_ACCENT : COLOR_METAL,
 }));
+// Weapons aren't one specific Steam item the way keys/ref/rec/scrap
+// are (see isWeaponCurrency()'s own doc) — there's no TF2_CURRENCY
+// entry for them, so this row is appended by hand instead of mapped
+// alongside the other four. Every existing DENOMS-driven bit of UI
+// below (availability label, +1/max, "Add to Trade") still picks this
+// up for free since none of it hardcodes which four keys exist.
+DENOMS.push({ key: "weapons", label: "Weapon", color: COLOR_METAL });
 
 // Full Steam item name → short label, e.g. "Refined Metal" → "Ref"
 const SHORT_TO_NAME = Object.fromEntries(
@@ -130,15 +138,19 @@ function getAvailableCurrency() {
   return new Promise((resolve) => {
     const eventId      = `tf2utils_currency_${Date.now()}`;
     const requestEvent = g_activeSide === "me" ? "tf2utils_get_my_currency" : "tf2utils_get_their_currency";
-    const timeout = setTimeout(() => resolve({ keys: 0, ref: 0, rec: 0, scrap: 0 }), 5_000);
+    const timeout = setTimeout(() => resolve({ keys: 0, ref: 0, rec: 0, scrap: 0, weapons: 0 }), 5_000);
     window.addEventListener(eventId, (e) => { clearTimeout(timeout); resolve(e.detail); }, { once: true });
-    window.dispatchEvent(new CustomEvent(requestEvent, { detail: { eventId } }));
+    // pageContext runs as a classic (non-module) script (world: "MAIN")
+    // and can't import utils/tf2Currency.js itself — WEAPONS is sent
+    // along with every request instead, so there's one source of truth
+    // for the list rather than a second hand-synced copy over there.
+    window.dispatchEvent(new CustomEvent(requestEvent, { detail: { eventId, weaponNames: WEAPONS } }));
   });
 }
 
 function dispatchAddCurrency(amounts) {
   const addEvent = g_activeSide === "me" ? "tf2utils_add_currency" : "tf2utils_add_their_currency";
-  window.dispatchEvent(new CustomEvent(addEvent, { detail: amounts }));
+  window.dispatchEvent(new CustomEvent(addEvent, { detail: { ...amounts, weaponNames: WEAPONS } }));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -395,13 +407,13 @@ function buildPanel() {
 
   const hint = document.createElement("div");
   hint.className   = "ac-hint";
-  hint.textContent = 'e.g. "5 keys 5.44 ref" or "3 keys" or "2.33 ref"';
+  hint.textContent = 'e.g. "5 keys 5.44 ref" or "3 keys" or "2.33 ref" or "2 weapons"';
   compactBody.appendChild(hint);
 
   const compactInput = document.createElement("input");
   compactInput.type        = "text";
   compactInput.className   = "ac-compact-input";
-  compactInput.placeholder = "5 keys 5.44 ref";
+  compactInput.placeholder = "5 keys 5.44 ref 2 weapons";
   compactInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") doCompactAdd();
   });
@@ -618,27 +630,30 @@ function hideDropdown(dropdown) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Parse compact input string → { keys, ref, rec, scrap }
-// Supports: "5 keys 5.44 ref", "3 keys", "2.33 ref", "5.44"
+// Parse compact input string → { keys, ref, rec, scrap, weapons }
+// Supports: "5 keys 5.44 ref", "3 keys", "2.33 ref", "5.44", "2 weapons"
+// (any combination, keys/metal/weapons in that order).
+//
+// One anchored pattern, not three independent .match() calls — those
+// weren't excluding text the other two already claimed, so the metal
+// group (having no required "ref"/"metal" word of its own) would
+// happily steal the keys/weapons digits instead: "5 keys" alone used
+// to also silently add 5 ref, and "3 keys 5.44 ref" used "3" as the
+// ref amount, dropping the real "5.44" entirely. Anchoring the whole
+// string against one pattern makes the three groups mutually
+// exclusive by construction.
 // ─────────────────────────────────────────────────────────────
 function parseCompactInput(str) {
-  if (!str.trim()) return null;
+  const match = str.trim().match(
+    /^(?:(\d+)\s*keys?\s*,?\s*)?(?:(\d+(?:\.\d+)?)\s*(?:ref(?:ined)?|metal)?\s*,?\s*)?(?:(\d+)\s*weapons?\s*)?$/i
+  );
+  if (!match || (!match[1] && !match[2] && !match[3])) return null;
 
-  const result = { keys: 0, ref: 0, rec: 0, scrap: 0 };
-
-  // Keys: "N key(s)"
-  const keysMatch = str.match(/(\d+)\s*keys?/i);
-  if (keysMatch) result.keys = parseInt(keysMatch[1]);
-
-  // Metal: "N.NN ref/metal/refined" or just "N.NN"
-  const metalMatch = str.match(/([\d]+(?:\.[\d]+)?)\s*(?:ref(?:ined)?|metal)?(?:\s|$)/i);
-  if (metalMatch) {
-    const decimal = parseFloat(metalMatch[1]);
-    const totalScrap = Math.round(decimal * 9);
-    result.ref   = Math.floor(totalScrap / 9);
-    const rem    = totalScrap % 9;
-    result.rec   = Math.floor(rem / 3);
-    result.scrap = rem % 3;
+  const result = { keys: 0, ref: 0, rec: 0, scrap: 0, weapons: 0 };
+  if (match[1]) result.keys = parseInt(match[1]);
+  if (match[3]) result.weapons = parseInt(match[3]);
+  if (match[2]) {
+    Object.assign(result, fromScrap(parseRefined(match[2])));
   }
 
   return result;
