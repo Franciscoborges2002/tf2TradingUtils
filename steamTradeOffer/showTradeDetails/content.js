@@ -7,7 +7,7 @@
 
 import { COLOR_ACCENT, COLOR_DANGER, COLOR_INFO, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
-import { fromScrap, formatRefined } from "../../utils/tf2Currency.js";
+import { fromHalfScrap, formatRefinedWithWeapons, isWeaponCurrency } from "../../utils/tf2Currency.js";
 
 const PANEL_ID  = "tf2utils-denominations-panel";
 const STYLES_ID = "tf2utils-denom-styles";
@@ -214,17 +214,23 @@ let g_currencyStyle = "detailed"; // "detailed" | "compact"
 function renderCurrency(el, items) {
   el.innerHTML = "";
 
-  let keys  = 0;
-  let scrap = 0;
+  let keys      = 0;
+  let halfScrap = 0;
 
   for (const item of items) {
     const cur = TF2_CURRENCY_BY_NAME[item.name];
-    if (!cur) continue;
-    if (cur.scrapValue === null) keys++;
-    else scrap += cur.scrapValue;
+    if (cur) {
+      if (cur.scrapValue === null) keys++;
+      else halfScrap += cur.scrapValue * 2; // scrapValue is whole scrap — this file tracks half-scrap so weapons (0.5 scrap) fit too
+      continue;
+    }
+    // Not a currency item itself — a plain weapon still counts as
+    // 0.5-scrap "fodder" (see isWeaponCurrency()'s own doc for the
+    // accuracy caveat on this).
+    if (isWeaponCurrency(item.name)) halfScrap += 1;
   }
 
-  if (!keys && !scrap) return;
+  if (!keys && !halfScrap) return;
 
   const row = document.createElement("div");
   row.className = "tf2d-currency-row";
@@ -232,7 +238,7 @@ function renderCurrency(el, items) {
   // ── Content ──
   const content = document.createElement("div");
   content.className = "tf2d-currency-content";
-  renderCurrencyContent(content, keys, scrap);
+  renderCurrencyContent(content, keys, halfScrap);
   row.appendChild(content);
 
   // ── Toggle button ──
@@ -243,32 +249,32 @@ function renderCurrency(el, items) {
   toggle.onclick     = () => {
     g_currencyStyle   = g_currencyStyle === "detailed" ? "compact" : "detailed";
     toggle.textContent = g_currencyStyle === "detailed" ? "compact" : "detailed";
-    renderCurrencyContent(content, keys, scrap);
+    renderCurrencyContent(content, keys, halfScrap);
   };
   row.appendChild(toggle);
 
   el.appendChild(row);
 }
 
-function renderCurrencyContent(el, keys, scrap) {
+function renderCurrencyContent(el, keys, halfScrap) {
   el.innerHTML = "";
   if (g_currencyStyle === "compact") {
-    renderCompact(el, keys, scrap);
+    renderCompact(el, keys, halfScrap);
   } else {
-    renderDetailed(el, keys, scrap);
+    renderDetailed(el, keys, halfScrap);
   }
 }
 
 // "2 Keys · 5.44 ref"
-function renderCompact(el, keys, scrap) {
+function renderCompact(el, keys, halfScrap) {
   const parts = [];
 
   if (keys) {
     parts.push({ label: `${keys} Key${keys > 1 ? "s" : ""}`, color: COLOR_ACCENT });
   }
 
-  if (scrap) {
-    parts.push({ label: `${formatRefined(scrap)} ref`, color: COLOR_METAL });
+  if (halfScrap) {
+    parts.push({ label: `${formatRefinedWithWeapons(halfScrap)} ref`, color: COLOR_METAL });
   }
 
   parts.forEach((p, i) => {
@@ -287,15 +293,16 @@ function renderCompact(el, keys, scrap) {
   });
 }
 
-// "2 Keys + 5 Ref + 1 Rec + 1 Scrap"
-function renderDetailed(el, keys, scrap) {
-  const { ref, rec, scrap: scraps } = fromScrap(scrap);
+// "2 Keys + 5 Ref + 1 Rec + 1 Scrap + 1 Weapon"
+function renderDetailed(el, keys, halfScrap) {
+  const { ref, rec, scrap, weapons } = fromHalfScrap(halfScrap);
 
   const parts = [];
-  if (keys)   parts.push({ label: `${keys} Key${keys > 1 ? "s" : ""}`, color: COLOR_ACCENT });
-  if (ref)    parts.push({ label: `${ref} Ref`,                          color: COLOR_METAL });
-  if (rec)    parts.push({ label: `${rec} Rec`,                          color: COLOR_METAL });
-  if (scraps) parts.push({ label: `${scraps} Scrap`,                     color: COLOR_METAL });
+  if (keys)    parts.push({ label: `${keys} Key${keys > 1 ? "s" : ""}`, color: COLOR_ACCENT });
+  if (ref)     parts.push({ label: `${ref} Ref`,                          color: COLOR_METAL });
+  if (rec)     parts.push({ label: `${rec} Rec`,                          color: COLOR_METAL });
+  if (scrap)   parts.push({ label: `${scrap} Scrap`,                      color: COLOR_METAL });
+  if (weapons) parts.push({ label: `${weapons} Weapon`,                   color: COLOR_METAL });
 
   parts.forEach((p, i) => {
     const chip = document.createElement("span");

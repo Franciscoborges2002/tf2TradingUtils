@@ -388,12 +388,29 @@ window.addEventListener("tf2utils_get_their_currency", (e) => {
   respondWithAvailable(e, g_partnerItemMap, window.g_rgCurrentTradeStatus?.them?.assets);
 });
 
+// Weapons aren't one specific item name — the caller (tradeOfferPanel,
+// which CAN import utils/constants/weapons.js) sends the full name list
+// along with the request instead of this file keeping its own
+// hand-synced copy (see file header for why it can't import it). A
+// leading "The " is stripped before checking: unlike quality/
+// craftability, that's not a value signal — a handful of TF2's
+// earliest weapons (e.g. "The Kritzkrieg") genuinely carry it as part
+// of their real Steam name, while the caller's list only ever stores
+// the bare form. Same normalization as utils/tf2Currency.js's
+// isWeaponCurrency() — duplicated by hand for the same reason
+// parsePriceString() is (see that function's own doc).
+function isWeaponName(name, weaponNames) {
+  return weaponNames.has(String(name || "").trim().replace(/^The\s+/, ""));
+}
+
 function respondWithAvailable(e, itemMap, tradeAssets) {
   const eventId = e.detail?.eventId;
   if (!eventId) return;
 
+  const weaponNames = new Set(e.detail?.weaponNames ?? []);
+
   const inTrade = new Set((tradeAssets ?? []).map((a) => a.assetid));
-  const counts  = { keys: 0, ref: 0, rec: 0, scrap: 0 };
+  const counts  = { keys: 0, ref: 0, rec: 0, scrap: 0, weapons: 0 };
 
   for (const info of itemMap.values()) {
     if (inTrade.has(info.assetid)) continue;
@@ -402,6 +419,7 @@ function respondWithAvailable(e, itemMap, tradeAssets) {
     else if (name === "Refined Metal")        counts.ref++;
     else if (name === "Reclaimed Metal")      counts.rec++;
     else if (name === "Scrap Metal")          counts.scrap++;
+    else if (isWeaponName(name, weaponNames)) counts.weapons++;
   }
 
   window.dispatchEvent(new CustomEvent(eventId, { detail: counts }));
@@ -459,7 +477,9 @@ window.addEventListener("tf2utils_add_assets", (e) => {
 // to redraw via RefreshTradeStatus — the same thing that happens
 // when you drag an item into a trade slot. Clicking/double-clicking
 // the item elements does NOT add them to the trade, only selects them.
-// Payload: { keys, ref, rec, scrap }  (amounts to add)
+// Payload: { keys, ref, rec, scrap, weapons, weaponNames }  (amounts to
+// add — weaponNames is the caller's WEAPONS list, see
+// respondWithAvailable()'s own doc for why it travels with the request)
 // ─────────────────────────────────────────────────────────────
 window.addEventListener("tf2utils_add_currency", (e) => {
   const { addedAny, missing } = addCurrencyToAssets(
@@ -671,7 +691,7 @@ function addCurrencyToAssets(itemMap, tradeAssets, notLoadedLabel, amounts) {
     };
   }
 
-  const { keys = 0, ref = 0, rec = 0, scrap = 0 } = amounts;
+  const { keys = 0, ref = 0, rec = 0, scrap = 0, weapons = 0, weaponNames = [] } = amounts;
   const inTrade = new Set(tradeAssets.map((a) => a.assetid));
 
   const toAdd = [
@@ -708,6 +728,35 @@ function addCurrencyToAssets(itemMap, tradeAssets, notLoadedLabel, amounts) {
 
     if (added < count) {
       missing.push({ name: targetName, requested: count, found: added });
+    }
+  }
+
+  // Weapons: unlike the four denominations above, any item whose name
+  // is in weaponNames counts — not one specific exact name.
+  if (weapons) {
+    const weaponNameSet = new Set(weaponNames);
+    let added = 0;
+
+    for (const info of itemMap.values()) {
+      if (added >= weapons) break;
+      if (inTrade.has(info.assetid)) continue;
+      const name = info.market_hash_name || info.name;
+      if (!isWeaponName(name, weaponNameSet)) continue;
+
+      tradeAssets.push({
+        appid:     TF2_APPID,
+        contextid: TF2_CONTEXTID,
+        assetid:   info.assetid,
+        amount:    1,
+      });
+
+      inTrade.add(info.assetid);
+      added++;
+      addedAny = true;
+    }
+
+    if (added < weapons) {
+      missing.push({ name: "Weapon", requested: weapons, found: added });
     }
   }
 
