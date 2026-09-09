@@ -6,8 +6,7 @@
  */
 
 import { COLOR_ACCENT, COLOR_DANGER, COLOR_INFO, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
-import { TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
-import { fromHalfScrap, formatRefinedWithWeapons, isWeaponCurrency } from "../../utils/tf2Currency.js";
+import { TF2_CURRENCY_BY_NAME, fromHalfScrap, formatRefinedWithWeapons, isWeaponCurrency } from "../../utils/tf2Currency.js";
 
 const PANEL_ID  = "tf2utils-denominations-panel";
 const STYLES_ID = "tf2utils-denom-styles";

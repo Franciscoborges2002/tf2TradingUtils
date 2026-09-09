@@ -1,6 +1,5 @@
-import { TF2_CURRENCY } from "../utils/constants/tf2Economy.js";
 import { getSettings, updateSettings } from "../utils/settings.js";
-import { toHalfScrap, fromHalfScrap, parseRefined } from "../utils/tf2Currency.js";
+import { TF2_CURRENCY, toHalfScrap, fromHalfScrap, parseRefined } from "../utils/tf2Currency.js";
 
 // Shared with the settings and calculator views below — the key price
 // (in ref) from chrome.storage.local, kept in sync across both without

@@ -40,10 +40,10 @@
  * https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/inventoryCurrencyCounter
  */
 
-import { TF2_APPID, TF2_CONTEXTID, TF2_CURRENCY } from "../../utils/constants/tf2Economy.js";
+import { TF2_APPID, TF2_CONTEXTID } from "../../utils/constants/tf2Economy.js";
 import { COLOR_ACCENT, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
 import { getSettings } from "../../utils/settings.js";
-import { toScrap, formatRefined, parseRefined } from "../../utils/tf2Currency.js";
+import { TF2_CURRENCY, toScrap, formatRefined, parseRefined } from "../../utils/tf2Currency.js";
 
 const PANEL_ID  = "tf2utils-inv-currency-panel";
 const STYLES_ID = "tf2utils-inv-currency-styles";

@@ -39,8 +39,7 @@
  */
 
 import { COLOR_PANEL_BG } from "../../utils/constants/colors.js";
-import { TF2_CURRENCY, TF2_CURRENCY_BY_CLASSID, TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
-import { formatRefined } from "../../utils/tf2Currency.js";
+import { TF2_CURRENCY, TF2_CURRENCY_BY_CLASSID, TF2_CURRENCY_BY_NAME, formatRefined } from "../../utils/tf2Currency.js";
 
 const STYLES_ID = "tf2utils-tradeoffer-currency-styles";
 const PROCESSED_ATTR = "data-tf2utils-currency-total";

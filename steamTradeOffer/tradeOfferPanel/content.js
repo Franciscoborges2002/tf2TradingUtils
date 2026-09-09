@@ -16,9 +16,8 @@
  */
 
 import { COLOR_ACCENT, COLOR_DANGER, COLOR_METAL, COLOR_PANEL_BG } from "../../utils/constants/colors.js";
-import { TF2_APPID, TF2_CONTEXTID, TF2_CURRENCY, TF2_CURRENCY_BY_NAME } from "../../utils/constants/tf2Economy.js";
-import { fromScrap, parseRefined } from "../../utils/tf2Currency.js";
-import { WEAPONS } from "../../utils/constants/weapons.js";
+import { TF2_APPID, TF2_CONTEXTID } from "../../utils/constants/tf2Economy.js";
+import { TF2_CURRENCY, TF2_CURRENCY_BY_NAME, WEAPONS, fromScrap, parseRefined } from "../../utils/tf2Currency.js";
 
 const PANEL_ID  = "tf2utils-tradepanel";
 const STYLES_ID = "tf2utils-tradepanel-styles";
@@ -142,9 +141,9 @@ function getAvailableCurrency() {
     const timeout = setTimeout(() => resolve({ keys: 0, ref: 0, rec: 0, scrap: 0, weapons: 0 }), 5_000);
     window.addEventListener(eventId, (e) => { clearTimeout(timeout); resolve(e.detail); }, { once: true });
     // pageContext runs as a classic (non-module) script (world: "MAIN")
-    // and can't import utils/constants/weapons.js itself — WEAPONS is
-    // sent along with every request instead, so there's one source of
-    // truth for the list rather than a second hand-synced copy over there.
+    // and can't import utils/tf2Currency.js itself — WEAPONS is sent
+    // along with every request instead, so there's one source of truth
+    // for the list rather than a second hand-synced copy over there.
     window.dispatchEvent(new CustomEvent(requestEvent, { detail: { eventId, weaponNames: WEAPONS } }));
   });
 }

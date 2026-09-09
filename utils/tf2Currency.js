@@ -1,9 +1,14 @@
 /**
- * TF2 metal currency math — scrap is the base integer unit (1 refined =
- * 9 scrap, 1 reclaimed = 3 scrap), and every conversion here works in
- * that integer space rather than float ref math, since dividing/
- * rounding a decimal ref value directly silently produces the wrong
- * TF2-convention result.
+ * Everything related to TF2 currency lives here — the item data (keys/
+ * ref/rec/scrap/weapons), and the math for converting/formatting/
+ * combining amounts of it. Non-currency TF2 economy data (quality ids,
+ * killstreak sheen/killstreaker ids, TF2_APPID/TF2_CONTEXTID) stays in
+ * utils/constants/tf2Economy.js instead — this file is currency only.
+ *
+ * scrap is the base integer unit (1 refined = 9 scrap, 1 reclaimed = 3
+ * scrap), and every conversion below works in that integer space rather
+ * than float ref math, since dividing/rounding a decimal ref value
+ * directly silently produces the wrong TF2-convention result.
  *
  * Bug this replaces, found duplicated (and already-buggy) across
  * steamcommunity.com/tradeOfferCurrency and steamcommunity.com/
@@ -22,8 +27,150 @@
  * utils/constants/README.md.
  */
 
-import { TF2_CURRENCY } from "./constants/tf2Economy.js";
-import { WEAPONS } from "./constants/weapons.js";
+/**
+ * Currency metadata keyed by the short key used throughout the trade
+ * scripts ({ keys, ref, rec, scrap } amount objects).
+ * scrapValue: how many scrap this denomination is worth, used for the
+ * ref/rec/scrap breakdown math (9 scrap = 1 ref, 3 scrap = 1 rec).
+ * Keys have no scrap value — priced separately, usually in ref.
+ * In future, add a setting so user can update it to its own value.
+ *
+ * classid: this item's Steam economy classid (the "classinfo/440/<classid>/
+ * <instanceid>" pages like steamcommunity.com/profiles/*\/tradeoffers/
+ * key items by, with no name/description text of their own to read) —
+ * NOT the same as defindex (app_data.def_index in the same classinfo),
+ * a separate TF2-schema id; confirmed distinct for every entry below.
+ * Confirmed against real classinfo data: Scrap by an exact iconHash
+ * match, Refined/Reclaimed by their icon image (the steamcdn class-image
+ * endpoint they used doesn't expose iconHash, so those were a visual
+ * check instead), Keys from a page's own embedded classinfo JSON
+ * (BuildHover(...) call) giving classid/instanceid directly by name.
+ */
+export const TF2_CURRENCY = {
+  keys: {
+    name:       "Mann Co. Supply Crate Key",
+    // Matches the name inside a full item display name — backpack.tf
+    // oldUI/newUI itemLinks use this to spot a Key and link straight to
+    // scrap.tf's keys market page instead (scrap.tf has no per-item page).
+    nameRe:     /Mann Co\. Supply Crate Key/i,
+    short:      "Keys",
+    scrapValue: null,
+    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEAaR4uURrwvz0N252yVaDVWrRTno9m4ccG2GNqxlQoZrC2aG9hcVGUWflbX_drrVu5UGki5sAij6tOtQ",
+    classid:    "101785959",
+    instanceid: "11040578",
+  },
+  ref: {
+    name:       "Refined Metal",
+    short:      "Ref",
+    scrapValue: 9,
+    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsO1Mv6NGucF1Ygzt8ZQijJukFMiMrbhYDEwI1yRVKNfD6xorQ3qW3Jr6546DNPuou9IOVK4p4kWJaA",
+    classid:    "2674",
+    instanceid: "11040547",
+  },
+  rec: {
+    name:       "Reclaimed Metal",
+    short:      "Rec",
+    scrapValue: 3,
+    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsO0Mv6NGucF1YJlscMEgDdvxVYsMLPkMmFjI1OSUvMHDPBp9lu0CnVluZQxA9Gwp-hIOVK4sMMNWF4",
+    classid:    "5564",
+    instanceid: "11040547",
+  },
+  scrap: {
+    name:       "Scrap Metal",
+    short:      "Scrap",
+    scrapValue: 1,
+    iconHash:   "fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsPZAfOeD-VOn4phtsdQ32ZtxFYoN7PkYmVmIgeaUKNaX_Rjpwy8UHMz6pcxAIfnovUWJ1t9nYFqYw",
+    classid:    "2675",
+    instanceid: "11040547",
+  },
+};
+
+/** Same data as TF2_CURRENCY, indexed by full Steam item name instead. */
+export const TF2_CURRENCY_BY_NAME = Object.fromEntries(
+  Object.values(TF2_CURRENCY).map((c) => [c.name, c])
+);
+
+/** Same data as TF2_CURRENCY, indexed by Steam economy classid — only the entries with a confirmed classid (see TF2_CURRENCY's own doc comment). */
+export const TF2_CURRENCY_BY_CLASSID = Object.fromEntries(
+  Object.values(TF2_CURRENCY).filter((c) => c.classid).map((c) => [c.classid, c])
+);
+
+/**
+ * TF2 weapon names — every stock/reskinned item that occupies a
+ * class's primary/secondary/melee (or PDA-equivalent) loadout slot,
+ * across all 9 classes. Used by isWeaponCurrency() below to recognize a
+ * plain weapon as 0.5-scrap "currency fodder" — see that function's own
+ * doc for why every match is priced the same regardless of which
+ * weapon it actually is.
+ *
+ * A shared item usable by more than one class (e.g. "Shotgun",
+ * "Pistol", "Bottle") appears once, not once per class — the name is
+ * identical either way. Assembled from general TF2 weapon knowledge
+ * rather than a verified schema/API pull, so treat this as a
+ * best-effort list: a newly-released weapon, or a promotional/
+ * event-exclusive one this missed, won't be recognized until added
+ * here.
+ */
+export const WEAPONS = [
+  // Scout
+  "Scattergun", "Force-a-Nature", "Shortstop", "Soda Popper", "Baby Face's Blaster", "Back Scatter",
+  "Pistol", "Lugermorph", "Winger", "Pretty Boy's Pocket Pistol", "Flying Guillotine",
+  "Mad Milk", "Bonk! Atomic Punch", "Crit-a-Cola",
+  "Bat", "Sandman", "Holy Mackerel", "Sun-on-a-Stick", "Fan O'War", "Atomizer", "Wrap Assassin",
+  "Boston Basher", "Three-Rune Blade", "Candy Cane", "Batsaber", "Unarmed Combat",
+
+  // Soldier
+  "Rocket Launcher", "Direct Hit", "Black Box", "Rocket Jumper", "Liberty Launcher",
+  "Cow Mangler 5000", "Original", "Beggar's Bazooka", "Air Strike",
+  "Shotgun", "Buff Banner", "Gunboats", "Battalion's Backup", "Concheror", "Righteous Bison",
+  "Reserve Shooter", "Mantreads", "Panic Attack",
+  "Shovel", "Equalizer", "Pain Train", "Half-Zatoichi", "Market Gardener", "Disciplinary Action",
+  "Escape Plan",
+
+  // Pyro
+  "Flame Thrower", "Backburner", "Degreaser", "Phlogistinator", "Rainblower", "Dragon's Fury",
+  "Flare Gun", "Detonator", "Manmelter", "Scorch Shot", "Thermal Thruster", "Gas Passer",
+  "Fire Axe", "Axtinguisher", "Homewrecker", "Powerjack", "Back Scratcher",
+  "Sharpened Volcano Fragment", "Postal Pummeler", "Third Degree", "Lollichop",
+  "Neon Annihilator", "Hot Hand", "Maul",
+
+  // Demoman
+  "Grenade Launcher", "Loch-n-Load", "Loose Cannon", "Iron Bomber", "Ali Baba's Wee Booties",
+  "B.A.S.E Jumper",
+  "Stickybomb Launcher", "Scottish Resistance", "Chargin' Targe", "Splendid Screen", "Tide Turner",
+  "Quickiebomb Launcher",
+  "Bottle", "Eyelander", "Scotsman's Skullcutter", "Ullapool Caber", "Claidheamh Mòr",
+  "Persian Persuader", "Nessie's Nine Iron",
+
+  // Heavy
+  "Minigun", "Natascha", "Brass Beast", "Huo-Long Heater", "Tomislav",
+  "Family Business",
+  "Fists", "Killing Gloves of Boxing", "Gloves of Running Urgently", "Warrior's Spirit",
+  "Fists of Steel", "Eviction Notice", "Apoco-Fists", "Holiday Punch",
+  "Sandvich", "Dalokohs Bar", "Buffalo Steak Sandvich", "Second Banana",
+
+  // Engineer
+  "Frontier Justice", "Widowmaker", "Pomson 6000", "Rescue Ranger",
+  "Wrangler",
+  "Wrench", "Gunslinger", "Southern Hospitality", "Jag", "Eureka Effect",
+
+  // Medic
+  "Syringe Gun", "Blutsauger", "Crusader's Crossbow", "Overdose",
+  "Medi Gun", "Kritzkrieg", "Quick-Fix", "Vaccinator",
+  "Bonesaw", "Ubersaw", "Vita-Saw", "Amputator", "Solemn Vow",
+
+  // Sniper
+  "Sniper Rifle", "Bazaar Bargain", "Machina", "Hitman's Heatmaker", "Sydney Sleeper",
+  "Fortified Compound",
+  "SMG", "Cleaner's Carbine", "Jarate", "Darwin's Danger Shield", "Razorback", "Cozy Camper",
+  "Kukri", "Tribalman's Shiv", "Bushwacka", "Shahanshah",
+
+  // Spy
+  "Revolver", "Ambassador", "L'Etranger", "Enforcer", "Diamondback", "Big Kill",
+  "Knife", "Your Eternal Reward", "Conniver's Kunai", "Big Earner", "Spy-cicle", "Black Rose",
+  "Sapper", "Red-Tape Recorder",
+  "Invis Watch", "Cloak and Dagger", "Dead Ringer", "Enthusiast's Timepiece",
+];
 
 /**
  * Converts {ref, rec, scrap} denomination counts into one total scrap

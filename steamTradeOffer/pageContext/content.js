@@ -64,9 +64,8 @@ let g_partnerMapBuilt = false;
 // step here, Steam's mobile confirmation still applies before the
 // trade actually goes through.
 // ─────────────────────────────────────────────────────────────
-// Manually-synced local copy of utils/constants/tf2Economy.js'
-// TF2_CURRENCY names — see the file header for why this can't just
-// import it.
+// Manually-synced local copy of utils/tf2Currency.js's TF2_CURRENCY
+// names — see the file header for why this can't just import it.
 const CURRENCY_SHORT_TO_NAME = {
   keys:  "Mann Co. Supply Crate Key",
   ref:   "Refined Metal",
@@ -389,7 +388,7 @@ window.addEventListener("tf2utils_get_their_currency", (e) => {
 });
 
 // Weapons aren't one specific item name — the caller (tradeOfferPanel,
-// which CAN import utils/constants/weapons.js) sends the full name list
+// which CAN import utils/tf2Currency.js) sends the full name list
 // along with the request instead of this file keeping its own
 // hand-synced copy (see file header for why it can't import it). A
 // leading "The " is stripped before checking: unlike quality/

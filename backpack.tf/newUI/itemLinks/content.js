@@ -17,7 +17,8 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/new
 */
 
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
-import { TF2_QUALITY_IDS, TF2_QUALITY_NAMES, TF2_CURRENCY } from "../../../utils/constants/tf2Economy.js";
+import { TF2_QUALITY_IDS, TF2_QUALITY_NAMES } from "../../../utils/constants/tf2Economy.js";
+import { TF2_CURRENCY } from "../../../utils/tf2Currency.js";
 import { backpackStatsUrl, mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
 import { resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../../utils/tf2ItemSchema.js";
 
