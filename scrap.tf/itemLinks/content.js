@@ -517,7 +517,7 @@ async function buildLinks(itemName, itemEl) {
         crateNumber: attrs.crateNumber ?? undefined, isAmbiguousSeries: attrs.isAmbiguousSeries,
       }).catch((err) => { console.warn("[TF2Utils] liquid.tf link failed:", err); return null; }) },
     { label: "Steam Market", href: steamMarketUrl(steamMarketName, attrs.quality) },
-    { label: "Wiki", href: wikiUrl(baseName) },
+    { label: "Wiki", href: settings.showWikiLink ? wikiUrl(baseName) : null },
   ].filter((link) => link.href);
 
   return links;

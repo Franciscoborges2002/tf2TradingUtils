@@ -211,7 +211,7 @@ async function buildLinks(itemName) {
     // for exactly this — see liquidTfUrl()'s own doc for what they're for.
     { label: "liquid.tf", href: itemAttrs ? await liquidTfUrl(itemAttrs.name, itemAttrs.quality, itemAttrs) : null },
     { label: "Steam Market", href: steamMarketUrl(itemName.trim()) },
-    { label: "Wiki", href: wikiUrl(shallow.name) },
+    { label: "Wiki", href: settings.showWikiLink ? wikiUrl(shallow.name) : null },
   ];
 
   return links;
