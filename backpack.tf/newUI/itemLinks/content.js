@@ -8,8 +8,9 @@ backpack.tf/oldUI/itemLinks for the newUI. next.backpack.tf already
 fills that tooltip with its own Classifieds/Inventory/Aggs/Item DB/
 Item/History/Wiki links — none of those are duplicated here.
 
-Mann Co. Supply Crate Keys also get a link to scrap.tf/keys — scrap.tf
-has no per-item page, but its keys market page is worth linking to
+Mann Co. Supply Crate Keys also get links to scrap.tf/keys,
+quicksell.store/keys and cobra.tf/keys — none of the three have a
+per-item page, but their keys market pages are worth linking to
 directly.
 
 Link:
@@ -33,6 +34,8 @@ const LINK_ACCENTS = {
   "scrap.tf": SITE_BRAND_COLORS.scrapTf,
   "skinport.com": SITE_BRAND_COLORS.skinport,
   "crate.tf": SITE_BRAND_COLORS.crateTf,
+  "quicksell.store": SITE_BRAND_COLORS.quicksell,
+  "cobra.tf": SITE_BRAND_COLORS.cobraTf,
 };
 
 const EXTRA_LINKS_CLASS = "tf2utils-newui-extra-links";
@@ -287,10 +290,13 @@ async function buildLinks(itemName, tooltip) {
     { label: "crate.tf", href: crateTfHref },
   ].filter((link) => link.href);
 
-  // scrap.tf has no per-item page — its keys market page is the one
-  // static exception worth linking to directly.
+  // scrap.tf/quicksell.store/cobra.tf all have no per-item page — each
+  // one's own keys market page is the one static exception worth
+  // linking to directly.
   if (TF2_CURRENCY.keys.nameRe.test(fullDisplayName)) {
     links.push({ label: "scrap.tf", href: "https://scrap.tf/keys" });
+    links.push({ label: "quicksell.store", href: "https://quicksell.store/keys" });
+    links.push({ label: "cobra.tf", href: "https://cobra.tf/keys" });
   }
 
   return links;

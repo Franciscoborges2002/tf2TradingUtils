@@ -48,6 +48,8 @@ export const SITE_BRAND_COLORS = {
   repTf:         "#4CAF50", // green checkmark/shield icon from their logo mark
   steamdb:       "#FFFFFF", // their logo is monochrome white on black
   gladiatorTf:   "#E8A33D", // amber/gold helmet-crest accent from their logo mark
+  quicksell:     "#FFFFFF", // their logo is monochrome white eagle-head mark on black
+  cobraTf:       "#8BC79A", // sage green from their site's own headline/button accent (no separate logo mark given)
 };
 
 // backpack.tf's own colors for each killstreak tier (see addKSButtons)
