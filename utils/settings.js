@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS = {
   showItemDescriptionsByDefault: true,
   unusualEffectScale: 1.3,
   bpTfVersion: "classic",
+  showWikiLink: true,
 };
 
 const BP_TF_VERSIONS = ["classic", "next"];
@@ -45,6 +46,8 @@ export function validateSettings(raw) {
     unusualEffectScale: Math.min(1.8, Math.max(1,
       positiveNumber(source.unusualEffectScale, DEFAULT_SETTINGS.unusualEffectScale))),
     bpTfVersion: BP_TF_VERSIONS.includes(source.bpTfVersion) ? source.bpTfVersion : DEFAULT_SETTINGS.bpTfVersion,
+    // Shown by default unless the user's explicitly turned it off.
+    showWikiLink: source.showWikiLink !== false,
   };
 }
 

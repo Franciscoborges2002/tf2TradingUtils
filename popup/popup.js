@@ -153,6 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const showDescInput     = document.getElementById("settings-show-item-descriptions");
   const effectScaleInput  = document.getElementById("settings-unusual-effect-scale");
   const bpVersionInput    = document.getElementById("settings-bp-version");
+  const showWikiInput     = document.getElementById("settings-show-wiki-link");
   const saveBtn           = document.getElementById("settings-save");
   const savedMsg          = document.getElementById("settings-saved-msg");
 
@@ -163,6 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showDescInput.checked  = settings.showItemDescriptionsByDefault;
     effectScaleInput.value = settings.unusualEffectScale;
     bpVersionInput.value   = settings.bpTfVersion;
+    showWikiInput.checked  = settings.showWikiLink;
   });
 
   function saveSettings() {
@@ -176,6 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showItemDescriptionsByDefault: showDescInput.checked,
       unusualEffectScale: parseFloat(effectScaleInput.value),
       bpTfVersion: bpVersionInput.value,
+      showWikiLink: showWikiInput.checked,
     }).then((saved) => {
       // Reflects back whatever validateSettings() actually clamped/
       // normalized (e.g. an out-of-range effect scale), rather than
