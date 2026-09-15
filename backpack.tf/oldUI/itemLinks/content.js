@@ -21,8 +21,9 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/backpack.tf/old
 import { SITE_BRAND_COLORS } from "../../../utils/constants/colors.js";
 import { TF2_QUALITY_IDS, TF2_QUALITY_NAMES } from "../../../utils/constants/tf2Economy.js";
 import { TF2_CURRENCY } from "../../../utils/tf2Currency.js";
-import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl } from "../../../utils/itemLinks.js";
-import { resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../../utils/tf2ItemSchema.js";
+import { mannCoStoreUrl, stnTradingUrl, skinportUrl, crateTfUrl, loadoutTfUrl } from "../../../utils/itemLinks.js";
+import { resolveCrateSeries, resolveDefindex, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../../utils/tf2ItemSchema.js";
+import { getEffectsData } from "../../../utils/unusualEffects.js";
 
 const QUALITY_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TF2_QUALITY_IDS).map(([name, id]) => [id, name])
@@ -36,6 +37,7 @@ const LINK_ACCENTS = {
   "crate.tf": SITE_BRAND_COLORS.crateTf,
   "quicksell.store": SITE_BRAND_COLORS.quicksell,
   "cobra.tf": SITE_BRAND_COLORS.cobraTf,
+  "loadout.tf": SITE_BRAND_COLORS.loadoutTf,
 };
 
 // backpack.tf's own stats page for one specific crate series (e.g.
@@ -153,22 +155,25 @@ async function processPopoverInner(popover) {
  * those become separate fields).
  *
  * The Classifieds link (when present) is the reliable source for
- * quality/craftable/killstreak tier — backpack.tf already parsed them
- * server-side there — read off its own query params instead of
- * re-deriving them from text. Currency items (Scrap/Reclaimed/Refined
- * Metal) can't be listed on Classifieds at all though, so their popover
- * has no such link; those fall back to text-based detection, the one
- * signal still available.
+ * quality/craftable/killstreak tier/effect id, AND the bare schema name
+ * itself — backpack.tf already parsed all of it server-side there, read
+ * off its own query params instead of re-deriving them from text
+ * (confirmed live: "item=Flamehawk" for a popover titled "Crystal Crown
+ * Flamehawk" — already the exact bare name, no text-stripping needed,
+ * and correctly excludes the Unusual effect name baked into the title;
+ * "particle=365" for that same item's Crystal Crown effect). Currency
+ * items (Scrap/Reclaimed/Refined Metal) can't be listed on Classifieds
+ * at all though, so their popover has no such link; those fall back to
+ * text-based detection, the one signal still available.
  *
  * Every field is always present on the returned object — one this
- * popover genuinely can't determine (there's no Unusual effect name
- * exposed here at all) is `null` rather than omitted, so callers/other
- * scripts can tell "no value" apart from "field not implemented here"
- * at a glance.
+ * popover genuinely can't determine is `null` rather than omitted, so
+ * callers/other scripts can tell "no value" apart from "field not
+ * implemented here" at a glance.
  *
  * @param {string} itemName
  * @param {Element} content - the popover's ".popover-content" element
- * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean, effectId: null, effectName: null, crateNumber: string|null, isAmbiguousSeries: boolean}>}
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean, effectId: string|null, effectName: string|null, crateNumber: string|null, isAmbiguousSeries: boolean}>}
  */
 async function parseItemAttributes(itemName, content) {
   const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
@@ -180,6 +185,8 @@ async function parseItemAttributes(itemName, content) {
     : /\bSpecialized Killstreak\b/i.test(fullDisplayName) ? 2
     : /\bKillstreak\b/i.test(fullDisplayName) ? 1
     : null;
+  let itemParam = null;
+  let particleId = null;
   if (searchLink) {
     const params = new URL(searchLink.href).searchParams;
     const qualityId = Number(params.get("quality"));
@@ -189,6 +196,10 @@ async function parseItemAttributes(itemName, content) {
       const tier = Number(params.get("killstreak_tier"));
       ksTier = tier || null;
     }
+    if (params.has("particle")) {
+      particleId = Number(params.get("particle")) || null;
+    }
+    itemParam = params.get("item");
   }
 
   const australium = /\bAustralium\b/i.test(fullDisplayName);
@@ -211,43 +222,59 @@ async function parseItemAttributes(itemName, content) {
     }
   }
 
-  // Reduce down to the bare schema name — strip Non-Craftable/
-  // Festivized/killstreak/Australium text, then the quality word itself
-  // (only shown as text for non-Unique/non-Unusual qualities, matching
-  // Steam's own display convention). Unusual items keep the effect name
-  // baked in here — this popover doesn't expose one to strip separately.
-  let name = fullDisplayName
-    .replace(/^Non-Craftable\s+/i, "")
-    .replace(/Festivized\s+/i, "")
-    .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "")
-    .replace(/\bAustralium\s+/i, "");
-  if (quality !== "Unique" && quality !== "Unusual") {
-    for (const q of TF2_QUALITY_NAMES) {
-      if (name.startsWith(q + " ")) { name = name.slice((q + " ").length); break; }
+  // Bare schema name — the Classifieds link's own "item" param when
+  // available (see this function's own doc for why that's preferred).
+  // Currency items have no Classifieds link at all, so those still fall
+  // back to stripping Non-Craftable/Festivized/killstreak/Australium
+  // text, then the quality word itself (only shown as text for
+  // non-Unique/non-Unusual qualities, matching Steam's own display
+  // convention).
+  let name = itemParam;
+  if (!name) {
+    name = fullDisplayName
+      .replace(/^Non-Craftable\s+/i, "")
+      .replace(/Festivized\s+/i, "")
+      .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "")
+      .replace(/\bAustralium\s+/i, "");
+    if (quality !== "Unique" && quality !== "Unusual") {
+      for (const q of TF2_QUALITY_NAMES) {
+        if (name.startsWith(q + " ")) { name = name.slice((q + " ").length); break; }
+      }
     }
   }
 
-  return { name, quality, craftable, ksTier, australium, effectId: null, effectName: null, crateNumber, isAmbiguousSeries };
+  // effectId/effectName: reverse-looked-up from the Classifieds link's
+  // own "particle" param against the same bundled effect data every
+  // other itemLinks script uses — a name-only match isn't needed here
+  // since the numeric id is already known directly.
+  let effectId = null;
+  let effectName = null;
+  if (quality === "Unusual" && particleId != null) {
+    const effectData = await getEffectsData();
+    const match = effectData[particleId];
+    effectId = match?.id ?? String(particleId);
+    effectName = match?.name ?? null;
+  }
+
+  return { name, quality, craftable, ksTier, australium, effectId, effectName, crateNumber, isAmbiguousSeries };
 }
 
 /**
  * Builds every reference link for the item — mannco.store/stntrading.eu/
- * skinport.com/crate.tf (crates/cases only) — as one array, all resolved
- * together before anything renders.
+ * skinport.com/crate.tf (crates/cases only)/loadout.tf (Unusuals only) —
+ * as one array, all resolved together before anything renders.
  */
 async function buildLinks(itemName, content) {
   const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
   const attrs = await parseItemAttributes(itemName, content);
+  const isUnusual = attrs.quality === "Unusual";
   const ambiguousCrateNumber = attrs.isAmbiguousSeries ? attrs.crateNumber : undefined;
 
   // mannco.store/skinport.com both want the full descriptive name
   // (quality/killstreak/Festivized text baked in) — exactly what the
   // popover title already is, minus "Non-Craftable " (craftableAwareName),
   // which goes through `craftable` instead so this doesn't depend on
-  // that text being there. TODO: Unusual items need their effect name
-  // prepended (mannCoStoreUrl()'s `effectName` option) for a correct
-  // slug — this popover doesn't expose one yet, so for now Unusual
-  // items just link without it.
+  // that text being there.
   const craftableAwareName = fullDisplayName.replace(/^Non-Craftable\s+/i, "");
 
   // crate.tf needs a network fetch (defindex lookup) and only has pages
@@ -260,6 +287,18 @@ async function buildLinks(itemName, content) {
         .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; })
     : null;
 
+  // loadout.tf only ever applies to Unusuals with a resolved effect —
+  // resolved as its own step since it needs a defindex lookup, not
+  // just attrs like most of the array below.
+  let loadoutTfHref = null;
+  if (isUnusual && attrs.effectId) {
+    const defindex = await resolveDefindex(attrs.name).catch((err) => {
+      console.warn("[TF2Utils] loadout.tf defindex lookup failed:", err);
+      return null;
+    });
+    if (defindex != null) loadoutTfHref = loadoutTfUrl(defindex, attrs.effectId);
+  }
+
   // stntrading.eu keeps a crate's case/series number as part of the
   // name (unlike mannco.store/skinport.com, which only want it for
   // ambiguous multi-series names — see resolveCrateSeries()) and has no
@@ -271,10 +310,24 @@ async function buildLinks(itemName, content) {
     .replace(/(?:Professional Killstreak|Specialized Killstreak|Killstreak)\s+/i, "");
 
   const links = [
-    { label: "mannco.store", href: mannCoStoreUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: ambiguousCrateNumber }) },
+    {
+      label: "mannco.store",
+      // Steam's own item name never includes the effect (it's a
+      // separate field, see parseItemAttributes()'s own doc) but
+      // mannco.store's slug wants it prepended — same convention
+      // stntrading.eu/itemLinks uses for this same exception. Only
+      // switched in once an effect name's actually known, so this
+      // never goes from "a link" to "no link" — an Unusual with no
+      // resolved effect name still falls back to the same link this
+      // always built before.
+      href: isUnusual && attrs.effectName
+        ? mannCoStoreUrl(`Unusual ${attrs.name}`, undefined, { effectName: attrs.effectName })
+        : mannCoStoreUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: ambiguousCrateNumber }),
+    },
     { label: "stntrading.eu", href: stnTradingUrl(stnName, undefined, { craftable: attrs.craftable, isAmbiguousSeries: attrs.isAmbiguousSeries }) },
     { label: "skinport.com", href: skinportUrl(craftableAwareName, attrs.quality, { craftable: attrs.craftable, crateNumber: ambiguousCrateNumber }) },
     { label: "crate.tf", href: crateTfHref },
+    { label: "loadout.tf", href: loadoutTfHref },
   ].filter((link) => link.href);
 
   // scrap.tf/quicksell.store/cobra.tf all have no per-item page — each

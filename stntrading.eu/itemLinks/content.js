@@ -9,11 +9,13 @@ import {
   steamMarketUrl,
   skinportUrl,
   crateTfUrl,
+  loadoutTfUrl,
   wikiUrl,
 } from "../../utils/itemLinks.js";
 import {
   getKnownCrateNumber,
   resolveCrateSeries,
+  resolveDefindex,
   CRATE_NUMBER_RE,
   IS_CRATE_CASE_RE,
 } from "../../utils/tf2ItemSchema.js";
@@ -36,6 +38,7 @@ const LINK_ACCENTS = {
   "gladiator.tf": SITE_BRAND_COLORS.gladiatorTf,
   "pricedb.io": SITE_BRAND_COLORS.pricedb,
   "liquid.tf": SITE_BRAND_COLORS.liquidTf,
+  "loadout.tf": SITE_BRAND_COLORS.loadoutTf,
   "Steam Market": SITE_BRAND_COLORS.steam,
   "Wiki": SITE_BRAND_COLORS.wiki,
 };
@@ -78,8 +81,8 @@ export async function addItemLinks() {
 /**
  * Builds every reference link for the item — backpack.tf/mannco.store/
  * skinport.com/marketplace.tf/crate.tf/merchant.tf/gladiator.tf/
- * pricedb.io/liquid.tf/Steam Market/Wiki — as one array, all resolved
- * together before anything renders. Every destination link is built
+ * pricedb.io/liquid.tf/loadout.tf/Steam Market/Wiki — as one array, all
+ * resolved together before anything renders. Every destination link is built
  * directly from utils/itemLinks.js's own builders right here — this
  * file only ever does its own name parsing (parseShallow()/
  * parseItemAttributes()/findUnusualEffect()), never a local wrapper
@@ -101,10 +104,9 @@ async function buildLinks(itemName) {
   // article never had (confirmed: the article for "Mann Co. Supply
   // Crate" covers every series under one shared page). Deliberately kept
   // separate from parseItemAttributes() below rather than derived from
-  // it — parseItemAttributes() returns null outright when an Unusual's
-  // effect can't be matched (see its own doc), and merchant.tf/
-  // gladiator.tf/Wiki must keep working even then, unlike the
-  // itemAttrs-gated destinations below.
+  // it — merchant.tf/gladiator.tf/Wiki want killstreak/Australium/
+  // "Festive " left as literal text, unlike the deeper parse below,
+  // which pulls those out as their own fields instead.
   const crateMatch = itemName.match(CRATE_NUMBER_RE);
   const nameWithoutSeries = crateMatch ? itemName.slice(0, crateMatch.index) : itemName;
   const shallow = parseShallow(nameWithoutSeries);
@@ -141,6 +143,14 @@ async function buildLinks(itemName) {
     : { crateNumber: null, isAmbiguous: false };
   const ambiguousCrateNumber = isAmbiguous ? seriesNumber : undefined;
 
+  // loadout.tf only ever applies to Unusuals with a matched effect
+  // (same gate as bp.tf stats/mannco.store's own Unusual branches
+  // above) — resolved as its own step since it needs a defindex
+  // lookup, not just itemAttrs like most of the array below.
+  const loadoutTfHref = (isUnusual && effect && itemAttrs)
+    ? await resolveDefindex(itemAttrs.name).then((defindex) => (defindex != null ? loadoutTfUrl(defindex, effect.id) : null))
+    : null;
+
   const links = [
     {
       label: "bp.tf stats",
@@ -167,6 +177,7 @@ async function buildLinks(itemName) {
                   }))
             : null),
     },
+    { label: "loadout.tf", href: loadoutTfHref },
     {
       label: "mannco.store",
       href: isUnusual
@@ -321,12 +332,16 @@ function stripUnusualEffectName(itemNameRaw, effectName) {
  * (132).
  *
  * Every field is always present on the returned object — one a given
- * name genuinely can't determine (e.g. an Unusual's crate number) is
- * `null` rather than omitted, so callers/other scripts can tell "no
- * value" apart from "field not implemented here" at a glance.
+ * name genuinely can't determine (e.g. an Unusual's crate number, or
+ * effectId/effectName when findUnusualEffect() below can't match one)
+ * is `null` rather than omitted, so callers/other scripts can tell "no
+ * value" apart from "field not implemented here" at a glance. Always
+ * resolves to a real object — never null — even for an Unusual whose
+ * effect can't be matched, so callers don't lose every other link over
+ * that one field.
  *
  * @param {string} itemNameRaw - e.g., "Vintage The Max's Severed Head"
- * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean|null, effectId: string|null, effectName: string|null, crateNumber: string|null, isAmbiguousSeries: boolean|null}|null>}
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean|null, effectId: string|null, effectName: string|null, crateNumber: string|null, isAmbiguousSeries: boolean|null}>}
  */
 async function parseItemAttributes(itemNameRaw) {
   // Crate series/case number always trails at the very end, after
@@ -362,15 +377,24 @@ async function parseItemAttributes(itemNameRaw) {
 
   if (matchedQuality === "Unusual") {
     const effect = await findUnusualEffect(itemNameRaw);
-    if (!effect) return null;
-    const baseName = stripUnusualEffectName(name, effect.name);
+    // Without a matched effect, the effect text can't be reliably
+    // stripped out of `name` (there's no way to tell which substring it
+    // is) — left as the best-effort remainder rather than returning
+    // null outright for the whole item. That early return used to take
+    // every itemAttrs-gated link down with it (marketplace.tf/
+    // pricedb.io/liquid.tf/crate.tf/loadout.tf) just because the effect
+    // alone wasn't found — a schema lookup against this less-clean name
+    // quietly resolves to no link on its own if it doesn't match
+    // anything, the same way any other unresolvable name already does,
+    // so there's no need to suppress the whole item over it.
+    const baseName = effect ? stripUnusualEffectName(name, effect.name) : name;
     // ksTier/australium/crateNumber/isAmbiguousSeries: stntrading.eu
     // Unusuals are cosmetics/hats, which never carry a killstreak tier,
     // Australium, or crate number — null rather than detected false/0,
     // since this branch never even checks for them.
     return {
       name: baseName, quality: "Unusual", craftable: !isNonCraftable,
-      ksTier: null, australium: null, effectId: effect.id, effectName: effect.name,
+      ksTier: null, australium: null, effectId: effect?.id ?? null, effectName: effect?.name ?? null,
       crateNumber: null, isAmbiguousSeries: null,
     };
   }

@@ -748,6 +748,34 @@ export async function crateTfUrl(name, quality, options = {}) {
 }
 
 /**
+ * loadout.tf character preview — renders an Unusual effect applied to
+ * one cosmetic item on a TF2 class model, for actually seeing what an
+ * effect looks like rather than just reading its name.
+ *
+ * The URL's JSON payload uses loadout.tf's own partial encoding, not
+ * plain `encodeURIComponent` — only "{", "}" and '"' are
+ * percent-encoded, everything else (":", ",", "[", "]") stays literal.
+ * Confirmed against a real loadout.tf URL: defindex 1158, effect 413,
+ * npc "spy" ->
+ * https://loadout.tf/@jsonloadout/%7B%22name%22:%22tf2tu%22,%22characters%22:[%7B%22npc%22:%22spy%22,%22items%22:[%7B%22id%22:%221158%22%7D],%22effects%22:[%7B%22id%22:413%7D]%7D]%7D
+ * — the item id is sent as a string, the effect id as a number
+ * (confirmed distinct in that same example).
+ *
+ * @param {string|number} itemDefindex - the item's schema defindex (not its name — the caller resolves that first, e.g. via resolveDefindex())
+ * @param {string|number} effectId - the Unusual effect's numeric id
+ * @param {string} [npc="spy"] - which TF2 class to render the item on. No bundled item->class data exists to pick this correctly per item, so every caller currently just accepts the default rather than guessing — a class-locked cosmetic may render wrong until that data exists.
+ * @returns {string}
+ */
+export function loadoutTfUrl(itemDefindex, effectId, npc = "spy") {
+  const payload = {
+    name: "tf2tu",
+    characters: [{ npc, items: [{ id: String(itemDefindex) }], effects: [{ id: Number(effectId) }] }],
+  };
+  const encoded = JSON.stringify(payload).replace(/[{}"]/g, (ch) => ({ "{": "%7B", "}": "%7D", "\"": "%22" }[ch]));
+  return `https://loadout.tf/@jsonloadout/${encoded}`;
+}
+
+/**
  * backpack.tf Classifieds "sell" listing draft for one specific item —
  * unlike every other builder here, this isn't derivable from the
  * item's name/quality/etc. at all, just its Steam asset id, so it's

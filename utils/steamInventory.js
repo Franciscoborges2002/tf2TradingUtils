@@ -135,3 +135,48 @@ export function getOrCreateTitleRow(title) {
   row.appendChild(title);
   return row;
 }
+
+/**
+ * Finds the item's description block within its info panel (case
+ * contents, Unusual effects list, set bonuses, etc.) — the one section
+ * made up entirely of lines carrying Steam's own `--white-space:
+ * pre-line` inline custom property. Steam's own class names on this
+ * page are hashed CSS-module output (e.g. "_3JCkAyd9cnB90tRcDLPp4W",
+ * "FYJ4NYxpWeIha0N1-jUcm") that can change on any Steam frontend
+ * redeploy, so the block is matched structurally via that property
+ * instead — confirmed set individually per description line, not
+ * inherited from a shared class. Returns null for items with no
+ * description at all (most plain weapons/currency).
+ * @param {Element} root - the item's info panel (see pickContainer())
+ */
+export function findDescriptionContainer(root) {
+  const lines = [...root.querySelectorAll("div")].filter(
+    (el) => el.style.getPropertyValue("--white-space") === "pre-line"
+  );
+  if (!lines.length) return null;
+
+  const parent = lines[0].parentElement;
+  // Every line should share one parent — Steam renders them as a flat
+  // list of siblings. If they don't, this heuristic matched something
+  // unrelated, so bail rather than act on the wrong element.
+  if (!parent || !lines.every((el) => el.parentElement === parent)) return null;
+
+  return parent;
+}
+
+/**
+ * The item's Unusual effect name, read from its description panel's
+ * "★ Unusual Effect: <name>" line (confirmed real text/color — gold,
+ * rgb(255, 215, 0) — on a live Steam inventory page). Null for
+ * non-Unusual items, or any item with no description block at all.
+ * @param {Element} root - the item's info panel (see pickContainer())
+ */
+export function getUnusualEffectName(root) {
+  const descBlock = findDescriptionContainer(root);
+  if (!descBlock) return null;
+
+  const line = [...descBlock.children].find((el) => /Unusual Effect:/i.test(el.textContent));
+  if (!line) return null;
+
+  return line.textContent.replace(/^.*Unusual Effect:\s*/i, "").trim() || null;
+}

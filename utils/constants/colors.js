@@ -50,6 +50,7 @@ export const SITE_BRAND_COLORS = {
   gladiatorTf:   "#E8A33D", // amber/gold helmet-crest accent from their logo mark
   quicksell:     "#FFFFFF", // their logo is monochrome white eagle-head mark on black
   cobraTf:       "#8BC79A", // sage green from their site's own headline/button accent (no separate logo mark given)
+  loadoutTf:     "#E67E22", // no logo given yet — placeholder orange accent
 };
 
 // backpack.tf's own colors for each killstreak tier (see addKSButtons)

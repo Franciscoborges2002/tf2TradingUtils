@@ -8,6 +8,7 @@ import {
   getMarketListingName,
   getRenamedOriginalName,
   getOrCreateTitleRow,
+  getUnusualEffectName,
 } from "../../utils/steamInventory.js";
 import {
   steamMarketUrl,
@@ -17,11 +18,13 @@ import {
   marketplaceTfUrl,
   skinportUrl,
   crateTfUrl,
+  loadoutTfUrl,
   backpackSellUrl,
   backpackHistoryUrl,
 } from "../../utils/itemLinks.js";
-import { getKnownCrateNumber, isAmbiguousCrateName, resolveCrateSeries, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
+import { getKnownCrateNumber, isAmbiguousCrateName, resolveCrateSeries, resolveDefindex, CRATE_NUMBER_RE, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
 import { ksPrefixFor } from "../../utils/tf2ItemName.js";
+import { getUnusualEffectId } from "../../utils/unusualEffects.js";
 import { getSettings } from "../../utils/settings.js";
 import { STEAMCOMMUNITY_CANT_GENERATE_ITEMLINKS } from "../../utils/constants/messages.js";
 
@@ -33,6 +36,7 @@ const LINK_ACCENTS = {
   "crate.tf": SITE_BRAND_COLORS.crateTf,
   "bp.tf stats": SITE_BRAND_COLORS.backpackTf,
   "bp.tf history": SITE_BRAND_COLORS.backpackTf,
+  "loadout.tf": SITE_BRAND_COLORS.loadoutTf,
   "stntrading.eu": SITE_BRAND_COLORS.stnTrading,
 };
 
@@ -100,25 +104,26 @@ function getAssetId(container) {
 /**
  * Parses the item's full display name down to the bare schema name,
  * plus the attributes the query-param-based links (next Bp Stats,
- * marketplace.tf, crate.tf) need. Unlike backpack.tf's hover popover,
- * Steam's own name literally includes Non-Craftable/Festivized/
- * killstreak-tier/quality/Australium/crate-number text — so, similar to
- * stntrading.eu/itemLinks, it's all parsed straight out of the name, in
- * the order Steam shows them.
+ * marketplace.tf, crate.tf, loadout.tf) need. Unlike backpack.tf's
+ * hover popover, Steam's own name literally includes Non-Craftable/
+ * Festivized/killstreak-tier/quality/Australium/crate-number text — so,
+ * similar to stntrading.eu/itemLinks, it's all parsed straight out of
+ * the name, in the order Steam shows them.
  *
  * Every field is always present on the returned object — one this page
- * genuinely can't determine (there's no Unusual effect name exposed
- * here at all) is `null` rather than omitted, so callers/other scripts
- * can tell "no value" apart from "field not implemented here" at a
- * glance. `festivized` is an extra field beyond the shared shape:
- * marketplace.tf's sku needs it as its own modifier (buildTf2Sku() in
- * utils/itemLinks.js), unlike every other destination this file builds.
+ * genuinely can't determine is `null` rather than omitted, so callers/
+ * other scripts can tell "no value" apart from "field not implemented
+ * here" at a glance. `festivized` is an extra field beyond the shared
+ * shape: marketplace.tf's sku needs it as its own modifier
+ * (buildTf2Sku() in utils/itemLinks.js), unlike every other destination
+ * this file builds.
  *
  * @param {string} itemName
  * @param {string|null} qualityFromTags - from getQualityFromTags(); "Unique" assumed if not found
- * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean, effectId: null, effectName: null, crateNumber: string|null, isAmbiguousSeries: boolean, festivized: boolean}>}
+ * @param {Element} container - the item's info panel, for reading the Unusual effect out of its description block (see getUnusualEffectName())
+ * @returns {Promise<{name: string, quality: string, craftable: boolean, ksTier: number|null, australium: boolean, effectId: string|null, effectName: string|null, crateNumber: string|null, isAmbiguousSeries: boolean, festivized: boolean}>}
  */
-async function parseItemAttributes(itemName, qualityFromTags) {
+async function parseItemAttributes(itemName, qualityFromTags, container) {
   const fullDisplayName = itemName.replace(CRATE_NUMBER_RE, "");
   let name = fullDisplayName.trim();
 
@@ -141,7 +146,16 @@ async function parseItemAttributes(itemName, qualityFromTags) {
   }
 
   const quality = qualityFromTags || "Unique";
-  if (qualityFromTags && qualityFromTags !== "Unique" && qualityFromTags !== "Unusual" && name.startsWith(`${quality} `)) {
+  // Unusual is stripped the same generic way as any other quality word
+  // here — Steam's own name for one really does lead with "Unusual "
+  // as plain text (confirmed: "Unusual Professional's Ushanka"), with
+  // no effect name baked in alongside it (that's a separate line in the
+  // description panel — see getUnusualEffectName()). Leaving it in
+  // `name` used to mean it could never match the schema's own bare
+  // item_name ("Professional's Ushanka", not "Unusual Professional's
+  // Ushanka"), silently breaking marketplace.tf/pricedb.io/liquid.tf/
+  // crate.tf/loadout.tf's defindex lookups for every Unusual item.
+  if (qualityFromTags && qualityFromTags !== "Unique" && name.startsWith(`${quality} `)) {
     name = name.slice((quality + " ").length);
   }
 
@@ -169,7 +183,17 @@ async function parseItemAttributes(itemName, qualityFromTags) {
     }
   }
 
-  return { name, quality, craftable: !isNonCraftable, ksTier, australium, effectId: null, effectName: null, crateNumber, isAmbiguousSeries, festivized };
+  // The effect name comes from the description panel's own "★ Unusual
+  // Effect: X" line (confirmed live), not from `name` — Steam's item
+  // name never includes it, unlike stntrading.eu's page.
+  let effectName = null;
+  let effectId = null;
+  if (quality === "Unusual") {
+    effectName = getUnusualEffectName(container);
+    effectId = effectName ? await getUnusualEffectId(effectName) : null;
+  }
+
+  return { name, quality, craftable: !isNonCraftable, ksTier, australium, effectId, effectName, crateNumber, isAmbiguousSeries, festivized };
 }
 
 export function addItemLinks() {
@@ -287,7 +311,7 @@ export function addItemLinks() {
   // link (Market included) is resolved together in buildLinks() before
   // anything renders, instead of the Market link appearing immediately
   // and the rest trickling in individually as each async lookup finishes.
-  buildLinks(itemName, fullDisplayName, qualityFromTags, assetId)
+  buildLinks(itemName, fullDisplayName, qualityFromTags, assetId, container)
     .then((links) => {
       // Skipped if the user's clicked a different item (or this one's
       // panel got re-rendered) by the time everything above resolves.
@@ -314,20 +338,32 @@ export function addItemLinks() {
 /**
  * Builds every reference link for the item — Market alongside
  * mannco.store/skinport.com/stntrading.eu/bp.tf stats/history/
- * marketplace.tf/crate.tf, which each need something async first (a
- * settings read, a network fetch — defindex lookup — or
+ * loadout.tf/marketplace.tf/crate.tf, which each need something async
+ * first (a settings read, a network fetch — defindex lookup — or
  * parseItemAttributes()'s own crate-series check) — as one array, all
  * resolved together.
  */
-async function buildLinks(itemName, fullDisplayName, qualityFromTags, assetId) {
+async function buildLinks(itemName, fullDisplayName, qualityFromTags, assetId, container) {
   const settings = await getSettings();
   const useNextBpTf = settings.bpTfVersion === "next";
-  const attrs = await parseItemAttributes(itemName, qualityFromTags);
+  const attrs = await parseItemAttributes(itemName, qualityFromTags, container);
 
   // mannco.store/skinport.com only want that series number for the
   // ambiguous case (a name shared by several different series) — see
   // mannCoStoreUrl()/skinportUrl()'s own docs.
   const ambiguousCrateNumber = attrs.isAmbiguousSeries ? attrs.crateNumber : undefined;
+
+  // loadout.tf only ever applies to Unusuals with a resolved effect —
+  // resolved as its own step since it needs a defindex lookup, not
+  // just attrs like most of the array below.
+  let loadoutTfHref = null;
+  if (attrs.quality === "Unusual" && attrs.effectId) {
+    const defindex = await resolveDefindex(attrs.name).catch((err) => {
+      console.warn("[TF2Utils] loadout.tf defindex lookup failed:", err);
+      return null;
+    });
+    if (defindex != null) loadoutTfHref = loadoutTfUrl(defindex, attrs.effectId);
+  }
 
   const links = [
     { label: "Market", href: steamMarketUrl(itemName) },
@@ -354,6 +390,7 @@ async function buildLinks(itemName, fullDisplayName, qualityFromTags, assetId) {
       label: "bp.tf history",
       href: assetId ? backpackHistoryUrl(assetId, { next: useNextBpTf }) : null,
     },
+    { label: "loadout.tf", href: loadoutTfHref },
     {
       label: "marketplace.tf",
       href: await marketplaceTfUrl(attrs.name, attrs.quality, {
