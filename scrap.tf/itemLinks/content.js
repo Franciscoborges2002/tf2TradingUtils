@@ -17,10 +17,10 @@ https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/scrap.tf/scrapH
 import { COLOR_PANEL_BG, SITE_BRAND_COLORS } from "../../utils/constants/colors.js";
 import { ITEM_NAME_QUIRKS } from "../../utils/constants/itemNameQuirks.js";
 import { TF2_KS_SHEEN_IDS, TF2_KS_KILLSTREAKER_IDS } from "../../utils/constants/tf2Economy.js";
-import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, wikiUrl } from "../../utils/itemLinks.js";
-import { getKnownCrateNumber, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
+import { steamMarketUrl, backpackStatsUrl, backpackClassifiedsUrl, mannCoStoreUrl, marketplaceTfUrl, merchantTfUrl, gladiatorTfUrl, pricedbUrl, liquidTfUrl, skinportUrl, crateTfUrl, loadoutTfUrl, wikiUrl } from "../../utils/itemLinks.js";
+import { getKnownCrateNumber, resolveDefindex, IS_CRATE_CASE_RE } from "../../utils/tf2ItemSchema.js";
 import { ksPrefixFor } from "../../utils/tf2ItemName.js";
-import { getEffectsData } from "../../utils/unusualEffects.js";
+import { getUnusualEffectId } from "../../utils/unusualEffects.js";
 import { getSettings } from "../../utils/settings.js";
 import { loadIconSvg } from "../../utils/icons.js";
 
@@ -49,6 +49,7 @@ const LINK_ACCENTS = {
   "gladiator.tf": SITE_BRAND_COLORS.gladiatorTf,
   "pricedb.io": SITE_BRAND_COLORS.pricedb,
   "liquid.tf": SITE_BRAND_COLORS.liquidTf,
+  "loadout.tf": SITE_BRAND_COLORS.loadoutTf,
   "Steam Market": SITE_BRAND_COLORS.steam,
   "Wiki": SITE_BRAND_COLORS.wiki,
 };
@@ -384,27 +385,12 @@ async function parseItemAttributes(itemName, itemEl) {
   };
 }
 
-/**
- * Reverse-looks-up an Unusual effect's numeric id from its exact name,
- * against the same bundled effect data stntrading.eu/itemLinks's
- * findUnusualEffect() uses (utils/unusualEffects.js) — an exact match is
- * enough here since parseItemAttributes() already has the precise
- * effect name off the tooltip's own "Effect: X" line, unlike
- * stntrading.eu's own substring-scan (it has no such line to read).
- * @param {string} effectName
- * @returns {Promise<string|null>}
- */
-async function getUnusualEffectId(effectName) {
-  const effectData = await getEffectsData();
-  const match = Object.values(effectData).find((e) => e.name.toLowerCase() === effectName.toLowerCase());
-  return match?.id ?? null;
-}
 
 /**
- * Builds every reference link for the item — Bp Stats/Specific Bp
- * Classifieds/mannco.store/skinport.com/marketplace.tf/crate.tf/
- * merchant.tf/gladiator.tf/pricedb.io/liquid.tf/Steam Market/Wiki — as
- * one array, all resolved together before anything renders.
+ * Builds every reference link for the item — Bp Stats/loadout.tf/
+ * Specific Bp Classifieds/mannco.store/skinport.com/marketplace.tf/
+ * crate.tf/merchant.tf/gladiator.tf/pricedb.io/liquid.tf/Steam Market/
+ * Wiki — as one array, all resolved together before anything renders.
  * @param {string} itemName - the hover tooltip's own title text
  * @param {Element} itemEl - the hovered/clicked item element
  */
@@ -477,6 +463,18 @@ async function buildLinks(itemName, itemEl) {
       .catch((err) => { console.warn("[TF2Utils] crate.tf link failed:", err); return null; });
   }
 
+  // loadout.tf only ever applies to Unusuals with a resolved effect —
+  // resolved as its own step since it needs a defindex lookup, not
+  // just attrs like most of the array below.
+  let loadoutTfHref = null;
+  if (attrs.quality === "Unusual" && attrs.effectId) {
+    const defindex = await resolveDefindex(attrs.name).catch((err) => {
+      console.warn("[TF2Utils] loadout.tf defindex lookup failed:", err);
+      return null;
+    });
+    if (defindex != null) loadoutTfHref = loadoutTfUrl(defindex, attrs.effectId);
+  }
+
   const links = [
     // Single "Bp Stats" button, following the popup's "Default bp.tf
     // version" setting — classic and next.backpack.tf need genuinely
@@ -485,6 +483,7 @@ async function buildLinks(itemName, itemEl) {
     { label: "Bp Stats", href: settings.bpTfVersion === "next"
         ? backpackStatsUrl(attrs.name, attrs.quality, { craftable: attrs.craftable, ksTier: attrs.ksTier, australium: attrs.australium, next: true })
         : backpackStatsUrl(fullDisplayName, attrs.quality, { craftable: attrs.craftable }) },
+    { label: "loadout.tf", href: loadoutTfHref },
     // The one destination here with sheen/killstreaker search filters,
     // so it's the only place those are worth resolving to their numeric
     // ids at all.

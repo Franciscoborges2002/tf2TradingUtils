@@ -15,12 +15,10 @@
  * Steam's own class names on this page are hashed CSS-module output
  * (e.g. "_3JCkAyd9cnB90tRcDLPp4W", "FYJ4NYxpWeIha0N1-jUcm") that can
  * change on any Steam frontend redeploy, so the description block isn't
- * found by matching one of those directly. Every description line does
- * carry a stable inline custom property instead — `--white-space:
- * pre-line` — set individually per line (not inherited from a shared
- * class), so the block is identified structurally: collect every div
- * with that property, then take their shared parent — the one panel
- * section made up entirely of description lines and nothing else.
+ * found by matching one of those directly — see
+ * utils/steamInventory.js's findDescriptionContainer() for how it's
+ * matched structurally instead (also used by itemLinks to read the
+ * "★ Unusual Effect: X" line out of this same block).
  *
  * Link:
  * https://github.com/Franciscoborges2002/tf2TradingUtils/tree/main/steamcommunity.com/itemDescriptionToggle
@@ -28,6 +26,7 @@
 
 import { COLOR_ACCENT } from "../../utils/constants/colors.js";
 import { getSettings } from "../../utils/settings.js";
+import { findDescriptionContainer } from "../../utils/steamInventory.js";
 
 const STYLES_ID = "tf2utils-item-desc-toggle-styles";
 const TOGGLE_BTN_CLASS = "tf2utils-desc-toggle-btn";
@@ -40,28 +39,6 @@ function pickContainer() {
   if (c0?.querySelector("h1")) return c0;
   if (c1?.querySelector("h1")) return c1;
   return null;
-}
-
-/**
- * Finds the item's description block within its info panel — the one
- * section made up entirely of lines carrying Steam's own
- * `--white-space: pre-line` inline custom property (see file header
- * for why that, not a class name, is what's matched). Returns null for
- * items with no description at all (most plain weapons/currency).
- */
-function findDescriptionContainer(root) {
-  const lines = [...root.querySelectorAll("div")].filter(
-    (el) => el.style.getPropertyValue("--white-space") === "pre-line"
-  );
-  if (!lines.length) return null;
-
-  const parent = lines[0].parentElement;
-  // Every line should share one parent — Steam renders them as a flat
-  // list of siblings. If they don't, this heuristic matched something
-  // unrelated, so bail rather than toggle the wrong element.
-  if (!parent || !lines.every((el) => el.parentElement === parent)) return null;
-
-  return parent;
 }
 
 async function getShowByDefault() {
